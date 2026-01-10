@@ -13,12 +13,14 @@
         <div class="flex flex-wrap gap-2">
             {% if youtube_configured %}
                 <form action="{{ url_for('videos.sync_videos') }}" method="post" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium shadow-sm">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
                         Sync from YouTube
                     </button>
                 </form>
                 <form action="{{ url_for('videos.refresh_stats') }}" method="post" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="inline-flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-surface-100 text-sm font-medium border border-surface-200 shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Refresh Stats
@@ -194,6 +196,7 @@
                             <div class="flex justify-between items-center pt-3 border-t border-surface-200">
                                 <a href="{{ url_for('videos.edit_video', id=video.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit Metadata</a>
                                 <form action="{{ url_for('videos.delete_video', id=video.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this video?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
                                 </form>
                             </div>

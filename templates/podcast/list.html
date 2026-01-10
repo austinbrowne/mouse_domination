@@ -129,6 +129,7 @@
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="{{ url_for('podcast.edit_episode', id=episode.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
                                         <form action="{{ url_for('podcast.delete_episode', id=episode.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this episode?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
                                         </form>
                                     </div>

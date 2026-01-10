@@ -1,10 +1,18 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from models import Video, Company, Inventory
 from app import db
 from services.youtube import YouTubeService
 from datetime import datetime
+from utils.validation import (
+    parse_date, parse_float, parse_int, validate_required, validate_foreign_key,
+    or_none, ValidationError
+)
 
 videos_bp = Blueprint('videos', __name__)
+
+VIDEO_TYPE_CHOICES = ['review', 'comparison', 'guide', 'tierlist', 'other']
 
 
 @videos_bp.route('/')
@@ -12,19 +20,19 @@ def list_videos():
     """List all videos with optional filtering."""
     video_type = request.args.get('type')
     sponsored = request.args.get('sponsored')
-    search = request.args.get('search', '')
+    search = request.args.get('search', '').strip()
     show = request.args.get('show', 'all')  # all, videos, shorts, podcasts
 
-    query = Video.query
+    query = Video.query.options(joinedload(Video.company))
 
-    if video_type:
+    if video_type and video_type in VIDEO_TYPE_CHOICES:
         query = query.filter_by(video_type=video_type)
     if sponsored == 'yes':
         query = query.filter_by(sponsored=True)
     elif sponsored == 'no':
         query = query.filter_by(sponsored=False)
     if search:
-        query = query.filter(Video.title.ilike(f'%{search}%'))
+        query = query.filter(Video.title.ilike('%' + search + '%'))
     if show == 'shorts':
         query = query.filter_by(is_short=True)
     elif show == 'podcasts':
@@ -34,10 +42,12 @@ def list_videos():
 
     videos = query.order_by(Video.publish_date.desc()).all()
 
-    # Stats
-    total_views = sum(v.views or 0 for v in videos)
-    sponsored_count = sum(1 for v in videos if v.sponsored)
-    total_sponsor_revenue = sum(v.sponsor_amount or 0 for v in videos if v.sponsored)
+    # Stats using database aggregation for efficiency
+    stats = db.session.query(
+        func.coalesce(func.sum(Video.views), 0).label('total_views'),
+        func.sum(func.cast(Video.sponsored == True, db.Integer)).label('sponsored_count'),
+        func.coalesce(func.sum(func.cast(Video.sponsored == True, db.Integer) * func.coalesce(Video.sponsor_amount, 0)), 0).label('sponsor_revenue')
+    ).first()
 
     # Check if YouTube is configured
     yt_service = YouTubeService()
@@ -49,9 +59,9 @@ def list_videos():
         current_sponsored=sponsored,
         current_show=show,
         search=search,
-        total_views=total_views,
-        sponsored_count=sponsored_count,
-        total_sponsor_revenue=total_sponsor_revenue,
+        total_views=stats.total_views or 0,
+        sponsored_count=stats.sponsored_count or 0,
+        total_sponsor_revenue=stats.sponsor_revenue or 0,
         youtube_configured=youtube_configured,
     )
 
@@ -154,34 +164,47 @@ def edit_video(id):
     video = Video.query.get_or_404(id)
 
     if request.method == 'POST':
-        # For non-synced videos, allow editing title/url/etc
-        if not video.youtube_id:
-            video.title = request.form['title']
-            video.url = request.form.get('url') or None
-            video.views = int(request.form['views']) if request.form.get('views') else None
-            if request.form.get('publish_date'):
-                video.publish_date = datetime.strptime(request.form['publish_date'], '%Y-%m-%d').date()
-            video.is_short = request.form.get('is_short') == 'yes'
+        try:
+            # For non-synced videos, allow editing title/url/etc
+            if not video.youtube_id:
+                video.title = validate_required(request.form.get('title', ''), 'Title')
+                video.url = or_none(request.form.get('url', ''))
+                video.views = parse_int(request.form.get('views', ''), 'Views', allow_negative=False)
+                video.publish_date = parse_date(request.form.get('publish_date', ''), 'Publish Date')
+                video.is_short = request.form.get('is_short') == 'yes'
 
-        video.video_type = request.form.get('video_type', 'review')
-        video.company_id = request.form.get('company_id') or None
-        video.sponsored = request.form.get('sponsored') == 'yes'
-        video.sponsor_amount = float(request.form['sponsor_amount']) if request.form.get('sponsor_amount') else None
-        video.affiliate_links = request.form.get('affiliate_links') == 'yes'
-        video.notes = request.form.get('notes') or None
-        video.is_podcast = request.form.get('is_podcast') == 'yes'
+            # Validate video type
+            video_type = request.form.get('video_type', 'review')
+            if video_type not in VIDEO_TYPE_CHOICES:
+                video_type = 'review'
+            video.video_type = video_type
 
-        # Update linked products
-        product_ids = request.form.getlist('product_ids')
-        if product_ids:
-            products = Inventory.query.filter(Inventory.id.in_(product_ids)).all()
-            video.products = products
-        else:
-            video.products = []
+            # Validate foreign key
+            video.company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
 
-        db.session.commit()
-        flash(f'Video "{video.title}" updated.', 'success')
-        return redirect(url_for('videos.list_videos'))
+            video.sponsored = request.form.get('sponsored') == 'yes'
+            video.sponsor_amount = parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False)
+            video.affiliate_links = request.form.get('affiliate_links') == 'yes'
+            video.notes = or_none(request.form.get('notes', ''))
+            video.is_podcast = request.form.get('is_podcast') == 'yes'
+
+            # Update linked products
+            product_ids = request.form.getlist('product_ids')
+            if product_ids:
+                products = Inventory.query.filter(Inventory.id.in_(product_ids)).all()
+                video.products = products
+            else:
+                video.products = []
+
+            db.session.commit()
+            flash(f'Video "{video.title}" updated.', 'success')
+            return redirect(url_for('videos.list_videos'))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            products = Inventory.query.order_by(Inventory.product_name).all()
+            return render_template('videos/form.html', video=video, companies=companies, products=products)
 
     companies = Company.query.order_by(Company.name).all()
     products = Inventory.query.order_by(Inventory.product_name).all()
@@ -204,33 +227,48 @@ def delete_video(id):
 def new_video():
     """Manually create a video (fallback when API not configured)."""
     if request.method == 'POST':
-        video = Video(
-            title=request.form['title'],
-            url=request.form.get('url') or None,
-            video_type=request.form.get('video_type', 'review'),
-            company_id=request.form.get('company_id') or None,
-            sponsored=request.form.get('sponsored') == 'yes',
-            sponsor_amount=float(request.form['sponsor_amount']) if request.form.get('sponsor_amount') else None,
-            affiliate_links=request.form.get('affiliate_links') == 'yes',
-            views=int(request.form['views']) if request.form.get('views') else None,
-            notes=request.form.get('notes') or None,
-            is_podcast=request.form.get('is_podcast') == 'yes',
-            is_short=request.form.get('is_short') == 'yes',
-        )
+        try:
+            title = validate_required(request.form.get('title', ''), 'Title')
 
-        if request.form.get('publish_date'):
-            video.publish_date = datetime.strptime(request.form['publish_date'], '%Y-%m-%d').date()
+            # Validate video type
+            video_type = request.form.get('video_type', 'review')
+            if video_type not in VIDEO_TYPE_CHOICES:
+                video_type = 'review'
 
-        # Link products
-        product_ids = request.form.getlist('product_ids')
-        if product_ids:
-            products = Inventory.query.filter(Inventory.id.in_(product_ids)).all()
-            video.products = products
+            # Validate foreign key
+            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
 
-        db.session.add(video)
-        db.session.commit()
-        flash(f'Video "{video.title}" created.', 'success')
-        return redirect(url_for('videos.list_videos'))
+            video = Video(
+                title=title,
+                url=or_none(request.form.get('url', '')),
+                video_type=video_type,
+                company_id=company_id,
+                sponsored=request.form.get('sponsored') == 'yes',
+                sponsor_amount=parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False),
+                affiliate_links=request.form.get('affiliate_links') == 'yes',
+                views=parse_int(request.form.get('views', ''), 'Views', allow_negative=False),
+                notes=or_none(request.form.get('notes', '')),
+                is_podcast=request.form.get('is_podcast') == 'yes',
+                is_short=request.form.get('is_short') == 'yes',
+                publish_date=parse_date(request.form.get('publish_date', ''), 'Publish Date'),
+            )
+
+            # Link products
+            product_ids = request.form.getlist('product_ids')
+            if product_ids:
+                products = Inventory.query.filter(Inventory.id.in_(product_ids)).all()
+                video.products = products
+
+            db.session.add(video)
+            db.session.commit()
+            flash(f'Video "{video.title}" created.', 'success')
+            return redirect(url_for('videos.list_videos'))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            products = Inventory.query.order_by(Inventory.product_name).all()
+            return render_template('videos/form.html', video=None, companies=companies, products=products)
 
     companies = Company.query.order_by(Company.name).all()
     products = Inventory.query.order_by(Inventory.product_name).all()

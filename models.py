@@ -7,14 +7,14 @@ class Contact(db.Model):
     __tablename__ = 'contacts'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(20), default='other')  # reviewer, company_rep, podcast_guest, other
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True)
+    name = db.Column(db.String(100), nullable=False, index=True)  # Index for search
+    role = db.Column(db.String(20), default='other', index=True)  # Index for filtering
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True, index=True)
     email = db.Column(db.String(120), nullable=True)
     twitter = db.Column(db.String(50), nullable=True)
     discord = db.Column(db.String(50), nullable=True)
     youtube = db.Column(db.String(100), nullable=True)
-    relationship_status = db.Column(db.String(20), default='cold')  # cold, warm, active, close
+    relationship_status = db.Column(db.String(20), default='cold', index=True)  # Index for filtering
     notes = db.Column(db.Text, nullable=True)
     last_contact_date = db.Column(db.Date, nullable=True)
     tags = db.Column(db.String(200), nullable=True)  # comma-separated tags
@@ -61,11 +61,11 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    # Relationships
-    contacts = db.relationship('Contact', back_populates='company')
-    inventory_items = db.relationship('Inventory', back_populates='company')
-    videos = db.relationship('Video', back_populates='company')
-    affiliate_revenues = db.relationship('AffiliateRevenue', back_populates='company')
+    # Relationships with lazy loading options
+    contacts = db.relationship('Contact', back_populates='company', lazy='dynamic')
+    inventory_items = db.relationship('Inventory', back_populates='company', lazy='dynamic')
+    videos = db.relationship('Video', back_populates='company', lazy='dynamic')
+    affiliate_revenues = db.relationship('AffiliateRevenue', back_populates='company', lazy='dynamic')
 
     def to_dict(self):
         return {
@@ -80,8 +80,8 @@ class Company(db.Model):
             'commission_rate': self.commission_rate,
             'notes': self.notes,
             'priority': self.priority,
-            'contact_count': len(self.contacts),
-            'inventory_count': len(self.inventory_items),
+            'contact_count': self.contacts.count(),
+            'inventory_count': self.inventory_items.count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -91,15 +91,15 @@ class Inventory(db.Model):
     __tablename__ = 'inventory'
 
     id = db.Column(db.Integer, primary_key=True)
-    product_name = db.Column(db.String(150), nullable=False)
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True)
-    category = db.Column(db.String(20), default='mouse')  # mouse, keyboard, mousepad, iem, other
-    source_type = db.Column(db.String(20), default='review_unit')  # review_unit, personal_purchase
-    date_acquired = db.Column(db.Date, nullable=True)
+    product_name = db.Column(db.String(150), nullable=False, index=True)  # Index for search
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True, index=True)
+    category = db.Column(db.String(20), default='mouse', index=True)  # Index for filtering
+    source_type = db.Column(db.String(20), default='review_unit', index=True)
+    date_acquired = db.Column(db.Date, nullable=True, index=True)
     cost = db.Column(db.Float, default=0.0)  # $0 for review units
     on_amazon = db.Column(db.Boolean, default=False)
-    deadline = db.Column(db.Date, nullable=True)  # optional, for hard deadlines
-    status = db.Column(db.String(20), default='in_queue')  # in_queue, reviewing, reviewed, keeping, listed, sold
+    deadline = db.Column(db.Date, nullable=True, index=True)  # Index for deadline queries
+    status = db.Column(db.String(20), default='in_queue', index=True)  # Index for filtering
     condition = db.Column(db.String(20), default='new')  # new, open_box, used
     notes = db.Column(db.Text, nullable=True)
 
@@ -110,7 +110,7 @@ class Inventory(db.Model):
     video_publish_date = db.Column(db.Date, nullable=True)
 
     # Sales tracking
-    sold = db.Column(db.Boolean, default=False)
+    sold = db.Column(db.Boolean, default=False, index=True)  # Index for sold filtering
     sale_price = db.Column(db.Float, nullable=True)
     fees = db.Column(db.Float, nullable=True)
     shipping = db.Column(db.Float, nullable=True)
@@ -188,8 +188,8 @@ class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # YouTube API fields (auto-synced)
-    youtube_id = db.Column(db.String(20), unique=True, nullable=True)  # YouTube video ID
-    title = db.Column(db.String(200), nullable=False)
+    youtube_id = db.Column(db.String(20), unique=True, nullable=True, index=True)  # Index for lookups
+    title = db.Column(db.String(200), nullable=False, index=True)  # Index for search
     description = db.Column(db.Text, nullable=True)
     url = db.Column(db.String(300), nullable=True)
     thumbnail_url = db.Column(db.String(300), nullable=True)
@@ -201,9 +201,9 @@ class Video(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
 
     # Business metadata (manual entry)
-    video_type = db.Column(db.String(20), default='review')  # review, comparison, guide, tierlist, podcast, short, other
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True)
-    sponsored = db.Column(db.Boolean, default=False)
+    video_type = db.Column(db.String(20), default='review', index=True)  # Index for filtering
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True, index=True)
+    sponsored = db.Column(db.Boolean, default=False, index=True)  # Index for filtering
     sponsor_amount = db.Column(db.Float, nullable=True)
     affiliate_links = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text, nullable=True)
@@ -240,7 +240,7 @@ class Video(db.Model):
             'notes': self.notes,
             'is_podcast': self.is_podcast,
             'is_short': self.is_short,
-            'product_count': len(self.products),
+            'product_count': len(self.products) if self.products else 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -288,9 +288,9 @@ class AffiliateRevenue(db.Model):
     __tablename__ = 'affiliate_revenue'
 
     id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
-    year = db.Column(db.Integer, nullable=False)
-    month = db.Column(db.Integer, nullable=False)  # 1-12
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)  # Index for year filtering
+    month = db.Column(db.Integer, nullable=False, index=True)  # Index for month filtering
     revenue = db.Column(db.Float, nullable=False, default=0.0)
     sales_count = db.Column(db.Integer, nullable=True)  # Number of sales if known
     notes = db.Column(db.Text, nullable=True)

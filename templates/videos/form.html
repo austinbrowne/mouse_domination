@@ -39,6 +39,7 @@
     {% endif %}
 
     <form method="post" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% if not video or not video.youtube_id %}
             <!-- Manual entry fields (for new videos or non-synced videos) -->
             <div class="bg-white rounded-xl border border-surface-200 p-6">

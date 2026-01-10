@@ -96,6 +96,7 @@
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="{{ url_for('affiliates.edit_revenue', id=entry.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
                                         <form action="{{ url_for('affiliates.delete_revenue', id=entry.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this entry?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
                                         </form>
                                     </div>
