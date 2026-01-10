@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import SalesPipeline, Company, Contact
-from app import db
+from extensions import db
 from constants import (
     DEAL_TYPE_CHOICES, DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 )
@@ -44,11 +44,10 @@ def list_deals():
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
 
-    # Stats using database aggregation
-    stats = db.session.query(
-        func.count(SalesPipeline.id).label('total'),
-        func.sum(func.cast(SalesPipeline.status.in_(['lead', 'negotiating', 'confirmed']), db.Integer)).label('active'),
-        func.sum(func.cast(SalesPipeline.status == 'completed', db.Integer)).label('completed'),
+    # Stats using database aggregation - compute what the template expects
+    stats_query = db.session.query(
+        func.sum(func.cast(SalesPipeline.status == 'lead', db.Integer)).label('lead'),
+        func.sum(func.cast(SalesPipeline.status == 'negotiating', db.Integer)).label('negotiating'),
         func.coalesce(func.sum(
             func.cast(SalesPipeline.status == 'completed', db.Integer) *
             func.coalesce(SalesPipeline.rate_agreed, 0)
@@ -58,6 +57,13 @@ def list_deals():
             func.coalesce(SalesPipeline.rate_quoted, 0)
         ), 0).label('pipeline_value'),
     ).first()
+
+    stats = {
+        'lead': stats_query.lead or 0,
+        'negotiating': stats_query.negotiating or 0,
+        'total_revenue': stats_query.total_revenue or 0,
+        'pipeline_value': stats_query.pipeline_value or 0,
+    }
 
     companies = get_companies_for_dropdown()
     contacts = get_contacts_for_dropdown()
@@ -71,11 +77,7 @@ def list_deals():
         current_status=status,
         current_payment=payment,
         current_follow_up=follow_up,
-        total=stats.total or 0,
-        active=stats.active or 0,
-        completed=stats.completed or 0,
-        total_revenue=stats.total_revenue or 0,
-        pipeline_value=stats.pipeline_value or 0,
+        stats=stats,
     )
 
 

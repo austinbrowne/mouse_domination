@@ -1,12 +1,8 @@
 import os
 from flask import Flask, request, g
-from flask_sqlalchemy import SQLAlchemy
-from flask_wtf.csrf import CSRFProtect
 from config import Config, DevelopmentConfig, ProductionConfig
+from extensions import db, csrf
 import uuid
-
-db = SQLAlchemy()
-csrf = CSRFProtect()
 
 
 def get_config():
