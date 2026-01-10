@@ -4,48 +4,37 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-800">Inventory</h1>
-        <a href="{{ url_for('inventory.new_item') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-            + Add Item
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Inventory</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ items|length }} items | P/L: <span class="{% if total_profit_loss >= 0 %}text-emerald-600{% else %}text-red-600{% endif %} font-medium">${{ "%.2f"|format(total_profit_loss) }}</span></p>
+        </div>
+        <a href="{{ url_for('inventory.new_item') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Item
         </a>
     </div>
 
-    <!-- Summary -->
-    <div class="bg-white rounded-lg shadow p-4">
-        <div class="flex flex-wrap gap-6">
-            <div>
-                <span class="text-sm text-gray-500">Total Items:</span>
-                <span class="font-bold ml-1">{{ items|length }}</span>
-            </div>
-            <div>
-                <span class="text-sm text-gray-500">Total P/L:</span>
-                <span class="font-bold ml-1 {% if total_profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                    ${{ "%.2f"|format(total_profit_loss) }}
-                </span>
-            </div>
-        </div>
-    </div>
-
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4">
-        <form method="get" class="flex flex-wrap gap-4 items-end">
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Search</label>
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
                 <input type="text" name="search" value="{{ search }}" placeholder="Product name..."
-                    class="border rounded-lg px-3 py-2 w-48">
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Type</label>
-                <select name="source_type" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
+                <select name="source_type" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Types</option>
                     <option value="review_unit" {% if current_source_type == 'review_unit' %}selected{% endif %}>Review Unit</option>
                     <option value="personal_purchase" {% if current_source_type == 'personal_purchase' %}selected{% endif %}>Personal Purchase</option>
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Category</label>
-                <select name="category" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Category</label>
+                <select name="category" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Categories</option>
                     <option value="mouse" {% if current_category == 'mouse' %}selected{% endif %}>Mouse</option>
                     <option value="keyboard" {% if current_category == 'keyboard' %}selected{% endif %}>Keyboard</option>
@@ -55,8 +44,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Status</label>
-                <select name="status" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Statuses</option>
                     <option value="in_queue" {% if current_status == 'in_queue' %}selected{% endif %}>In Queue</option>
                     <option value="reviewing" {% if current_status == 'reviewing' %}selected{% endif %}>Reviewing</option>
@@ -66,93 +55,91 @@
                     <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>Sold</option>
                 </select>
             </div>
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Sold</label>
-                <select name="sold" class="border rounded-lg px-3 py-2">
-                    <option value="">All</option>
-                    <option value="yes" {% if current_sold == 'yes' %}selected{% endif %}>Sold</option>
-                    <option value="no" {% if current_sold == 'no' %}selected{% endif %}>Not Sold</option>
-                </select>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('inventory.list_inventory') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Filter</button>
-            <a href="{{ url_for('inventory.list_inventory') }}" class="text-gray-500 hover:text-gray-700 px-4 py-2">Clear</a>
         </form>
     </div>
 
-    <!-- Inventory List -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <!-- Inventory Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
         {% if items %}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Product</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Source</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Date</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Content</th>
-                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">P/L</th>
-                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="name" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
+                            <th data-sort="source" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Source</th>
+                            <th data-sort="status" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                            <th data-sort="date" data-sort-type="date" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Date</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Content</th>
+                            <th data-sort="pl" data-sort-type="number" class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">P/L</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody class="divide-y divide-surface-200">
                         {% for item in items %}
-                            <tr class="hover:bg-gray-50 {% if item.deadline and not item.sold %}bg-red-50{% endif %}">
-                                <td class="px-4 py-3">
-                                    <div class="font-medium">{{ item.product_name }}</div>
-                                    <div class="text-xs text-gray-500">
+                            <tr class="hover:bg-surface-50 {% if item.deadline and not item.sold %}bg-red-50/50{% endif %}">
+                                <td class="px-4 py-3" data-value="{{ item.product_name }}">
+                                    <div class="font-medium text-gray-900">{{ item.product_name }}</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">
                                         {{ item.company.name if item.company else 'Unknown' }} &middot; {{ item.category|title }}
                                     </div>
                                     {% if item.deadline %}
-                                        <div class="text-xs text-red-600">Deadline: {{ item.deadline.strftime('%b %d') }}</div>
+                                        <div class="text-xs text-red-600 font-medium mt-0.5">Deadline: {{ item.deadline.strftime('%b %d') }}</div>
                                     {% endif %}
                                 </td>
-                                <td class="px-4 py-3 hidden md:table-cell">
-                                    <span class="text-xs px-2 py-1 rounded-full
-                                        {% if item.source_type == 'review_unit' %}bg-blue-100 text-blue-700
-                                        {% else %}bg-purple-100 text-purple-700{% endif %}">
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ item.source_type }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if item.source_type == 'review_unit' %}bg-blue-50 text-blue-700
+                                        {% else %}bg-violet-50 text-violet-700{% endif %}">
                                         {{ item.source_type|replace('_', ' ')|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <span class="text-xs px-2 py-1 rounded-full
-                                        {% if item.status == 'in_queue' %}bg-yellow-100 text-yellow-700
-                                        {% elif item.status == 'reviewing' %}bg-blue-100 text-blue-700
-                                        {% elif item.status == 'reviewed' %}bg-purple-100 text-purple-700
+                                <td class="px-4 py-3" data-value="{{ item.status }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if item.status == 'in_queue' %}bg-amber-50 text-amber-700
+                                        {% elif item.status == 'reviewing' %}bg-blue-50 text-blue-700
+                                        {% elif item.status == 'reviewed' %}bg-violet-50 text-violet-700
                                         {% elif item.status == 'keeping' %}bg-gray-100 text-gray-700
-                                        {% elif item.status == 'listed' %}bg-orange-100 text-orange-700
-                                        {% elif item.status == 'sold' %}bg-green-100 text-green-700
+                                        {% elif item.status == 'listed' %}bg-orange-50 text-orange-700
+                                        {% elif item.status == 'sold' %}bg-emerald-50 text-emerald-700
                                         {% else %}bg-gray-100 text-gray-700{% endif %}">
                                         {{ item.status|replace('_', ' ')|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-500">
+                                <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-500" data-value="{{ item.date_acquired.isoformat() if item.date_acquired else '' }}">
                                     {{ item.date_acquired.strftime('%b %d, %Y') if item.date_acquired else '-' }}
                                 </td>
                                 <td class="px-4 py-3 hidden lg:table-cell">
-                                    {% if item.short_url %}
-                                        <a href="{{ item.short_url }}" target="_blank" class="text-primary-600 hover:underline text-sm">Short</a>
-                                    {% endif %}
-                                    {% if item.video_url %}
-                                        <a href="{{ item.video_url }}" target="_blank" class="text-primary-600 hover:underline text-sm ml-2">Video</a>
-                                    {% endif %}
-                                    {% if not item.short_url and not item.video_url %}
-                                        <span class="text-gray-400">-</span>
-                                    {% endif %}
+                                    <div class="flex gap-2">
+                                        {% if item.short_url %}
+                                            <a href="{{ item.short_url }}" target="_blank" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Short</a>
+                                        {% endif %}
+                                        {% if item.video_url %}
+                                            <a href="{{ item.video_url }}" target="_blank" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Video</a>
+                                        {% endif %}
+                                        {% if not item.short_url and not item.video_url %}
+                                            <span class="text-gray-400 text-sm">-</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
-                                <td class="px-4 py-3 text-right font-medium {% if item.profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                <td class="px-4 py-3 text-right font-medium {% if item.profit_loss >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}" data-value="{{ item.profit_loss }}">
                                     ${{ "%.2f"|format(item.profit_loss) }}
                                 </td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
-                                    {% if not item.sold and item.status == 'listed' %}
-                                        <form action="{{ url_for('inventory.mark_sold', id=item.id) }}" method="post" class="inline">
-                                            <button type="submit" class="text-green-600 hover:text-green-800 mr-2">Sold</button>
+                                    <div class="flex items-center justify-end gap-2">
+                                        {% if not item.sold and item.status == 'listed' %}
+                                            <form action="{{ url_for('inventory.mark_sold', id=item.id) }}" method="post" class="inline">
+                                                <button type="submit" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">Sold</button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="{{ url_for('inventory.edit_item', id=item.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('inventory.delete_item', id=item.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this item?')">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
                                         </form>
-                                    {% endif %}
-                                    <a href="{{ url_for('inventory.edit_item', id=item.id) }}" class="text-primary-600 hover:text-primary-800 mr-2">Edit</a>
-                                    <form action="{{ url_for('inventory.delete_item', id=item.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this item?')">
-                                        <button type="submit" class="text-red-600 hover:text-red-800">Delete</button>
-                                    </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -160,8 +147,10 @@
                 </table>
             </div>
         {% else %}
-            <div class="p-8 text-center text-gray-500">
-                No inventory found. <a href="{{ url_for('inventory.new_item') }}" class="text-primary-600 hover:underline">Add your first item</a>
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <p class="text-gray-500 mb-2">No inventory found</p>
+                <a href="{{ url_for('inventory.new_item') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first item</a>
             </div>
         {% endif %}
     </div>

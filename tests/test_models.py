@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 from app import db
-from models import Contact, Company, Inventory
+from models import Contact, Company, Inventory, Video, PodcastEpisode, AffiliateRevenue
 
 
 class TestCompanyModel:
@@ -305,3 +305,335 @@ class TestInventoryModel:
             assert data['product_name'] == 'Serialized Mouse'
             assert data['profit_loss'] == 85.0
             assert 'created_at' in data
+
+
+class TestVideoModel:
+    """Tests for Video model."""
+
+    def test_create_video(self, app):
+        """Test creating a video."""
+        with app.app_context():
+            video = Video(
+                title='Pulsar X2 Review',
+                url='https://youtube.com/watch?v=abc123',
+                publish_date=date(2025, 3, 19),
+                video_type='review',
+                views=5000,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.id is not None
+            assert video.title == 'Pulsar X2 Review'
+            assert video.video_type == 'review'
+
+    def test_video_with_company(self, app):
+        """Test video linked to company."""
+        with app.app_context():
+            company = Company(name='Pulsar')
+            db.session.add(company)
+            db.session.commit()
+
+            video = Video(
+                title='Pulsar X2 Review',
+                company_id=company.id,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.company.name == 'Pulsar'
+            assert video in company.videos
+
+    def test_video_with_products(self, app):
+        """Test video linked to inventory items."""
+        with app.app_context():
+            item1 = Inventory(product_name='Mouse 1')
+            item2 = Inventory(product_name='Mouse 2')
+            db.session.add_all([item1, item2])
+            db.session.commit()
+
+            video = Video(title='Comparison Video')
+            video.products.append(item1)
+            video.products.append(item2)
+            db.session.add(video)
+            db.session.commit()
+
+            assert len(video.products) == 2
+            assert item1 in video.products
+            assert video in item1.videos
+
+    def test_sponsored_video(self, app):
+        """Test sponsored video tracking."""
+        with app.app_context():
+            video = Video(
+                title='Sponsored Review',
+                sponsored=True,
+                sponsor_amount=500.0,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.sponsored is True
+            assert video.sponsor_amount == 500.0
+
+    def test_video_defaults(self, app):
+        """Test video default values."""
+        with app.app_context():
+            video = Video(title='Test Video')
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.video_type == 'review'
+            assert video.sponsored is False
+            assert video.affiliate_links is False
+            assert video.is_podcast is False
+            assert video.is_short is False
+
+    def test_youtube_synced_video(self, app):
+        """Test video with YouTube sync data."""
+        with app.app_context():
+            video = Video(
+                youtube_id='abc123xyz',
+                title='Synced Video',
+                description='Video description from YouTube',
+                url='https://www.youtube.com/watch?v=abc123xyz',
+                thumbnail_url='https://i.ytimg.com/vi/abc123xyz/hqdefault.jpg',
+                duration='PT5M30S',
+                views=10000,
+                likes=500,
+                comments=50,
+                is_short=False,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.youtube_id == 'abc123xyz'
+            assert video.description == 'Video description from YouTube'
+            assert video.thumbnail_url is not None
+            assert video.duration == 'PT5M30S'
+            assert video.likes == 500
+            assert video.comments == 50
+
+    def test_youtube_short_video(self, app):
+        """Test YouTube Short video."""
+        with app.app_context():
+            video = Video(
+                youtube_id='shortabc',
+                title='Quick tip #shorts',
+                is_short=True,
+                duration='PT45S',
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.is_short is True
+
+    def test_podcast_flag(self, app):
+        """Test podcast episode flag on video."""
+        with app.app_context():
+            video = Video(
+                title='MouseCast Episode 42',
+                is_podcast=True,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            assert video.is_podcast is True
+
+    def test_video_to_dict(self, app):
+        """Test video serialization."""
+        with app.app_context():
+            video = Video(
+                title='Test Video',
+                video_type='comparison',
+                views=10000,
+            )
+            db.session.add(video)
+            db.session.commit()
+
+            data = video.to_dict()
+            assert data['title'] == 'Test Video'
+            assert data['video_type'] == 'comparison'
+            assert data['views'] == 10000
+
+
+class TestPodcastEpisodeModel:
+    """Tests for PodcastEpisode model."""
+
+    def test_create_episode(self, app):
+        """Test creating a podcast episode."""
+        with app.app_context():
+            episode = PodcastEpisode(
+                episode_number=42,
+                title='Best Mice of 2025',
+                publish_date=date(2025, 6, 15),
+                youtube_url='https://youtube.com/watch?v=xyz789',
+            )
+            db.session.add(episode)
+            db.session.commit()
+
+            assert episode.id is not None
+            assert episode.episode_number == 42
+            assert episode.title == 'Best Mice of 2025'
+
+    def test_episode_with_guests(self, app):
+        """Test episode with guest contacts."""
+        with app.app_context():
+            guest1 = Contact(name='Aimadapt', role='reviewer')
+            guest2 = Contact(name='Company Rep', role='company_rep')
+            db.session.add_all([guest1, guest2])
+            db.session.commit()
+
+            episode = PodcastEpisode(title='Guest Episode')
+            episode.guests.append(guest1)
+            episode.guests.append(guest2)
+            db.session.add(episode)
+            db.session.commit()
+
+            assert len(episode.guests) == 2
+            assert guest1 in episode.guests
+            assert episode in guest1.podcast_appearances
+
+    def test_sponsored_episode(self, app):
+        """Test sponsored podcast episode."""
+        with app.app_context():
+            episode = PodcastEpisode(
+                title='Sponsored Episode',
+                sponsored=True,
+                sponsor_name='Pulsar',
+                sponsor_amount=200.0,
+            )
+            db.session.add(episode)
+            db.session.commit()
+
+            assert episode.sponsored is True
+            assert episode.sponsor_name == 'Pulsar'
+            assert episode.sponsor_amount == 200.0
+
+    def test_episode_defaults(self, app):
+        """Test episode default values."""
+        with app.app_context():
+            episode = PodcastEpisode(title='Test Episode')
+            db.session.add(episode)
+            db.session.commit()
+
+            assert episode.sponsored is False
+            assert episode.episode_number is None
+
+    def test_episode_to_dict(self, app):
+        """Test episode serialization."""
+        with app.app_context():
+            guest = Contact(name='Test Guest')
+            db.session.add(guest)
+
+            episode = PodcastEpisode(title='Test Episode', episode_number=10)
+            episode.guests.append(guest)
+            db.session.add(episode)
+            db.session.commit()
+
+            data = episode.to_dict()
+            assert data['title'] == 'Test Episode'
+            assert data['episode_number'] == 10
+            assert 'Test Guest' in data['guest_names']
+            assert data['guest_count'] == 1
+
+
+class TestAffiliateRevenueModel:
+    """Tests for AffiliateRevenue model."""
+
+    def test_create_revenue_entry(self, app):
+        """Test creating affiliate revenue entry."""
+        with app.app_context():
+            company = Company(name='Pulsar')
+            db.session.add(company)
+            db.session.commit()
+
+            revenue = AffiliateRevenue(
+                company_id=company.id,
+                year=2025,
+                month=6,
+                revenue=150.0,
+                sales_count=5,
+            )
+            db.session.add(revenue)
+            db.session.commit()
+
+            assert revenue.id is not None
+            assert revenue.revenue == 150.0
+            assert revenue.sales_count == 5
+
+    def test_revenue_company_relationship(self, app):
+        """Test revenue linked to company."""
+        with app.app_context():
+            company = Company(name='MCHOSE')
+            db.session.add(company)
+            db.session.commit()
+
+            revenue = AffiliateRevenue(
+                company_id=company.id,
+                year=2025,
+                month=1,
+                revenue=75.0,
+            )
+            db.session.add(revenue)
+            db.session.commit()
+
+            assert revenue.company.name == 'MCHOSE'
+            assert revenue in company.affiliate_revenues
+
+    def test_month_year_property(self, app):
+        """Test month_year formatted string."""
+        with app.app_context():
+            company = Company(name='Test')
+            db.session.add(company)
+            db.session.commit()
+
+            revenue = AffiliateRevenue(
+                company_id=company.id,
+                year=2025,
+                month=12,
+                revenue=100.0,
+            )
+            db.session.add(revenue)
+            db.session.commit()
+
+            assert revenue.month_year == 'Dec 2025'
+
+    def test_unique_constraint(self, app):
+        """Test unique constraint on company/year/month."""
+        with app.app_context():
+            company = Company(name='Test')
+            db.session.add(company)
+            db.session.commit()
+
+            rev1 = AffiliateRevenue(company_id=company.id, year=2025, month=6, revenue=100.0)
+            db.session.add(rev1)
+            db.session.commit()
+
+            # Try to add duplicate
+            rev2 = AffiliateRevenue(company_id=company.id, year=2025, month=6, revenue=200.0)
+            db.session.add(rev2)
+
+            with pytest.raises(Exception):  # IntegrityError
+                db.session.commit()
+
+    def test_revenue_to_dict(self, app):
+        """Test revenue serialization."""
+        with app.app_context():
+            company = Company(name='Pulsar')
+            db.session.add(company)
+            db.session.commit()
+
+            revenue = AffiliateRevenue(
+                company_id=company.id,
+                year=2025,
+                month=3,
+                revenue=125.50,
+            )
+            db.session.add(revenue)
+            db.session.commit()
+
+            data = revenue.to_dict()
+            assert data['company_name'] == 'Pulsar'
+            assert data['revenue'] == 125.50
+            assert data['month_year'] == 'Mar 2025'

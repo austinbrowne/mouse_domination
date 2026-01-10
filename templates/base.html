@@ -11,67 +11,148 @@
                 extend: {
                     colors: {
                         primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        surface: {
+                            50: '#fafafa',
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
                         }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         [x-cloak] { display: none !important; }
+
+        /* Smooth transitions */
+        * { transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+
+        /* Better focus states */
+        :focus { outline: none; }
+        :focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; }
+
+        /* Sortable table styles */
+        .sortable th[data-sort] { cursor: pointer; user-select: none; }
+        .sortable th[data-sort]:hover { background-color: #f4f4f5; }
+        .sortable th[data-sort]::after { content: ''; display: inline-block; width: 0; height: 0; margin-left: 8px; vertical-align: middle; opacity: 0.3; }
+        .sortable th[data-sort].asc::after { border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 6px solid currentColor; opacity: 1; }
+        .sortable th[data-sort].desc::after { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid currentColor; opacity: 1; }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f4f4f5; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
     </style>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-surface-50 min-h-screen flex flex-col font-sans text-gray-900 antialiased">
     <!-- Navigation -->
-    <nav class="bg-primary-700 text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
+    <nav class="bg-white border-b border-surface-200 sticky top-0 z-50" x-data="{ mobileOpen: false }">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6">
             <div class="flex justify-between items-center h-16">
-                <a href="{{ url_for('main.dashboard') }}" class="font-bold text-xl">Mouse Domination</a>
-
-                <!-- Mobile menu button -->
-                <button @click="open = !open" x-data="{ open: false }" class="md:hidden p-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
+                <!-- Logo -->
+                <a href="{{ url_for('main.dashboard') }}" class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                        </svg>
+                    </div>
+                    <span class="font-semibold text-lg text-gray-900">Mouse Domination</span>
+                </a>
 
                 <!-- Desktop menu -->
-                <div class="hidden md:flex space-x-6">
-                    <a href="{{ url_for('main.dashboard') }}" class="hover:text-primary-200 transition">Dashboard</a>
-                    <a href="{{ url_for('contacts.list_contacts') }}" class="hover:text-primary-200 transition">Contacts</a>
-                    <a href="{{ url_for('companies.list_companies') }}" class="hover:text-primary-200 transition">Companies</a>
-                    <a href="{{ url_for('inventory.list_inventory') }}" class="hover:text-primary-200 transition">Inventory</a>
+                <div class="hidden md:flex items-center space-x-1">
+                    {% set current_endpoint = request.endpoint %}
+                    <a href="{{ url_for('main.dashboard') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint == 'main.dashboard' %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Dashboard
+                    </a>
+                    <a href="{{ url_for('inventory.list_inventory') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'inventory' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Inventory
+                    </a>
+                    <a href="{{ url_for('videos.list_videos') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'videos' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Videos
+                    </a>
+                    <a href="{{ url_for('podcast.list_episodes') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'podcast' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Podcast
+                    </a>
+                    <a href="{{ url_for('affiliates.list_revenue') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Revenue
+                    </a>
+                    <div class="w-px h-6 bg-surface-200 mx-2"></div>
+                    <a href="{{ url_for('contacts.list_contacts') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'contacts' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Contacts
+                    </a>
+                    <a href="{{ url_for('companies.list_companies') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'companies' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Companies
+                    </a>
                 </div>
+
+                <!-- Mobile menu button -->
+                <button @click="mobileOpen = !mobileOpen" class="md:hidden p-2 rounded-lg hover:bg-surface-100">
+                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path x-show="!mobileOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path x-show="mobileOpen" x-cloak stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
         <!-- Mobile menu -->
-        <div x-data="{ open: false }" x-show="open" x-cloak class="md:hidden bg-primary-800 px-4 py-2">
-            <a href="{{ url_for('main.dashboard') }}" class="block py-2 hover:text-primary-200">Dashboard</a>
-            <a href="{{ url_for('contacts.list_contacts') }}" class="block py-2 hover:text-primary-200">Contacts</a>
-            <a href="{{ url_for('companies.list_companies') }}" class="block py-2 hover:text-primary-200">Companies</a>
-            <a href="{{ url_for('inventory.list_inventory') }}" class="block py-2 hover:text-primary-200">Inventory</a>
+        <div x-show="mobileOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="md:hidden border-t border-surface-200 bg-white">
+            <div class="px-4 py-3 space-y-1">
+                <a href="{{ url_for('main.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Dashboard</a>
+                <a href="{{ url_for('inventory.list_inventory') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Inventory</a>
+                <a href="{{ url_for('videos.list_videos') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Videos</a>
+                <a href="{{ url_for('podcast.list_episodes') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Podcast</a>
+                <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
+                <hr class="my-2 border-surface-200">
+                <a href="{{ url_for('contacts.list_contacts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Contacts</a>
+                <a href="{{ url_for('companies.list_companies') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Companies</a>
+            </div>
         </div>
     </nav>
 
     <!-- Flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="max-w-7xl mx-auto px-4 mt-4">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg mb-2 {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
-                        {{ message }}
+                    <div class="flex items-center gap-3 p-4 rounded-lg mb-3 {% if category == 'error' %}bg-red-50 text-red-800 border border-red-200{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}" x-data="{ show: true }" x-show="show" x-transition>
+                        {% if category == 'error' %}
+                            <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                        {% else %}
+                            <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        {% endif %}
+                        <span class="text-sm font-medium">{{ message }}</span>
+                        <button @click="show = false" class="ml-auto p-1 rounded hover:bg-black/5">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                        </button>
                     </div>
                 {% endfor %}
             </div>
@@ -79,15 +160,71 @@
     {% endwith %}
 
     <!-- Main content -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-100 border-t mt-auto py-4">
-        <div class="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-            Mouse Domination &copy; dazztrazak
+    <footer class="border-t border-surface-200 bg-white mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-500">
+                <span>Mouse Domination</span>
+                <span>Built for dazztrazak</span>
+            </div>
         </div>
     </footer>
+
+    <!-- Sortable Table Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('table.sortable').forEach(table => {
+                const headers = table.querySelectorAll('th[data-sort]');
+                const tbody = table.querySelector('tbody');
+
+                headers.forEach(header => {
+                    header.addEventListener('click', () => {
+                        const sortKey = header.dataset.sort;
+                        const sortType = header.dataset.sortType || 'string';
+                        const isAsc = header.classList.contains('asc');
+
+                        // Reset all headers
+                        headers.forEach(h => h.classList.remove('asc', 'desc'));
+
+                        // Set current header
+                        header.classList.add(isAsc ? 'desc' : 'asc');
+
+                        // Get rows and sort
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const colIndex = Array.from(header.parentNode.children).indexOf(header);
+
+                        rows.sort((a, b) => {
+                            let aVal = a.children[colIndex]?.dataset.value || a.children[colIndex]?.textContent.trim() || '';
+                            let bVal = b.children[colIndex]?.dataset.value || b.children[colIndex]?.textContent.trim() || '';
+
+                            if (sortType === 'number') {
+                                aVal = parseFloat(aVal.replace(/[^0-9.-]/g, '')) || 0;
+                                bVal = parseFloat(bVal.replace(/[^0-9.-]/g, '')) || 0;
+                            } else if (sortType === 'date') {
+                                aVal = new Date(aVal) || 0;
+                                bVal = new Date(bVal) || 0;
+                            } else {
+                                aVal = aVal.toLowerCase();
+                                bVal = bVal.toLowerCase();
+                            }
+
+                            if (aVal < bVal) return isAsc ? 1 : -1;
+                            if (aVal > bVal) return isAsc ? -1 : 1;
+                            return 0;
+                        });
+
+                        // Reorder rows
+                        rows.forEach(row => tbody.appendChild(row));
+                    });
+                });
+            });
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>

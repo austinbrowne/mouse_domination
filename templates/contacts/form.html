@@ -3,95 +3,123 @@
 {% block title %}{{ 'Edit' if contact else 'New' }} Contact - Mouse Domination{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto space-y-6">
-    <h1 class="text-3xl font-bold text-gray-800">{{ 'Edit' if contact else 'New' }} Contact</h1>
+<div class="max-w-2xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <a href="{{ url_for('contacts.list_contacts') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-2">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to Contacts
+        </a>
+        <h1 class="text-2xl font-bold text-gray-900">{{ 'Edit' if contact else 'New' }} Contact</h1>
+    </div>
 
-    <form method="post" class="bg-white rounded-lg shadow p-6 space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-            <input type="text" name="name" value="{{ contact.name if contact else '' }}" required
-                class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-        </div>
+    <form method="post" class="space-y-6">
+        <!-- Basic Info -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Basic Info</h3>
 
-        <div class="grid md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select name="role" class="w-full border rounded-lg px-3 py-2">
-                    <option value="other" {% if contact and contact.role == 'other' %}selected{% endif %}>Other</option>
-                    <option value="reviewer" {% if contact and contact.role == 'reviewer' %}selected{% endif %}>Reviewer</option>
-                    <option value="company_rep" {% if contact and contact.role == 'company_rep' %}selected{% endif %}>Company Rep</option>
-                    <option value="podcast_guest" {% if contact and contact.role == 'podcast_guest' %}selected{% endif %}>Podcast Guest</option>
-                </select>
-            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
+                    <input type="text" name="name" value="{{ contact.name if contact else '' }}" required
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-                <select name="company_id" class="w-full border rounded-lg px-3 py-2">
-                    <option value="">None</option>
-                    {% for company in companies %}
-                        <option value="{{ company.id }}" {% if contact and contact.company_id == company.id %}selected{% endif %}>
-                            {{ company.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
+                        <select name="role" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="other" {% if contact and contact.role == 'other' %}selected{% endif %}>Other</option>
+                            <option value="reviewer" {% if contact and contact.role == 'reviewer' %}selected{% endif %}>Reviewer</option>
+                            <option value="company_rep" {% if contact and contact.role == 'company_rep' %}selected{% endif %}>Company Rep</option>
+                            <option value="podcast_guest" {% if contact and contact.role == 'podcast_guest' %}selected{% endif %}>Podcast Guest</option>
+                        </select>
+                    </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" name="email" value="{{ contact.email if contact else '' }}"
-                class="w-full border rounded-lg px-3 py-2">
-        </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Company</label>
+                        <select name="company_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="">None</option>
+                            {% for company in companies %}
+                                <option value="{{ company.id }}" {% if contact and contact.company_id == company.id %}selected{% endif %}>
+                                    {{ company.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
 
-        <div class="grid md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Twitter</label>
-                <input type="text" name="twitter" value="{{ contact.twitter if contact else '' }}" placeholder="@handle"
-                    class="w-full border rounded-lg px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Discord</label>
-                <input type="text" name="discord" value="{{ contact.discord if contact else '' }}" placeholder="username#1234"
-                    class="w-full border rounded-lg px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">YouTube</label>
-                <input type="text" name="youtube" value="{{ contact.youtube if contact else '' }}" placeholder="Channel URL"
-                    class="w-full border rounded-lg px-3 py-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                    <input type="email" name="email" value="{{ contact.email if contact else '' }}"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Relationship Status</label>
-                <select name="relationship_status" class="w-full border rounded-lg px-3 py-2">
-                    <option value="cold" {% if contact and contact.relationship_status == 'cold' %}selected{% endif %}>Cold</option>
-                    <option value="warm" {% if contact and contact.relationship_status == 'warm' %}selected{% endif %}>Warm</option>
-                    <option value="active" {% if contact and contact.relationship_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="close" {% if contact and contact.relationship_status == 'close' %}selected{% endif %}>Close</option>
-                </select>
+        <!-- Social Links -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Social Links</h3>
+
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Twitter</label>
+                    <input type="text" name="twitter" value="{{ contact.twitter if contact else '' }}" placeholder="@handle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Discord</label>
+                    <input type="text" name="discord" value="{{ contact.discord if contact else '' }}" placeholder="username"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">YouTube</label>
+                    <input type="text" name="youtube" value="{{ contact.youtube if contact else '' }}" placeholder="Channel URL"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Last Contact Date</label>
-                <input type="date" name="last_contact_date" value="{{ contact.last_contact_date.isoformat() if contact and contact.last_contact_date else '' }}"
-                    class="w-full border rounded-lg px-3 py-2">
+        </div>
+
+        <!-- Relationship -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Relationship</h3>
+
+            <div class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Relationship Status</label>
+                        <select name="relationship_status" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="cold" {% if contact and contact.relationship_status == 'cold' %}selected{% endif %}>Cold</option>
+                            <option value="warm" {% if contact and contact.relationship_status == 'warm' %}selected{% endif %}>Warm</option>
+                            <option value="active" {% if contact and contact.relationship_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="close" {% if contact and contact.relationship_status == 'close' %}selected{% endif %}>Close</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Last Contact Date</label>
+                        <input type="date" name="last_contact_date" value="{{ contact.last_contact_date.isoformat() if contact and contact.last_contact_date else '' }}"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tags</label>
+                    <input type="text" name="tags" value="{{ contact.tags if contact else '' }}" placeholder="collab, friend, sponsor (comma-separated)"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+                    <textarea name="notes" rows="3" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">{{ contact.notes if contact else '' }}</textarea>
+                </div>
             </div>
         </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-            <input type="text" name="tags" value="{{ contact.tags if contact else '' }}" placeholder="collab, friend, sponsor (comma-separated)"
-                class="w-full border rounded-lg px-3 py-2">
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea name="notes" rows="3" class="w-full border rounded-lg px-3 py-2">{{ contact.notes if contact else '' }}</textarea>
-        </div>
-
-        <div class="flex justify-between pt-4">
-            <a href="{{ url_for('contacts.list_contacts') }}" class="text-gray-500 hover:text-gray-700">Cancel</a>
-            <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition">
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <a href="{{ url_for('contacts.list_contacts') }}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 {{ 'Save Changes' if contact else 'Create Contact' }}
             </button>
         </div>

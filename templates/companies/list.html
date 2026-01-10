@@ -4,24 +4,29 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-800">Companies</h1>
-        <a href="{{ url_for('companies.new_company') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-            + Add Company
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Companies</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ companies|length }} companies</p>
+        </div>
+        <a href="{{ url_for('companies.new_company') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Company
         </a>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4">
-        <form method="get" class="flex flex-wrap gap-4 items-end">
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Search</label>
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
                 <input type="text" name="search" value="{{ search }}" placeholder="Name..."
-                    class="border rounded-lg px-3 py-2 w-48">
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Category</label>
-                <select name="category" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Category</label>
+                <select name="category" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Categories</option>
                     <option value="mice" {% if current_category == 'mice' %}selected{% endif %}>Mice</option>
                     <option value="keyboards" {% if current_category == 'keyboards' %}selected{% endif %}>Keyboards</option>
@@ -31,8 +36,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Status</label>
-                <select name="status" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Statuses</option>
                     <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
                     <option value="affiliate_only" {% if current_status == 'affiliate_only' %}selected{% endif %}>Affiliate Only</option>
@@ -42,78 +47,85 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Priority</label>
-                <select name="priority" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Priority</label>
+                <select name="priority" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Priorities</option>
                     <option value="target" {% if current_priority == 'target' %}selected{% endif %}>Target</option>
                     <option value="active" {% if current_priority == 'active' %}selected{% endif %}>Active</option>
                     <option value="low" {% if current_priority == 'low' %}selected{% endif %}>Low</option>
                 </select>
             </div>
-            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Filter</button>
-            <a href="{{ url_for('companies.list_companies') }}" class="text-gray-500 hover:text-gray-700 px-4 py-2">Clear</a>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('companies.list_companies') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
         </form>
     </div>
 
-    <!-- Companies List -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <!-- Companies Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
         {% if companies %}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Company</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Category</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Status</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Affiliate</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Code</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Rate</th>
-                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="name" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
+                            <th data-sort="category" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                            <th data-sort="status" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Status</th>
+                            <th data-sort="affiliate" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Affiliate</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Code</th>
+                            <th data-sort="rate" data-sort-type="number" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Rate</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody class="divide-y divide-surface-200">
                         {% for company in companies %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="font-medium">{{ company.name }}</div>
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-4 py-3" data-value="{{ company.name }}">
+                                    <div class="font-medium text-gray-900">{{ company.name }}</div>
                                     {% if company.priority == 'target' %}
-                                        <span class="text-xs text-orange-600">Target</span>
+                                        <span class="text-xs text-orange-600 font-medium">Target</span>
                                     {% endif %}
                                 </td>
-                                <td class="px-4 py-3">
-                                    <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                <td class="px-4 py-3" data-value="{{ company.category }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
                                         {{ company.category|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 hidden md:table-cell">
-                                    <span class="text-xs px-2 py-1 rounded-full
-                                        {% if company.relationship_status == 'active' %}bg-green-100 text-green-700
-                                        {% elif company.relationship_status == 'affiliate_only' %}bg-blue-100 text-blue-700
-                                        {% elif company.relationship_status == 'reached_out' %}bg-yellow-100 text-yellow-700
-                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ company.relationship_status }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if company.relationship_status == 'active' %}bg-emerald-50 text-emerald-700
+                                        {% elif company.relationship_status == 'affiliate_only' %}bg-blue-50 text-blue-700
+                                        {% elif company.relationship_status == 'reached_out' %}bg-amber-50 text-amber-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
                                         {{ company.relationship_status|replace('_', ' ')|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 hidden md:table-cell">
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ company.affiliate_status }}">
                                     {% if company.affiliate_status == 'yes' %}
-                                        <span class="text-green-600">Yes</span>
+                                        <span class="inline-flex items-center text-xs font-medium text-emerald-600">
+                                            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                            Yes
+                                        </span>
                                     {% elif company.affiliate_status == 'pending' %}
-                                        <span class="text-yellow-600">Pending</span>
+                                        <span class="text-xs font-medium text-amber-600">Pending</span>
                                     {% else %}
-                                        <span class="text-gray-400">No</span>
+                                        <span class="text-xs text-gray-400">No</span>
                                     {% endif %}
                                 </td>
-                                <td class="px-4 py-3 hidden lg:table-cell text-sm font-mono text-gray-500">
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm font-mono text-gray-600">
                                     {{ company.affiliate_code or '-' }}
                                 </td>
-                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-500">
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" data-value="{{ company.commission_rate or 0 }}">
                                     {{ (company.commission_rate|string + '%') if company.commission_rate else '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <a href="{{ url_for('companies.edit_company', id=company.id) }}" class="text-primary-600 hover:text-primary-800 mr-2">Edit</a>
-                                    <form action="{{ url_for('companies.delete_company', id=company.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this company?')">
-                                        <button type="submit" class="text-red-600 hover:text-red-800">Delete</button>
-                                    </form>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{{ url_for('companies.edit_company', id=company.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('companies.delete_company', id=company.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this company?')">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -121,12 +133,12 @@
                 </table>
             </div>
         {% else %}
-            <div class="p-8 text-center text-gray-500">
-                No companies found. <a href="{{ url_for('companies.new_company') }}" class="text-primary-600 hover:underline">Add your first company</a>
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <p class="text-gray-500 mb-2">No companies found</p>
+                <a href="{{ url_for('companies.new_company') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first company</a>
             </div>
         {% endif %}
     </div>
-
-    <div class="text-sm text-gray-500">{{ companies|length }} company(s)</div>
 </div>
 {% endblock %}

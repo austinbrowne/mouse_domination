@@ -3,121 +3,292 @@
 {% block title %}Dashboard - Mouse Domination{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <h1 class="text-3xl font-bold text-gray-800">Dashboard</h1>
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('inventory.new_item') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Inventory
+            </a>
+            <a href="{{ url_for('videos.list_videos') }}" class="inline-flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-surface-100 text-sm font-medium border border-surface-200 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Videos
+            </a>
+            <a href="{{ url_for('affiliates.new_revenue') }}" class="inline-flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-surface-100 text-sm font-medium border border-surface-200 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Revenue
+            </a>
+        </div>
+    </div>
 
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Total Contacts</div>
-            <div class="text-2xl font-bold text-primary-600">{{ total_contacts }}</div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Active Companies</div>
-            <div class="text-2xl font-bold text-primary-600">{{ active_companies }}</div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Total Inventory</div>
-            <div class="text-2xl font-bold text-primary-600">{{ total_inventory }}</div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Total P/L</div>
-            <div class="text-2xl font-bold {% if total_profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                ${{ "%.2f"|format(total_profit_loss) }}
+    <!-- Revenue Overview Card -->
+    <div class="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+                <p class="text-primary-100 text-sm font-medium">Total Revenue (All Sources)</p>
+                <p class="text-4xl font-bold mt-1">${{ "%.2f"|format(total_revenue) }}</p>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:gap-8">
+                <div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p class="text-primary-100 text-xs">Affiliate ({{ current_year }})</p>
+                    <p class="text-lg font-semibold">${{ "%.2f"|format(yearly_affiliate_revenue) }}</p>
+                </div>
+                <div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p class="text-primary-100 text-xs">Video Sponsors</p>
+                    <p class="text-lg font-semibold">${{ "%.2f"|format(video_sponsor_revenue) }}</p>
+                </div>
+                <div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p class="text-primary-100 text-xs">Podcast Sponsors</p>
+                    <p class="text-lg font-semibold">${{ "%.2f"|format(podcast_sponsor_revenue) }}</p>
+                </div>
+                <div class="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p class="text-primary-100 text-xs">Resale P/L</p>
+                    <p class="text-lg font-semibold">${{ "%.2f"|format(total_profit_loss) }}</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Inventory Status -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-400">
-            <div class="text-sm text-gray-500">In Queue</div>
-            <div class="text-xl font-bold">{{ in_queue }}</div>
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Contacts</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_contacts }}</p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-400">
-            <div class="text-sm text-gray-500">Reviewing</div>
-            <div class="text-xl font-bold">{{ reviewing }}</div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Companies</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ active_companies }}</p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-400">
-            <div class="text-sm text-gray-500">Listed</div>
-            <div class="text-xl font-bold">{{ listed }}</div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Inventory</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_inventory }}</p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-400">
-            <div class="text-sm text-gray-500">Sold</div>
-            <div class="text-xl font-bold">{{ sold_count }}</div>
-        </div>
-        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-gray-400">
-            <div class="text-sm text-gray-500">Review Units</div>
-            <div class="text-xl font-bold">{{ review_units }} / {{ personal_purchases }}</div>
-            <div class="text-xs text-gray-400">review / personal</div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg {% if total_profit_loss >= 0 %}bg-emerald-50{% else %}bg-red-50{% endif %} flex items-center justify-center">
+                    <svg class="w-5 h-5 {% if total_profit_loss >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Resale P/L</p>
+                    <p class="text-2xl font-bold {% if total_profit_loss >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">${{ "%.2f"|format(total_profit_loss) }}</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="grid md:grid-cols-2 gap-6">
+    <!-- Content & Inventory Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Videos</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_videos }}</p>
+                    <p class="text-xs text-gray-400 mt-1">{{ "{:,}".format(total_views|int) }} views</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Podcast Episodes</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_episodes }}</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Affiliate (All Time)</p>
+                    <p class="text-2xl font-bold text-emerald-600">${{ "%.2f"|format(total_affiliate_revenue) }}</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-5 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Sponsor Revenue</p>
+                    <p class="text-2xl font-bold text-emerald-600">${{ "%.2f"|format(video_sponsor_revenue + podcast_sponsor_revenue) }}</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Pipeline -->
+    <div class="bg-white rounded-xl border border-surface-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Inventory Pipeline</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="relative overflow-hidden rounded-lg bg-amber-50 p-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
+                <p class="text-xs font-medium text-amber-700 uppercase tracking-wide">In Queue</p>
+                <p class="text-2xl font-bold text-amber-900 mt-1">{{ in_queue }}</p>
+            </div>
+            <div class="relative overflow-hidden rounded-lg bg-blue-50 p-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-blue-400"></div>
+                <p class="text-xs font-medium text-blue-700 uppercase tracking-wide">Reviewing</p>
+                <p class="text-2xl font-bold text-blue-900 mt-1">{{ reviewing }}</p>
+            </div>
+            <div class="relative overflow-hidden rounded-lg bg-violet-50 p-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-violet-400"></div>
+                <p class="text-xs font-medium text-violet-700 uppercase tracking-wide">Listed</p>
+                <p class="text-2xl font-bold text-violet-900 mt-1">{{ listed }}</p>
+            </div>
+            <div class="relative overflow-hidden rounded-lg bg-emerald-50 p-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-emerald-400"></div>
+                <p class="text-xs font-medium text-emerald-700 uppercase tracking-wide">Sold</p>
+                <p class="text-2xl font-bold text-emerald-900 mt-1">{{ sold_count }}</p>
+            </div>
+            <div class="relative overflow-hidden rounded-lg bg-gray-50 p-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-gray-400"></div>
+                <p class="text-xs font-medium text-gray-600 uppercase tracking-wide">Review / Personal</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">{{ review_units }} / {{ personal_purchases }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
         <!-- Upcoming Deadlines -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="p-4 border-b">
-                <h2 class="font-semibold text-gray-800">Upcoming Deadlines</h2>
+        <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-surface-200 flex items-center justify-between">
+                <h2 class="font-semibold text-gray-900">Upcoming Deadlines</h2>
+                <a href="{{ url_for('inventory.list_inventory') }}?status=in_queue" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all</a>
             </div>
-            <div class="p-4">
+            <div class="p-6">
                 {% if upcoming_deadlines %}
-                    <ul class="space-y-2">
+                    <ul class="space-y-3">
                         {% for item in upcoming_deadlines %}
-                            <li class="flex justify-between items-center">
-                                <span>{{ item.product_name }}</span>
-                                <span class="text-sm {% if item.deadline %}text-red-600 font-medium{% else %}text-gray-500{% endif %}">
+                            <li class="flex items-center justify-between gap-4">
+                                <span class="text-sm text-gray-700 truncate">{{ item.product_name }}</span>
+                                <span class="text-sm font-medium flex-shrink-0 {% if item.deadline %}text-red-600{% else %}text-gray-400{% endif %}">
                                     {{ item.deadline.strftime('%b %d') if item.deadline else 'No deadline' }}
                                 </span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-gray-500 text-sm">No upcoming deadlines</p>
+                    <p class="text-gray-500 text-sm text-center py-4">No upcoming deadlines</p>
                 {% endif %}
             </div>
         </div>
 
         <!-- Recent Inventory -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="p-4 border-b">
-                <h2 class="font-semibold text-gray-800">Recent Inventory</h2>
+        <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-surface-200 flex items-center justify-between">
+                <h2 class="font-semibold text-gray-900">Recent Inventory</h2>
+                <a href="{{ url_for('inventory.list_inventory') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all</a>
             </div>
-            <div class="p-4">
+            <div class="p-6">
                 {% if recent_inventory %}
-                    <ul class="space-y-2">
+                    <ul class="space-y-3">
                         {% for item in recent_inventory %}
-                            <li class="flex justify-between items-center">
-                                <span>{{ item.product_name }}</span>
-                                <span class="text-xs px-2 py-1 rounded-full
-                                    {% if item.status == 'in_queue' %}bg-yellow-100 text-yellow-700
+                            <li class="flex items-center justify-between gap-4">
+                                <span class="text-sm text-gray-700 truncate">{{ item.product_name }}</span>
+                                <span class="text-xs font-medium px-2.5 py-1 rounded-full
+                                    {% if item.status == 'in_queue' %}bg-amber-100 text-amber-700
                                     {% elif item.status == 'reviewing' %}bg-blue-100 text-blue-700
-                                    {% elif item.status == 'reviewed' %}bg-purple-100 text-purple-700
+                                    {% elif item.status == 'reviewed' %}bg-violet-100 text-violet-700
                                     {% elif item.status == 'listed' %}bg-orange-100 text-orange-700
-                                    {% elif item.status == 'sold' %}bg-green-100 text-green-700
+                                    {% elif item.status == 'sold' %}bg-emerald-100 text-emerald-700
                                     {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                    {{ item.status }}
+                                    {{ item.status|replace('_', ' ')|title }}
                                 </span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-gray-500 text-sm">No inventory yet</p>
+                    <p class="text-gray-500 text-sm text-center py-4">No inventory yet</p>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="flex flex-wrap gap-4">
-        <a href="{{ url_for('inventory.new_item') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-            + Add Inventory
-        </a>
-        <a href="{{ url_for('contacts.new_contact') }}" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
-            + Add Contact
-        </a>
-        <a href="{{ url_for('companies.new_company') }}" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
-            + Add Company
-        </a>
+    <!-- Affiliate Revenue Chart -->
+    <div class="bg-white rounded-xl border border-surface-200 p-6">
+        <h2 class="font-semibold text-gray-900 mb-4">Monthly Affiliate Revenue</h2>
+        <div class="h-64">
+            <canvas id="revenueChart"></canvas>
+        </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const monthlyData = {{ monthly_revenue_json|safe }};
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: monthlyData.map(d => d.month),
+            datasets: [{
+                label: 'Revenue ($)',
+                data: monthlyData.map(d => d.revenue),
+                backgroundColor: 'rgba(14, 165, 233, 0.8)',
+                borderColor: 'rgba(14, 165, 233, 1)',
+                borderWidth: 0,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value;
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

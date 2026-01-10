@@ -64,6 +64,8 @@ class Company(db.Model):
     # Relationships
     contacts = db.relationship('Contact', back_populates='company')
     inventory_items = db.relationship('Inventory', back_populates='company')
+    videos = db.relationship('Video', back_populates='company')
+    affiliate_revenues = db.relationship('AffiliateRevenue', back_populates='company')
 
     def to_dict(self):
         return {
@@ -162,5 +164,164 @@ class Inventory(db.Model):
             'marketplace': self.marketplace,
             'buyer': self.buyer,
             'sale_notes': self.sale_notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# Association table for Video <-> Inventory many-to-many
+video_inventory = db.Table('video_inventory',
+    db.Column('video_id', db.Integer, db.ForeignKey('videos.id'), primary_key=True),
+    db.Column('inventory_id', db.Integer, db.ForeignKey('inventory.id'), primary_key=True)
+)
+
+# Association table for PodcastEpisode <-> Contact (guests) many-to-many
+episode_guests = db.Table('episode_guests',
+    db.Column('episode_id', db.Integer, db.ForeignKey('podcast_episodes.id'), primary_key=True),
+    db.Column('contact_id', db.Integer, db.ForeignKey('contacts.id'), primary_key=True)
+)
+
+
+class Video(db.Model):
+    """YouTube videos - reviews, comparisons, guides, etc."""
+    __tablename__ = 'videos'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # YouTube API fields (auto-synced)
+    youtube_id = db.Column(db.String(20), unique=True, nullable=True)  # YouTube video ID
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    url = db.Column(db.String(300), nullable=True)
+    thumbnail_url = db.Column(db.String(300), nullable=True)
+    publish_date = db.Column(db.Date, nullable=True)
+    duration = db.Column(db.String(20), nullable=True)  # ISO 8601 duration
+    views = db.Column(db.Integer, nullable=True)
+    likes = db.Column(db.Integer, nullable=True)
+    comments = db.Column(db.Integer, nullable=True)
+    last_synced = db.Column(db.DateTime, nullable=True)
+
+    # Business metadata (manual entry)
+    video_type = db.Column(db.String(20), default='review')  # review, comparison, guide, tierlist, podcast, short, other
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=True)
+    sponsored = db.Column(db.Boolean, default=False)
+    sponsor_amount = db.Column(db.Float, nullable=True)
+    affiliate_links = db.Column(db.Boolean, default=False)
+    notes = db.Column(db.Text, nullable=True)
+    is_podcast = db.Column(db.Boolean, default=False)  # Flag for MouseCast episodes
+    is_short = db.Column(db.Boolean, default=False)  # YouTube Shorts
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    company = db.relationship('Company', back_populates='videos')
+    products = db.relationship('Inventory', secondary=video_inventory, backref='videos')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'youtube_id': self.youtube_id,
+            'title': self.title,
+            'description': self.description,
+            'url': self.url,
+            'thumbnail_url': self.thumbnail_url,
+            'publish_date': self.publish_date.isoformat() if self.publish_date else None,
+            'duration': self.duration,
+            'views': self.views,
+            'likes': self.likes,
+            'comments': self.comments,
+            'last_synced': self.last_synced.isoformat() if self.last_synced else None,
+            'video_type': self.video_type,
+            'company_id': self.company_id,
+            'company_name': self.company.name if self.company else None,
+            'sponsored': self.sponsored,
+            'sponsor_amount': self.sponsor_amount,
+            'affiliate_links': self.affiliate_links,
+            'notes': self.notes,
+            'is_podcast': self.is_podcast,
+            'is_short': self.is_short,
+            'product_count': len(self.products),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class PodcastEpisode(db.Model):
+    """MouseCast podcast episodes."""
+    __tablename__ = 'podcast_episodes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    episode_number = db.Column(db.Integer, nullable=True)
+    title = db.Column(db.String(200), nullable=False)
+    publish_date = db.Column(db.Date, nullable=True)
+    youtube_url = db.Column(db.String(300), nullable=True)
+    topics = db.Column(db.Text, nullable=True)  # Comma-separated or free text
+    sponsored = db.Column(db.Boolean, default=False)
+    sponsor_name = db.Column(db.String(100), nullable=True)
+    sponsor_amount = db.Column(db.Float, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    guests = db.relationship('Contact', secondary=episode_guests, backref='podcast_appearances')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'episode_number': self.episode_number,
+            'title': self.title,
+            'publish_date': self.publish_date.isoformat() if self.publish_date else None,
+            'youtube_url': self.youtube_url,
+            'topics': self.topics,
+            'sponsored': self.sponsored,
+            'sponsor_name': self.sponsor_name,
+            'sponsor_amount': self.sponsor_amount,
+            'notes': self.notes,
+            'guest_names': [g.name for g in self.guests],
+            'guest_count': len(self.guests),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AffiliateRevenue(db.Model):
+    """Monthly affiliate revenue tracking by company."""
+    __tablename__ = 'affiliate_revenue'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)  # 1-12
+    revenue = db.Column(db.Float, nullable=False, default=0.0)
+    sales_count = db.Column(db.Integer, nullable=True)  # Number of sales if known
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    company = db.relationship('Company', back_populates='affiliate_revenues')
+
+    # Unique constraint: one entry per company per month
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'year', 'month', name='unique_company_month'),
+    )
+
+    @property
+    def month_year(self):
+        """Return formatted month/year string."""
+        months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return f"{months[self.month]} {self.year}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'company_id': self.company_id,
+            'company_name': self.company.name if self.company else None,
+            'year': self.year,
+            'month': self.month,
+            'month_year': self.month_year,
+            'revenue': self.revenue,
+            'sales_count': self.sales_count,
+            'notes': self.notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

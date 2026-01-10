@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Affiliate Revenue - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Affiliate Revenue</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ entries|length }} entries</p>
+        </div>
+        <a href="{{ url_for('affiliates.new_revenue') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Revenue
+        </a>
+    </div>
+
+    <!-- Total Revenue Card -->
+    <div class="bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 rounded-xl shadow-lg p-6 text-white">
+        <p class="text-emerald-100 text-sm font-medium">Total Revenue{% if current_year %} ({{ current_year }}){% endif %}</p>
+        <p class="text-4xl font-bold mt-1">${{ "%.2f"|format(total_revenue) }}</p>
+    </div>
+
+    <!-- Revenue by Company -->
+    {% if revenue_by_company %}
+    <div class="bg-white rounded-xl border border-surface-200 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Revenue by Company</h3>
+        <div class="space-y-3">
+            {% for company_name, total in revenue_by_company %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-700">{{ company_name }}</span>
+                    <span class="text-sm font-semibold text-emerald-600">${{ "%.2f"|format(total) }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Year</label>
+                <select name="year" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Years</option>
+                    {% for y in years %}
+                        <option value="{{ y }}" {% if current_year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Company</label>
+                <select name="company_id" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Companies</option>
+                    {% for company in companies %}
+                        <option value="{{ company.id }}" {% if current_company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('affiliates.list_revenue') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Revenue Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+        {% if entries %}
+            <div class="overflow-x-auto">
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="month" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Month</th>
+                            <th data-sort="company" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
+                            <th data-sort="revenue" data-sort-type="number" class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Revenue</th>
+                            <th data-sort="sales" data-sort-type="number" class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Sales</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Notes</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-surface-200">
+                        {% for entry in entries %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-4 py-3 font-medium text-gray-900" data-value="{{ entry.month_year }}">{{ entry.month_year }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-700" data-value="{{ entry.company.name }}">{{ entry.company.name }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-emerald-600" data-value="{{ entry.revenue }}">${{ "%.2f"|format(entry.revenue) }}</td>
+                                <td class="px-4 py-3 text-right hidden md:table-cell text-sm text-gray-500" data-value="{{ entry.sales_count or 0 }}">
+                                    {{ entry.sales_count if entry.sales_count else '-' }}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-500 truncate max-w-xs">
+                                    {{ entry.notes or '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{{ url_for('affiliates.edit_revenue', id=entry.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('affiliates.delete_revenue', id=entry.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this entry?')">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <p class="text-gray-500 mb-2">No revenue entries found</p>
+                <a href="{{ url_for('affiliates.new_revenue') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first entry</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

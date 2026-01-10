@@ -17,6 +17,10 @@ class Config:
     BACKUP_DIR = BASE_DIR / 'backups'
     BACKUP_RETENTION_DAYS = 30
 
+    # YouTube API settings
+    YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
+    YOUTUBE_CHANNEL_ID = os.environ.get('YOUTUBE_CHANNEL_ID')  # Your channel ID
+
 
 class TestConfig(Config):
     """Testing configuration."""

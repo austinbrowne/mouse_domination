@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template
-from models import Contact, Company, Inventory
+from models import Contact, Company, Inventory, Video, PodcastEpisode, AffiliateRevenue
 from app import db
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import json
 
 main_bp = Blueprint('main', __name__)
 
@@ -51,6 +52,43 @@ def dashboard():
         Inventory.updated_at.desc()
     ).limit(5).all()
 
+    # Phase 2: Video stats
+    total_videos = Video.query.count()
+    total_views = db.session.query(func.sum(Video.views)).scalar() or 0
+    video_sponsor_revenue = db.session.query(func.sum(Video.sponsor_amount)).filter(
+        Video.sponsored == True
+    ).scalar() or 0
+
+    # Phase 2: Podcast stats
+    total_episodes = PodcastEpisode.query.count()
+    podcast_sponsor_revenue = db.session.query(func.sum(PodcastEpisode.sponsor_amount)).filter(
+        PodcastEpisode.sponsored == True
+    ).scalar() or 0
+
+    # Phase 2: Affiliate revenue stats (current year)
+    current_year = datetime.now().year
+    yearly_affiliate_revenue = db.session.query(func.sum(AffiliateRevenue.revenue)).filter(
+        AffiliateRevenue.year == current_year
+    ).scalar() or 0
+
+    total_affiliate_revenue = db.session.query(func.sum(AffiliateRevenue.revenue)).scalar() or 0
+
+    # Monthly affiliate revenue for chart (last 12 months)
+    monthly_revenue = []
+    for i in range(11, -1, -1):
+        target_date = datetime.now() - timedelta(days=i*30)
+        month = target_date.month
+        year = target_date.year
+        revenue = db.session.query(func.sum(AffiliateRevenue.revenue)).filter(
+            AffiliateRevenue.year == year,
+            AffiliateRevenue.month == month
+        ).scalar() or 0
+        month_name = target_date.strftime('%b')
+        monthly_revenue.append({'month': f"{month_name} {year}", 'revenue': float(revenue)})
+
+    # Total revenue from all sources
+    total_revenue = video_sponsor_revenue + podcast_sponsor_revenue + total_affiliate_revenue + total_profit_loss
+
     return render_template('dashboard.html',
         total_contacts=total_contacts,
         total_companies=total_companies,
@@ -66,4 +104,15 @@ def dashboard():
         upcoming_deadlines=upcoming_deadlines,
         recent_inventory=recent_inventory,
         recent_sales=recent_sales,
+        # Phase 2 data
+        total_videos=total_videos,
+        total_views=total_views,
+        video_sponsor_revenue=video_sponsor_revenue,
+        total_episodes=total_episodes,
+        podcast_sponsor_revenue=podcast_sponsor_revenue,
+        yearly_affiliate_revenue=yearly_affiliate_revenue,
+        total_affiliate_revenue=total_affiliate_revenue,
+        total_revenue=total_revenue,
+        monthly_revenue_json=json.dumps(monthly_revenue),
+        current_year=current_year,
     )

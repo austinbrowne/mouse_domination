@@ -4,24 +4,29 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-800">Contacts</h1>
-        <a href="{{ url_for('contacts.new_contact') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-            + Add Contact
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Contacts</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ contacts|length }} contacts</p>
+        </div>
+        <a href="{{ url_for('contacts.new_contact') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Contact
         </a>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4">
-        <form method="get" class="flex flex-wrap gap-4 items-end">
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Search</label>
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
                 <input type="text" name="search" value="{{ search }}" placeholder="Name..."
-                    class="border rounded-lg px-3 py-2 w-48">
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Role</label>
-                <select name="role" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Role</label>
+                <select name="role" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Roles</option>
                     <option value="reviewer" {% if current_role == 'reviewer' %}selected{% endif %}>Reviewer</option>
                     <option value="company_rep" {% if current_role == 'company_rep' %}selected{% endif %}>Company Rep</option>
@@ -30,8 +35,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Status</label>
-                <select name="status" class="border rounded-lg px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                     <option value="">All Statuses</option>
                     <option value="cold" {% if current_status == 'cold' %}selected{% endif %}>Cold</option>
                     <option value="warm" {% if current_status == 'warm' %}selected{% endif %}>Warm</option>
@@ -39,55 +44,67 @@
                     <option value="close" {% if current_status == 'close' %}selected{% endif %}>Close</option>
                 </select>
             </div>
-            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Filter</button>
-            <a href="{{ url_for('contacts.list_contacts') }}" class="text-gray-500 hover:text-gray-700 px-4 py-2">Clear</a>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('contacts.list_contacts') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
         </form>
     </div>
 
-    <!-- Contacts List -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <!-- Contacts Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
         {% if contacts %}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Name</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Role</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Company</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Status</th>
-                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Twitter</th>
-                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="name" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                            <th data-sort="role" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
+                            <th data-sort="company" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Company</th>
+                            <th data-sort="status" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Status</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Twitter</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody class="divide-y divide-surface-200">
                         {% for contact in contacts %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 font-medium">{{ contact.name }}</td>
-                                <td class="px-4 py-3">
-                                    <span class="text-xs px-2 py-1 rounded-full
-                                        {% if contact.role == 'reviewer' %}bg-blue-100 text-blue-700
-                                        {% elif contact.role == 'company_rep' %}bg-purple-100 text-purple-700
-                                        {% elif contact.role == 'podcast_guest' %}bg-green-100 text-green-700
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-4 py-3 font-medium text-gray-900" data-value="{{ contact.name }}">{{ contact.name }}</td>
+                                <td class="px-4 py-3" data-value="{{ contact.role }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if contact.role == 'reviewer' %}bg-blue-50 text-blue-700
+                                        {% elif contact.role == 'company_rep' %}bg-violet-50 text-violet-700
+                                        {% elif contact.role == 'podcast_guest' %}bg-emerald-50 text-emerald-700
                                         {% else %}bg-gray-100 text-gray-700{% endif %}">
                                         {{ contact.role|replace('_', ' ')|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 hidden md:table-cell">{{ contact.company.name if contact.company else '-' }}</td>
-                                <td class="px-4 py-3 hidden md:table-cell">
-                                    <span class="text-xs px-2 py-1 rounded-full
-                                        {% if contact.relationship_status == 'close' %}bg-green-100 text-green-700
-                                        {% elif contact.relationship_status == 'active' %}bg-blue-100 text-blue-700
-                                        {% elif contact.relationship_status == 'warm' %}bg-yellow-100 text-yellow-700
-                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-600" data-value="{{ contact.company.name if contact.company else '' }}">
+                                    {{ contact.company.name if contact.company else '-' }}
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ contact.relationship_status }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if contact.relationship_status == 'close' %}bg-emerald-50 text-emerald-700
+                                        {% elif contact.relationship_status == 'active' %}bg-blue-50 text-blue-700
+                                        {% elif contact.relationship_status == 'warm' %}bg-amber-50 text-amber-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
                                         {{ contact.relationship_status|title }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-500">{{ contact.twitter or '-' }}</td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-500">
+                                    {% if contact.twitter %}
+                                        <a href="https://twitter.com/{{ contact.twitter }}" target="_blank" class="text-primary-600 hover:text-primary-700">@{{ contact.twitter }}</a>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td class="px-4 py-3 text-right">
-                                    <a href="{{ url_for('contacts.edit_contact', id=contact.id) }}" class="text-primary-600 hover:text-primary-800 mr-2">Edit</a>
-                                    <form action="{{ url_for('contacts.delete_contact', id=contact.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this contact?')">
-                                        <button type="submit" class="text-red-600 hover:text-red-800">Delete</button>
-                                    </form>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{{ url_for('contacts.edit_contact', id=contact.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('contacts.delete_contact', id=contact.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this contact?')">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -95,12 +112,12 @@
                 </table>
             </div>
         {% else %}
-            <div class="p-8 text-center text-gray-500">
-                No contacts found. <a href="{{ url_for('contacts.new_contact') }}" class="text-primary-600 hover:underline">Add your first contact</a>
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <p class="text-gray-500 mb-2">No contacts found</p>
+                <a href="{{ url_for('contacts.new_contact') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first contact</a>
             </div>
         {% endif %}
     </div>
-
-    <div class="text-sm text-gray-500">{{ contacts|length }} contact(s)</div>
 </div>
 {% endblock %}
