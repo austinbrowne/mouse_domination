@@ -1,8 +1,9 @@
 import os
-from flask import Flask, request
+from flask import Flask, request, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from config import Config, DevelopmentConfig, ProductionConfig
+import uuid
 
 db = SQLAlchemy()
 csrf = CSRFProtect()
@@ -27,6 +28,11 @@ def create_app(config_class=None):
     # Initialize extensions
     db.init_app(app)
     csrf.init_app(app)
+
+    # Add request ID for logging context
+    @app.before_request
+    def add_request_id():
+        g.request_id = str(uuid.uuid4())[:8]
 
     # Add security headers
     @app.after_request
