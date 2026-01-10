@@ -1,6 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from models import Inventory, Company
 from app import db
+from constants import (
+    INVENTORY_CATEGORY_CHOICES, INVENTORY_SOURCE_TYPE_CHOICES,
+    INVENTORY_STATUS_CHOICES, INVENTORY_CONDITION_CHOICES,
+    MARKETPLACE_CHOICES, DEFAULT_PAGE_SIZE
+)
 from utils.validation import (
     parse_date, parse_float, validate_required, validate_foreign_key,
     or_none, ValidationError
@@ -8,45 +15,45 @@ from utils.validation import (
 
 inventory_bp = Blueprint('inventory', __name__)
 
-CATEGORY_CHOICES = ['mouse', 'keyboard', 'mousepad', 'iem', 'other']
-SOURCE_TYPE_CHOICES = ['review_unit', 'personal_purchase']
-STATUS_CHOICES = ['in_queue', 'reviewing', 'reviewed', 'keeping', 'listed', 'sold']
-CONDITION_CHOICES = ['new', 'open_box', 'used']
-MARKETPLACE_CHOICES = ['ebay', 'reddit', 'discord', 'facebook', 'offerup', 'mercari', 'local', 'other']
-
 
 @inventory_bp.route('/')
 def list_inventory():
-    """List all inventory with optional filtering."""
+    """List all inventory with optional filtering and pagination."""
     source_type = request.args.get('source_type')
     category = request.args.get('category')
     status = request.args.get('status')
     sold = request.args.get('sold')
     search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
 
-    query = Inventory.query
+    # Eager load company relationship to avoid N+1
+    query = Inventory.query.options(joinedload(Inventory.company))
 
-    if source_type and source_type in SOURCE_TYPE_CHOICES:
+    if source_type and source_type in INVENTORY_SOURCE_TYPE_CHOICES:
         query = query.filter_by(source_type=source_type)
-    if category and category in CATEGORY_CHOICES:
+    if category and category in INVENTORY_CATEGORY_CHOICES:
         query = query.filter_by(category=category)
-    if status and status in STATUS_CHOICES:
+    if status and status in INVENTORY_STATUS_CHOICES:
         query = query.filter_by(status=status)
     if sold == 'yes':
         query = query.filter_by(sold=True)
     elif sold == 'no':
         query = query.filter_by(sold=False)
     if search:
-        query = query.filter(Inventory.product_name.ilike('%' + search + '%'))
+        query = query.filter(Inventory.product_name.ilike(f"%{search}%"))
 
-    items = query.order_by(Inventory.date_acquired.desc()).all()
+    # Paginated query
+    pagination = query.order_by(Inventory.date_acquired.desc()).paginate(
+        page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
+    )
     companies = Company.query.order_by(Company.name).all()
 
-    # Calculate totals
-    total_profit_loss = sum(item.profit_loss for item in items if item.sold)
+    # Calculate totals for current page
+    total_profit_loss = sum(item.profit_loss for item in pagination.items if item.sold)
 
     return render_template('inventory/list.html',
-        items=items,
+        items=pagination.items,
+        pagination=pagination,
         companies=companies,
         current_source_type=source_type,
         current_category=category,
@@ -68,21 +75,21 @@ def new_item():
             # Validate foreign key
             company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
 
-            # Validate choices
+            # Validate choices using constants
             category = request.form.get('category', 'mouse')
-            if category not in CATEGORY_CHOICES:
+            if category not in INVENTORY_CATEGORY_CHOICES:
                 category = 'mouse'
 
             source_type = request.form.get('source_type', 'review_unit')
-            if source_type not in SOURCE_TYPE_CHOICES:
+            if source_type not in INVENTORY_SOURCE_TYPE_CHOICES:
                 source_type = 'review_unit'
 
             status = request.form.get('status', 'in_queue')
-            if status not in STATUS_CHOICES:
+            if status not in INVENTORY_STATUS_CHOICES:
                 status = 'in_queue'
 
             condition = request.form.get('condition', 'new')
-            if condition not in CONDITION_CHOICES:
+            if condition not in INVENTORY_CONDITION_CHOICES:
                 condition = 'new'
 
             marketplace = or_none(request.form.get('marketplace', ''))
@@ -135,6 +142,11 @@ def new_item():
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=None, companies=companies)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            return render_template('inventory/form.html', item=None, companies=companies)
 
     companies = Company.query.order_by(Company.name).all()
     return render_template('inventory/form.html', item=None, companies=companies)
@@ -153,21 +165,21 @@ def edit_item(id):
             # Validate foreign key
             company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
 
-            # Validate choices
+            # Validate choices using constants
             category = request.form.get('category', 'mouse')
-            if category not in CATEGORY_CHOICES:
+            if category not in INVENTORY_CATEGORY_CHOICES:
                 category = 'mouse'
 
             source_type = request.form.get('source_type', 'review_unit')
-            if source_type not in SOURCE_TYPE_CHOICES:
+            if source_type not in INVENTORY_SOURCE_TYPE_CHOICES:
                 source_type = 'review_unit'
 
             status = request.form.get('status', 'in_queue')
-            if status not in STATUS_CHOICES:
+            if status not in INVENTORY_STATUS_CHOICES:
                 status = 'in_queue'
 
             condition = request.form.get('condition', 'new')
-            if condition not in CONDITION_CHOICES:
+            if condition not in INVENTORY_CONDITION_CHOICES:
                 condition = 'new'
 
             marketplace = or_none(request.form.get('marketplace', ''))
@@ -217,6 +229,11 @@ def edit_item(id):
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=item, companies=companies)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            return render_template('inventory/form.html', item=item, companies=companies)
 
     companies = Company.query.order_by(Company.name).all()
     return render_template('inventory/form.html', item=item, companies=companies)
@@ -225,20 +242,28 @@ def edit_item(id):
 @inventory_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_item(id):
     """Delete an inventory item."""
-    item = Inventory.query.get_or_404(id)
-    name = item.product_name
-    db.session.delete(item)
-    db.session.commit()
-    flash(f'Item "{name}" deleted.', 'success')
+    try:
+        item = Inventory.query.get_or_404(id)
+        name = item.product_name
+        db.session.delete(item)
+        db.session.commit()
+        flash(f'Item "{name}" deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('inventory.list_inventory'))
 
 
 @inventory_bp.route('/<int:id>/mark-sold', methods=['POST'])
 def mark_sold(id):
     """Quick action to mark an item as sold."""
-    item = Inventory.query.get_or_404(id)
-    item.sold = True
-    item.status = 'sold'
-    db.session.commit()
-    flash(f'Item "{item.product_name}" marked as sold.', 'success')
+    try:
+        item = Inventory.query.get_or_404(id)
+        item.sold = True
+        item.status = 'sold'
+        db.session.commit()
+        flash(f'Item "{item.product_name}" marked as sold.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('inventory.list_inventory'))

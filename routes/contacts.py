@@ -1,6 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from models import Contact, Company
 from app import db
+from constants import CONTACT_ROLE_CHOICES, CONTACT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 from utils.validation import (
     parse_date, validate_required, validate_email, validate_foreign_key,
     validate_choice, or_none, ValidationError
@@ -8,32 +11,34 @@ from utils.validation import (
 
 contacts_bp = Blueprint('contacts', __name__)
 
-ROLE_CHOICES = ['reviewer', 'company_rep', 'podcast_guest', 'other']
-STATUS_CHOICES = ['cold', 'warm', 'active', 'close']
-
 
 @contacts_bp.route('/')
 def list_contacts():
-    """List all contacts with optional filtering."""
+    """List all contacts with optional filtering and pagination."""
     role = request.args.get('role')
     status = request.args.get('status')
     search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
 
-    query = Contact.query
+    # Eager load company relationship to avoid N+1
+    query = Contact.query.options(joinedload(Contact.company))
 
-    if role and role in ROLE_CHOICES:
+    if role and role in CONTACT_ROLE_CHOICES:
         query = query.filter_by(role=role)
-    if status and status in STATUS_CHOICES:
+    if status and status in CONTACT_STATUS_CHOICES:
         query = query.filter_by(relationship_status=status)
     if search:
-        # Use parameterized query to avoid SQL injection
-        query = query.filter(Contact.name.ilike('%' + search + '%'))
+        query = query.filter(Contact.name.ilike(f"%{search}%"))
 
-    contacts = query.order_by(Contact.name).all()
+    # Paginated query
+    pagination = query.order_by(Contact.name).paginate(
+        page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
+    )
     companies = Company.query.order_by(Company.name).all()
 
     return render_template('contacts/list.html',
-        contacts=contacts,
+        contacts=pagination.items,
+        pagination=pagination,
         companies=companies,
         current_role=role,
         current_status=status,
@@ -49,13 +54,13 @@ def new_contact():
             # Validate required fields
             name = validate_required(request.form.get('name', ''), 'Name')
 
-            # Validate choices
+            # Validate choices using constants
             role = request.form.get('role', 'other')
-            if role not in ROLE_CHOICES:
+            if role not in CONTACT_ROLE_CHOICES:
                 role = 'other'
 
             status = request.form.get('relationship_status', 'cold')
-            if status not in STATUS_CHOICES:
+            if status not in CONTACT_STATUS_CHOICES:
                 status = 'cold'
 
             # Validate foreign key
@@ -90,6 +95,11 @@ def new_contact():
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=None, companies=companies)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            return render_template('contacts/form.html', contact=None, companies=companies)
 
     companies = Company.query.order_by(Company.name).all()
     return render_template('contacts/form.html', contact=None, companies=companies)
@@ -105,13 +115,13 @@ def edit_contact(id):
             # Validate required fields
             name = validate_required(request.form.get('name', ''), 'Name')
 
-            # Validate choices
+            # Validate choices using constants
             role = request.form.get('role', 'other')
-            if role not in ROLE_CHOICES:
+            if role not in CONTACT_ROLE_CHOICES:
                 role = 'other'
 
             status = request.form.get('relationship_status', 'cold')
-            if status not in STATUS_CHOICES:
+            if status not in CONTACT_STATUS_CHOICES:
                 status = 'cold'
 
             # Validate foreign key
@@ -143,6 +153,11 @@ def edit_contact(id):
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=contact, companies=companies)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            return render_template('contacts/form.html', contact=contact, companies=companies)
 
     companies = Company.query.order_by(Company.name).all()
     return render_template('contacts/form.html', contact=contact, companies=companies)
@@ -151,9 +166,13 @@ def edit_contact(id):
 @contacts_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_contact(id):
     """Delete a contact."""
-    contact = Contact.query.get_or_404(id)
-    name = contact.name
-    db.session.delete(contact)
-    db.session.commit()
-    flash(f'Contact "{name}" deleted.', 'success')
+    try:
+        contact = Contact.query.get_or_404(id)
+        name = contact.name
+        db.session.delete(contact)
+        db.session.commit()
+        flash(f'Contact "{name}" deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('contacts.list_contacts'))

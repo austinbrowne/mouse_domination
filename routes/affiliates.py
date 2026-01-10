@@ -1,9 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from models import AffiliateRevenue, Company
 from app import db
 from datetime import datetime
+from constants import DEFAULT_PAGE_SIZE
 from utils.validation import (
     parse_float, parse_int, validate_required, validate_foreign_key, validate_range,
     or_none, ValidationError
@@ -14,10 +16,12 @@ affiliates_bp = Blueprint('affiliates', __name__)
 
 @affiliates_bp.route('/')
 def list_revenue():
-    """List affiliate revenue with stats."""
+    """List affiliate revenue with stats and pagination."""
     year = request.args.get('year', type=int)
     company_id = request.args.get('company_id', type=int)
+    page = request.args.get('page', 1, type=int)
 
+    # Eager load company to avoid N+1
     query = AffiliateRevenue.query.options(joinedload(AffiliateRevenue.company))
 
     if year:
@@ -25,7 +29,10 @@ def list_revenue():
     if company_id:
         query = query.filter_by(company_id=company_id)
 
-    entries = query.order_by(AffiliateRevenue.year.desc(), AffiliateRevenue.month.desc()).all()
+    # Paginated query
+    pagination = query.order_by(
+        AffiliateRevenue.year.desc(), AffiliateRevenue.month.desc()
+    ).paginate(page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False)
 
     # Get available years for filter
     years = db.session.query(AffiliateRevenue.year).distinct().order_by(AffiliateRevenue.year.desc()).all()
@@ -52,7 +59,8 @@ def list_revenue():
     companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
 
     return render_template('affiliates/list.html',
-        entries=entries,
+        entries=pagination.items,
+        pagination=pagination,
         years=years,
         current_year=year,
         current_company_id=company_id,
@@ -125,6 +133,14 @@ def new_revenue():
             current_month = datetime.now().month
             return render_template('affiliates/form.html', entry=None, companies=companies,
                                   current_year=current_year, current_month=current_month)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
+            current_year = datetime.now().year
+            current_month = datetime.now().month
+            return render_template('affiliates/form.html', entry=None, companies=companies,
+                                  current_year=current_year, current_month=current_month)
 
     companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
     current_year = datetime.now().year
@@ -160,6 +176,12 @@ def edit_revenue(id):
             companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
             return render_template('affiliates/form.html', entry=entry, companies=companies,
                                   current_year=None, current_month=None)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
+            return render_template('affiliates/form.html', entry=entry, companies=companies,
+                                  current_year=None, current_month=None)
 
     companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
     return render_template('affiliates/form.html', entry=entry, companies=companies,
@@ -169,8 +191,12 @@ def edit_revenue(id):
 @affiliates_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_revenue(id):
     """Delete a revenue entry."""
-    entry = AffiliateRevenue.query.get_or_404(id)
-    db.session.delete(entry)
-    db.session.commit()
-    flash('Revenue entry deleted.', 'success')
+    try:
+        entry = AffiliateRevenue.query.get_or_404(id)
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Revenue entry deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('affiliates.list_revenue'))

@@ -8,7 +8,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Companies</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ companies|length }} companies</p>
+            <p class="text-sm text-gray-500 mt-1">{{ companies_with_counts|length }} companies</p>
         </div>
         <a href="{{ url_for('companies.new_company') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -64,7 +64,7 @@
 
     <!-- Companies Table -->
     <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
-        {% if companies %}
+        {% if companies_with_counts %}
             <div class="overflow-x-auto">
                 <table class="w-full sortable">
                     <thead>
@@ -79,10 +79,12 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-200">
-                        {% for company in companies %}
+                        {% for item in companies_with_counts %}
+                            {% set company = item.company %}
                             <tr class="hover:bg-surface-50">
                                 <td class="px-4 py-3" data-value="{{ company.name }}">
                                     <div class="font-medium text-gray-900">{{ company.name }}</div>
+                                    <div class="text-xs text-gray-500">{{ item.contact_count }} contacts, {{ item.inventory_count }} products</div>
                                     {% if company.priority == 'target' %}
                                         <span class="text-xs text-orange-600 font-medium">Target</span>
                                     {% endif %}

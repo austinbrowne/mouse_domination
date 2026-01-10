@@ -1,17 +1,18 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from sqlalchemy.exc import SQLAlchemyError
 from models import Company
 from app import db
+from constants import (
+    COMPANY_CATEGORY_CHOICES, COMPANY_STATUS_CHOICES,
+    COMPANY_PRIORITY_CHOICES, AFFILIATE_STATUS_CHOICES, DEFAULT_PAGE_SIZE
+)
+from services.crud import CompanyService
 from utils.validation import (
     parse_float, validate_required, validate_url, validate_range,
     or_none, ValidationError
 )
 
 companies_bp = Blueprint('companies', __name__)
-
-CATEGORY_CHOICES = ['mice', 'keyboards', 'mousepads', 'iems', 'other']
-STATUS_CHOICES = ['no_contact', 'reached_out', 'active', 'affiliate_only', 'past']
-PRIORITY_CHOICES = ['target', 'active', 'low']
-AFFILIATE_STATUS_CHOICES = ['yes', 'no', 'pending']
 
 
 @companies_bp.route('/')
@@ -21,22 +22,28 @@ def list_companies():
     status = request.args.get('status')
     priority = request.args.get('priority')
     search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
 
-    query = Company.query
+    # Build filters dict
+    filters = {}
+    if category and category in COMPANY_CATEGORY_CHOICES:
+        filters['category'] = category
+    if status and status in COMPANY_STATUS_CHOICES:
+        filters['relationship_status'] = status
+    if priority and priority in COMPANY_PRIORITY_CHOICES:
+        filters['priority'] = priority
 
-    if category and category in CATEGORY_CHOICES:
-        query = query.filter_by(category=category)
-    if status and status in STATUS_CHOICES:
-        query = query.filter_by(relationship_status=status)
-    if priority and priority in PRIORITY_CHOICES:
-        query = query.filter_by(priority=priority)
-    if search:
-        query = query.filter(Company.name.ilike('%' + search + '%'))
+    # Use service layer for efficient query with counts
+    results = CompanyService.list_with_counts(filters=filters, search=search)
 
-    companies = query.order_by(Company.name).all()
+    # Build company list with counts
+    companies_with_counts = [
+        {'company': c, 'contact_count': cc, 'inventory_count': ic}
+        for c, cc, ic in results
+    ]
 
     return render_template('companies/list.html',
-        companies=companies,
+        companies_with_counts=companies_with_counts,
         current_category=category,
         current_status=status,
         current_priority=priority,
@@ -58,17 +65,17 @@ def new_company():
                 flash(f'Company "{name}" already exists.', 'error')
                 return render_template('companies/form.html', company=None)
 
-            # Validate choices
+            # Validate choices using constants
             category = request.form.get('category', 'mice')
-            if category not in CATEGORY_CHOICES:
+            if category not in COMPANY_CATEGORY_CHOICES:
                 category = 'mice'
 
             status = request.form.get('relationship_status', 'no_contact')
-            if status not in STATUS_CHOICES:
+            if status not in COMPANY_STATUS_CHOICES:
                 status = 'no_contact'
 
             priority = request.form.get('priority', 'low')
-            if priority not in PRIORITY_CHOICES:
+            if priority not in COMPANY_PRIORITY_CHOICES:
                 priority = 'low'
 
             affiliate_status = request.form.get('affiliate_status', 'no')
@@ -105,6 +112,10 @@ def new_company():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('companies/form.html', company=None)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            return render_template('companies/form.html', company=None)
 
     return render_template('companies/form.html', company=None)
 
@@ -128,17 +139,17 @@ def edit_company(id):
                 flash(f'Company "{name}" already exists.', 'error')
                 return render_template('companies/form.html', company=company)
 
-            # Validate choices
+            # Validate choices using constants
             category = request.form.get('category', 'mice')
-            if category not in CATEGORY_CHOICES:
+            if category not in COMPANY_CATEGORY_CHOICES:
                 category = 'mice'
 
             status = request.form.get('relationship_status', 'no_contact')
-            if status not in STATUS_CHOICES:
+            if status not in COMPANY_STATUS_CHOICES:
                 status = 'no_contact'
 
             priority = request.form.get('priority', 'low')
-            if priority not in PRIORITY_CHOICES:
+            if priority not in COMPANY_PRIORITY_CHOICES:
                 priority = 'low'
 
             affiliate_status = request.form.get('affiliate_status', 'no')
@@ -172,6 +183,10 @@ def edit_company(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('companies/form.html', company=company)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            return render_template('companies/form.html', company=company)
 
     return render_template('companies/form.html', company=company)
 
@@ -179,9 +194,13 @@ def edit_company(id):
 @companies_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_company(id):
     """Delete a company."""
-    company = Company.query.get_or_404(id)
-    name = company.name
-    db.session.delete(company)
-    db.session.commit()
-    flash(f'Company "{name}" deleted.', 'success')
+    try:
+        company = Company.query.get_or_404(id)
+        name = company.name
+        db.session.delete(company)
+        db.session.commit()
+        flash(f'Company "{name}" deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('companies.list_companies'))

@@ -1,8 +1,10 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from models import PodcastEpisode, Contact
 from app import db
+from constants import DEFAULT_PAGE_SIZE
 from utils.validation import (
     parse_date, parse_float, parse_int, validate_required,
     or_none, ValidationError
@@ -13,10 +15,12 @@ podcast_bp = Blueprint('podcast', __name__)
 
 @podcast_bp.route('/')
 def list_episodes():
-    """List all podcast episodes."""
+    """List all podcast episodes with pagination."""
     sponsored = request.args.get('sponsored')
     search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
 
+    # Eager load guests to avoid N+1
     query = PodcastEpisode.query.options(joinedload(PodcastEpisode.guests))
 
     if sponsored == 'yes':
@@ -24,9 +28,12 @@ def list_episodes():
     elif sponsored == 'no':
         query = query.filter_by(sponsored=False)
     if search:
-        query = query.filter(PodcastEpisode.title.ilike('%' + search + '%'))
+        query = query.filter(PodcastEpisode.title.ilike(f"%{search}%"))
 
-    episodes = query.order_by(PodcastEpisode.publish_date.desc()).all()
+    # Paginated query
+    pagination = query.order_by(PodcastEpisode.publish_date.desc()).paginate(
+        page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
+    )
 
     # Stats using database aggregation
     stats = db.session.query(
@@ -36,7 +43,8 @@ def list_episodes():
     ).first()
 
     return render_template('podcast/list.html',
-        episodes=episodes,
+        episodes=pagination.items,
+        pagination=pagination,
         current_sponsored=sponsored,
         search=search,
         total_episodes=stats.total or 0,
@@ -80,6 +88,13 @@ def new_episode():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
+            contacts = Contact.query.order_by(Contact.name).all()
+            last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
+            next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
+            return render_template('podcast/form.html', episode=None, contacts=contacts, next_number=next_number)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
             next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
@@ -131,6 +146,11 @@ def edit_episode(id):
             flash(f'{e.field}: {e.message}', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            contacts = Contact.query.order_by(Contact.name).all()
+            return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
 
     contacts = Contact.query.order_by(Contact.name).all()
     return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
@@ -139,9 +159,13 @@ def edit_episode(id):
 @podcast_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_episode(id):
     """Delete a podcast episode."""
-    episode = PodcastEpisode.query.get_or_404(id)
-    title = episode.title
-    db.session.delete(episode)
-    db.session.commit()
-    flash(f'Episode "{title}" deleted.', 'success')
+    try:
+        episode = PodcastEpisode.query.get_or_404(id)
+        title = episode.title
+        db.session.delete(episode)
+        db.session.commit()
+        flash(f'Episode "{title}" deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('podcast.list_episodes'))

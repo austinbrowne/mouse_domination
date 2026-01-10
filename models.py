@@ -61,13 +61,14 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    # Relationships with lazy loading options
-    contacts = db.relationship('Contact', back_populates='company', lazy='dynamic')
-    inventory_items = db.relationship('Inventory', back_populates='company', lazy='dynamic')
-    videos = db.relationship('Video', back_populates='company', lazy='dynamic')
-    affiliate_revenues = db.relationship('AffiliateRevenue', back_populates='company', lazy='dynamic')
+    # Relationships - use default lazy='select' for efficient eager loading
+    contacts = db.relationship('Contact', back_populates='company', lazy='select')
+    inventory_items = db.relationship('Inventory', back_populates='company', lazy='select')
+    videos = db.relationship('Video', back_populates='company', lazy='select')
+    affiliate_revenues = db.relationship('AffiliateRevenue', back_populates='company', lazy='select')
 
-    def to_dict(self):
+    def to_dict(self, contact_count: int = None, inventory_count: int = None):
+        """Convert to dictionary. Pass counts from service layer to avoid N+1."""
         return {
             'id': self.id,
             'name': self.name,
@@ -80,8 +81,8 @@ class Company(db.Model):
             'commission_rate': self.commission_rate,
             'notes': self.notes,
             'priority': self.priority,
-            'contact_count': self.contacts.count(),
-            'inventory_count': self.inventory_items.count(),
+            'contact_count': contact_count,
+            'inventory_count': inventory_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 

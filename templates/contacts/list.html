@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import pagination as render_pagination %}
 
 {% block title %}Contacts - Mouse Domination{% endblock %}
 
@@ -8,7 +9,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Contacts</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ contacts|length }} contacts</p>
+            <p class="text-sm text-gray-500 mt-1">{{ pagination.total if pagination else contacts|length }} contacts</p>
         </div>
         <a href="{{ url_for('contacts.new_contact') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -120,5 +121,10 @@
             </div>
         {% endif %}
     </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    {{ render_pagination(pagination, 'contacts.list_contacts', role=current_role, status=current_status, search=search) }}
+    {% endif %}
 </div>
 {% endblock %}

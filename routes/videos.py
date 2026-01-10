@@ -1,10 +1,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from models import Video, Company, Inventory
 from app import db
 from services.youtube import YouTubeService
 from datetime import datetime
+from constants import VIDEO_TYPE_CHOICES, DEFAULT_PAGE_SIZE
 from utils.validation import (
     parse_date, parse_float, parse_int, validate_required, validate_foreign_key,
     or_none, ValidationError
@@ -12,16 +14,15 @@ from utils.validation import (
 
 videos_bp = Blueprint('videos', __name__)
 
-VIDEO_TYPE_CHOICES = ['review', 'comparison', 'guide', 'tierlist', 'other']
-
 
 @videos_bp.route('/')
 def list_videos():
-    """List all videos with optional filtering."""
+    """List all videos with optional filtering and pagination."""
     video_type = request.args.get('type')
     sponsored = request.args.get('sponsored')
     search = request.args.get('search', '').strip()
     show = request.args.get('show', 'all')  # all, videos, shorts, podcasts
+    page = request.args.get('page', 1, type=int)
 
     query = Video.query.options(joinedload(Video.company))
 
@@ -32,7 +33,7 @@ def list_videos():
     elif sponsored == 'no':
         query = query.filter_by(sponsored=False)
     if search:
-        query = query.filter(Video.title.ilike('%' + search + '%'))
+        query = query.filter(Video.title.ilike(f"%{search}%"))
     if show == 'shorts':
         query = query.filter_by(is_short=True)
     elif show == 'podcasts':
@@ -40,7 +41,10 @@ def list_videos():
     elif show == 'videos':
         query = query.filter_by(is_short=False, is_podcast=False)
 
-    videos = query.order_by(Video.publish_date.desc()).all()
+    # Paginated query
+    pagination = query.order_by(Video.publish_date.desc()).paginate(
+        page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
+    )
 
     # Stats using database aggregation for efficiency
     stats = db.session.query(
@@ -54,7 +58,8 @@ def list_videos():
     youtube_configured = yt_service.is_configured
 
     return render_template('videos/list.html',
-        videos=videos,
+        videos=pagination.items,
+        pagination=pagination,
         current_type=video_type,
         current_sponsored=sponsored,
         current_show=show,
@@ -82,41 +87,45 @@ def sync_videos():
         flash(f'YouTube API error: {result["error"]}', 'error')
         return redirect(url_for('videos.list_videos'))
 
-    new_count = 0
-    updated_count = 0
+    try:
+        new_count = 0
+        updated_count = 0
 
-    for video_data in result['videos']:
-        # Check if video already exists
-        existing = Video.query.filter_by(youtube_id=video_data['youtube_id']).first()
+        for video_data in result['videos']:
+            # Check if video already exists
+            existing = Video.query.filter_by(youtube_id=video_data['youtube_id']).first()
 
-        if existing:
-            # Update stats
-            existing.views = video_data['views']
-            existing.likes = video_data['likes']
-            existing.comments = video_data['comments']
-            existing.last_synced = datetime.now()
-            updated_count += 1
-        else:
-            # Create new video
-            video = Video(
-                youtube_id=video_data['youtube_id'],
-                title=video_data['title'],
-                description=video_data['description'],
-                url=video_data['url'],
-                thumbnail_url=video_data['thumbnail_url'],
-                publish_date=video_data['publish_date'],
-                duration=video_data['duration'],
-                views=video_data['views'],
-                likes=video_data['likes'],
-                comments=video_data['comments'],
-                is_short=video_data['is_short'],
-                last_synced=datetime.now(),
-            )
-            db.session.add(video)
-            new_count += 1
+            if existing:
+                # Update stats
+                existing.views = video_data['views']
+                existing.likes = video_data['likes']
+                existing.comments = video_data['comments']
+                existing.last_synced = datetime.now()
+                updated_count += 1
+            else:
+                # Create new video
+                video = Video(
+                    youtube_id=video_data['youtube_id'],
+                    title=video_data['title'],
+                    description=video_data['description'],
+                    url=video_data['url'],
+                    thumbnail_url=video_data['thumbnail_url'],
+                    publish_date=video_data['publish_date'],
+                    duration=video_data['duration'],
+                    views=video_data['views'],
+                    likes=video_data['likes'],
+                    comments=video_data['comments'],
+                    is_short=video_data['is_short'],
+                    last_synced=datetime.now(),
+                )
+                db.session.add(video)
+                new_count += 1
 
-    db.session.commit()
-    flash(f'Synced {new_count} new videos, updated {updated_count} existing.', 'success')
+        db.session.commit()
+        flash(f'Synced {new_count} new videos, updated {updated_count} existing.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred during sync.', 'error')
     return redirect(url_for('videos.list_videos'))
 
 
@@ -136,25 +145,29 @@ def refresh_stats():
         flash('No synced videos to refresh.', 'info')
         return redirect(url_for('videos.list_videos'))
 
-    # Batch refresh (API allows up to 50 at once)
-    youtube_ids = [v.youtube_id for v in videos]
-    updated_data = yt_service.get_video_details(youtube_ids)
+    try:
+        # Batch refresh (API allows up to 50 at once)
+        youtube_ids = [v.youtube_id for v in videos]
+        updated_data = yt_service.get_video_details(youtube_ids)
 
-    # Create lookup by youtube_id
-    data_lookup = {d['youtube_id']: d for d in updated_data}
+        # Create lookup by youtube_id
+        data_lookup = {d['youtube_id']: d for d in updated_data}
 
-    updated_count = 0
-    for video in videos:
-        if video.youtube_id in data_lookup:
-            data = data_lookup[video.youtube_id]
-            video.views = data['views']
-            video.likes = data['likes']
-            video.comments = data['comments']
-            video.last_synced = datetime.now()
-            updated_count += 1
+        updated_count = 0
+        for video in videos:
+            if video.youtube_id in data_lookup:
+                data = data_lookup[video.youtube_id]
+                video.views = data['views']
+                video.likes = data['likes']
+                video.comments = data['comments']
+                video.last_synced = datetime.now()
+                updated_count += 1
 
-    db.session.commit()
-    flash(f'Refreshed stats for {updated_count} videos.', 'success')
+        db.session.commit()
+        flash(f'Refreshed stats for {updated_count} videos.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred during refresh.', 'error')
     return redirect(url_for('videos.list_videos'))
 
 
@@ -173,7 +186,7 @@ def edit_video(id):
                 video.publish_date = parse_date(request.form.get('publish_date', ''), 'Publish Date')
                 video.is_short = request.form.get('is_short') == 'yes'
 
-            # Validate video type
+            # Validate video type using constants
             video_type = request.form.get('video_type', 'review')
             if video_type not in VIDEO_TYPE_CHOICES:
                 video_type = 'review'
@@ -205,6 +218,12 @@ def edit_video(id):
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=video, companies=companies, products=products)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            products = Inventory.query.order_by(Inventory.product_name).all()
+            return render_template('videos/form.html', video=video, companies=companies, products=products)
 
     companies = Company.query.order_by(Company.name).all()
     products = Inventory.query.order_by(Inventory.product_name).all()
@@ -214,11 +233,15 @@ def edit_video(id):
 @videos_bp.route('/<int:id>/delete', methods=['POST'])
 def delete_video(id):
     """Delete a video."""
-    video = Video.query.get_or_404(id)
-    title = video.title
-    db.session.delete(video)
-    db.session.commit()
-    flash(f'Video "{title}" deleted.', 'success')
+    try:
+        video = Video.query.get_or_404(id)
+        title = video.title
+        db.session.delete(video)
+        db.session.commit()
+        flash(f'Video "{title}" deleted.', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('videos.list_videos'))
 
 
@@ -230,7 +253,7 @@ def new_video():
         try:
             title = validate_required(request.form.get('title', ''), 'Title')
 
-            # Validate video type
+            # Validate video type using constants
             video_type = request.form.get('video_type', 'review')
             if video_type not in VIDEO_TYPE_CHOICES:
                 video_type = 'review'
@@ -266,6 +289,12 @@ def new_video():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
+            companies = Company.query.order_by(Company.name).all()
+            products = Inventory.query.order_by(Inventory.product_name).all()
+            return render_template('videos/form.html', video=None, companies=companies, products=products)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=None, companies=companies, products=products)

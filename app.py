@@ -16,6 +16,10 @@ def create_app(config_class=Config):
     db.init_app(app)
     csrf.init_app(app)
 
+    # Setup logging
+    from utils.logging import setup_logging
+    setup_logging(app)
+
     # Register blueprints
     from routes.main import main_bp
     from routes.contacts import contacts_bp
