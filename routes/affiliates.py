@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,6 +10,7 @@ from utils.validation import (
     parse_float, parse_int, validate_required, validate_foreign_key, validate_range,
     or_none, ValidationError
 )
+from utils.logging import log_exception
 
 affiliates_bp = Blueprint('affiliates', __name__)
 
@@ -133,8 +134,9 @@ def new_revenue():
             current_month = datetime.now().month
             return render_template('affiliates/form.html', entry=None, companies=companies,
                                   current_year=current_year, current_month=current_month)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
             current_year = datetime.now().year
@@ -176,8 +178,9 @@ def edit_revenue(id):
             companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
             return render_template('affiliates/form.html', entry=entry, companies=companies,
                                   current_year=None, current_month=None)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.filter(Company.affiliate_status == 'yes').order_by(Company.name).all()
             return render_template('affiliates/form.html', entry=entry, companies=companies,
@@ -196,7 +199,8 @@ def delete_revenue(id):
         db.session.delete(entry)
         db.session.commit()
         flash('Revenue entry deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('affiliates.list_revenue'))

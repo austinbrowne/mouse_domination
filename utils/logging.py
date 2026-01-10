@@ -45,3 +45,19 @@ def setup_logging(app):
 def get_logger(name):
     """Get a logger instance for a module."""
     return logging.getLogger(name)
+
+
+def log_exception(logger, operation: str, exc: Exception, **context):
+    """Log an exception with context information.
+
+    Args:
+        logger: Logger instance to use
+        operation: Description of the operation that failed
+        exc: The exception that was raised
+        **context: Additional context to include in the log
+    """
+    context_str = ', '.join(f'{k}={v}' for k, v in context.items())
+    logger.error(
+        f"{operation} failed: {exc.__class__.__name__}: {exc}"
+        + (f" [{context_str}]" if context_str else "")
+    )

@@ -5,6 +5,7 @@ from models import OutreachTemplate, Contact, Company
 from app import db
 from constants import TEMPLATE_CATEGORY_CHOICES, DEFAULT_PAGE_SIZE
 from utils.validation import validate_required, or_none, ValidationError
+from utils.logging import log_exception
 
 templates_bp = Blueprint('templates', __name__)
 
@@ -65,8 +66,9 @@ def new_template():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('outreach/form.html', template=None)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             return render_template('outreach/form.html', template=None)
 
@@ -101,8 +103,9 @@ def edit_template(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('outreach/form.html', template=template)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             return render_template('outreach/form.html', template=template)
 
@@ -118,8 +121,9 @@ def delete_template(id):
         db.session.delete(template)
         db.session.commit()
         flash(f'Template "{name}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('templates.list_templates'))
 
@@ -179,8 +183,9 @@ def use_template(id):
         template.times_used = (template.times_used or 0) + 1
         db.session.commit()
         return jsonify({'success': True, 'times_used': template.times_used})
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         return jsonify({'success': False, 'error': 'Database error'}), 500
 
 
@@ -201,7 +206,8 @@ def copy_template(id):
         db.session.add(copy)
         db.session.commit()
         flash(f'Template copied as "{copy.name}".', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('templates.list_templates'))

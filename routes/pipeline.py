@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +11,7 @@ from utils.validation import (
     parse_date, parse_float, validate_required, validate_foreign_key,
     validate_choice, or_none, ValidationError
 )
+from utils.logging import log_exception
 
 pipeline_bp = Blueprint('pipeline', __name__)
 
@@ -140,8 +141,9 @@ def new_deal():
             companies = Company.query.order_by(Company.name).all()
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             contacts = Contact.query.order_by(Contact.name).all()
@@ -212,8 +214,9 @@ def edit_deal(id):
             companies = Company.query.order_by(Company.name).all()
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             contacts = Contact.query.order_by(Contact.name).all()
@@ -232,8 +235,9 @@ def delete_deal(id):
         db.session.delete(deal)
         db.session.commit()
         flash('Deal deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('pipeline.list_deals'))
 
@@ -246,8 +250,9 @@ def mark_complete(id):
         deal.status = 'completed'
         db.session.commit()
         flash('Deal marked as completed.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('pipeline.list_deals'))
 
@@ -261,7 +266,8 @@ def mark_paid(id):
         deal.payment_date = db.func.current_date()
         db.session.commit()
         flash('Deal marked as paid.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('pipeline.list_deals'))

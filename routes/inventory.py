@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Inventory, Company
@@ -12,6 +12,7 @@ from utils.validation import (
     parse_date, parse_float, validate_required, validate_foreign_key,
     or_none, ValidationError
 )
+from utils.logging import log_exception
 
 inventory_bp = Blueprint('inventory', __name__)
 
@@ -142,8 +143,9 @@ def new_item():
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=None, companies=companies)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=None, companies=companies)
@@ -229,8 +231,9 @@ def edit_item(id):
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=item, companies=companies)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('inventory/form.html', item=item, companies=companies)
@@ -248,8 +251,9 @@ def delete_item(id):
         db.session.delete(item)
         db.session.commit()
         flash(f'Item "{name}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('inventory.list_inventory'))
 
@@ -263,7 +267,8 @@ def mark_sold(id):
         item.status = 'sold'
         db.session.commit()
         flash(f'Item "{item.product_name}" marked as sold.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('inventory.list_inventory'))

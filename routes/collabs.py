@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Collaboration, Contact
@@ -10,6 +10,7 @@ from utils.validation import (
     parse_date, parse_int, validate_required, validate_foreign_key,
     validate_choice, or_none, ValidationError
 )
+from utils.logging import log_exception
 
 collabs_bp = Blueprint('collabs', __name__)
 
@@ -125,8 +126,9 @@ def new_collab():
             flash(f'{e.field}: {e.message}', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('collabs/form.html', collab=None, contacts=contacts)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('collabs/form.html', collab=None, contacts=contacts)
@@ -193,8 +195,9 @@ def edit_collab(id):
             flash(f'{e.field}: {e.message}', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('collabs/form.html', collab=collab, contacts=contacts)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('collabs/form.html', collab=collab, contacts=contacts)
@@ -211,8 +214,9 @@ def delete_collab(id):
         db.session.delete(collab)
         db.session.commit()
         flash('Collaboration deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('collabs.list_collabs'))
 
@@ -226,8 +230,9 @@ def complete_collab(id):
         collab.completed_date = db.func.current_date()
         db.session.commit()
         flash('Collaboration marked as completed.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('collabs.list_collabs'))
 
@@ -241,7 +246,8 @@ def clear_followup(id):
         collab.follow_up_date = None
         db.session.commit()
         flash('Follow-up cleared.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('collabs.list_collabs'))

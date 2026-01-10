@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.exc import SQLAlchemyError
 from models import Company
 from app import db
@@ -11,6 +11,7 @@ from utils.validation import (
     parse_float, validate_required, validate_url, validate_range,
     or_none, ValidationError
 )
+from utils.logging import log_exception
 
 companies_bp = Blueprint('companies', __name__)
 
@@ -112,8 +113,9 @@ def new_company():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('companies/form.html', company=None)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             return render_template('companies/form.html', company=None)
 
@@ -183,8 +185,9 @@ def edit_company(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             return render_template('companies/form.html', company=company)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             return render_template('companies/form.html', company=company)
 
@@ -200,7 +203,8 @@ def delete_company(id):
         db.session.delete(company)
         db.session.commit()
         flash(f'Company "{name}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('companies.list_companies'))

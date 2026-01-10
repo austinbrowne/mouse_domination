@@ -4,7 +4,6 @@ from app import db
 from sqlalchemy import func, case, and_
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
-import json
 
 main_bp = Blueprint('main', __name__)
 
@@ -148,6 +147,6 @@ def dashboard():
         yearly_affiliate_revenue=yearly_affiliate_revenue,
         total_affiliate_revenue=total_affiliate_revenue,
         total_revenue=total_revenue,
-        monthly_revenue_json=json.dumps(monthly_revenue),
+        monthly_revenue=monthly_revenue,  # Use tojson filter in template for XSS safety
         current_year=current_year,
     )

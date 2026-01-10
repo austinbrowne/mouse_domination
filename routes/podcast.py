@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,6 +9,7 @@ from utils.validation import (
     parse_date, parse_float, parse_int, validate_required,
     or_none, ValidationError
 )
+from utils.logging import log_exception
 
 podcast_bp = Blueprint('podcast', __name__)
 
@@ -92,8 +93,9 @@ def new_episode():
             last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
             next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
             return render_template('podcast/form.html', episode=None, contacts=contacts, next_number=next_number)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
@@ -146,8 +148,9 @@ def edit_episode(id):
             flash(f'{e.field}: {e.message}', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = Contact.query.order_by(Contact.name).all()
             return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
@@ -165,7 +168,8 @@ def delete_episode(id):
         db.session.delete(episode)
         db.session.commit()
         flash(f'Episode "{title}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('podcast.list_episodes'))

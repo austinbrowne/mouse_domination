@@ -36,24 +36,45 @@ class TestSecurityHeaders:
 class TestCSRFProtection:
     """Test CSRF protection."""
 
-    def test_post_without_csrf_fails(self, app):
+    def test_post_without_csrf_fails(self, csrf_client):
         """Test that POST requests without CSRF token fail when CSRF is enabled."""
-        # Create app with CSRF enabled
-        class CSRFEnabledConfig(TestConfig):
-            WTF_CSRF_ENABLED = True
+        response = csrf_client.post('/contacts/new', data={
+            'name': 'Test Contact',
+            'email': 'test@example.com'
+        })
+        # Should get a 400 Bad Request due to missing CSRF
+        assert response.status_code == 400
 
-        csrf_app = create_app(CSRFEnabledConfig)
+    def test_post_with_csrf_succeeds(self, csrf_client):
+        """Test that POST requests with valid CSRF token succeed."""
+        from tests.conftest import get_csrf_token
+
+        # Get a CSRF token from the form page
+        token = get_csrf_token(csrf_client, '/contacts/new')
+        assert token is not None, "Failed to get CSRF token"
+
+        response = csrf_client.post('/contacts/new', data={
+            'csrf_token': token,
+            'name': 'Test Contact',
+            'email': 'test@example.com',
+            'role': 'other',
+            'relationship_status': 'cold'
+        })
+        # Should redirect on success (302) or show form with success message
+        assert response.status_code in [200, 302]
+
+    def test_delete_without_csrf_fails(self, csrf_app, csrf_client):
+        """Test that DELETE (POST) requests without CSRF fail."""
         with csrf_app.app_context():
-            db.create_all()
-            client = csrf_app.test_client()
+            # Create a contact first
+            contact = Contact(name='Test', email='test@test.com')
+            db.session.add(contact)
+            db.session.commit()
+            contact_id = contact.id
 
-            response = client.post('/contacts/new', data={
-                'name': 'Test Contact',
-                'email': 'test@example.com'
-            })
-            # Should get a 400 Bad Request due to missing CSRF
+            # Try to delete without CSRF
+            response = csrf_client.post(f'/contacts/{contact_id}/delete')
             assert response.status_code == 400
-            db.drop_all()
 
 
 class TestURLValidation:

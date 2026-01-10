@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Contact, Company
@@ -8,6 +8,7 @@ from utils.validation import (
     parse_date, validate_required, validate_email, validate_foreign_key,
     validate_choice, or_none, ValidationError
 )
+from utils.logging import log_exception
 
 contacts_bp = Blueprint('contacts', __name__)
 
@@ -95,8 +96,9 @@ def new_contact():
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=None, companies=companies)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Create contact', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=None, companies=companies)
@@ -153,8 +155,9 @@ def edit_contact(id):
             flash(f'{e.field}: {e.message}', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=contact, companies=companies)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Update contact', e, contact_id=id)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             return render_template('contacts/form.html', contact=contact, companies=companies)
@@ -172,7 +175,8 @@ def delete_contact(id):
         db.session.delete(contact)
         db.session.commit()
         flash(f'Contact "{name}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Delete contact', e, contact_id=id)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('contacts.list_contacts'))

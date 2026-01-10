@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +11,7 @@ from utils.validation import (
     parse_date, parse_float, parse_int, validate_required, validate_foreign_key,
     or_none, ValidationError
 )
+from utils.logging import log_exception
 
 videos_bp = Blueprint('videos', __name__)
 
@@ -123,8 +124,9 @@ def sync_videos():
 
         db.session.commit()
         flash(f'Synced {new_count} new videos, updated {updated_count} existing.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred during sync.', 'error')
     return redirect(url_for('videos.list_videos'))
 
@@ -165,8 +167,9 @@ def refresh_stats():
 
         db.session.commit()
         flash(f'Refreshed stats for {updated_count} videos.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred during refresh.', 'error')
     return redirect(url_for('videos.list_videos'))
 
@@ -218,8 +221,9 @@ def edit_video(id):
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=video, companies=companies, products=products)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
@@ -239,8 +243,9 @@ def delete_video(id):
         db.session.delete(video)
         db.session.commit()
         flash(f'Video "{title}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('videos.list_videos'))
 
@@ -292,8 +297,9 @@ def new_video():
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=None, companies=companies, products=products)
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = Company.query.order_by(Company.name).all()
             products = Inventory.query.order_by(Inventory.product_name).all()
