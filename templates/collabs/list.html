@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination as render_pagination %}
+
+{% block title %}Collaborations - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Collaborations</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ pagination.total if pagination else collabs|length }} collaborations</p>
+        </div>
+        <a href="{{ url_for('collabs.new_collab') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Collab
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Ideas</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.idea or 0 }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Reached Out</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ stats.reached_out or 0 }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Confirmed</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">{{ stats.confirmed or 0 }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.completed or 0 }}</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Channel name..."
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
+                <select name="collab_type" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Types</option>
+                    <option value="guest_on_their_channel" {% if current_type == 'guest_on_their_channel' %}selected{% endif %}>Guest on Their Channel</option>
+                    <option value="guest_on_mousecast" {% if current_type == 'guest_on_mousecast' %}selected{% endif %}>Guest on Mousecast</option>
+                    <option value="cross_promo" {% if current_type == 'cross_promo' %}selected{% endif %}>Cross Promo</option>
+                    <option value="collab_video" {% if current_type == 'collab_video' %}selected{% endif %}>Collab Video</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Statuses</option>
+                    <option value="idea" {% if current_status == 'idea' %}selected{% endif %}>Idea</option>
+                    <option value="reached_out" {% if current_status == 'reached_out' %}selected{% endif %}>Reached Out</option>
+                    <option value="confirmed" {% if current_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="declined" {% if current_status == 'declined' %}selected{% endif %}>Declined</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('collabs.list_collabs') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Collabs Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+        {% if collabs %}
+            <div class="overflow-x-auto">
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="channel" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Channel</th>
+                            <th data-sort="type" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                            <th data-sort="status" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Status</th>
+                            <th data-sort="date" data-sort-type="date" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Scheduled</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Contact</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-surface-200">
+                        {% for collab in collabs %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-4 py-3" data-value="{{ collab.their_channel or '' }}">
+                                    <div class="font-medium text-gray-900">{{ collab.their_channel or 'TBD' }}</div>
+                                    {% if collab.audience_size %}
+                                        <div class="text-xs text-gray-500">{{ collab.audience_size|int|string }} subs</div>
+                                    {% endif %}
+                                    {% if collab.follow_up_needed %}
+                                        <span class="inline-flex items-center text-xs font-medium text-orange-600">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                                            Follow-up needed
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3" data-value="{{ collab.collab_type }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                        {{ collab.collab_type|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ collab.status }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if collab.status == 'completed' %}bg-emerald-50 text-emerald-700
+                                        {% elif collab.status == 'confirmed' %}bg-blue-50 text-blue-700
+                                        {% elif collab.status == 'reached_out' %}bg-amber-50 text-amber-700
+                                        {% elif collab.status == 'declined' %}bg-red-50 text-red-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {{ collab.status|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-600" data-value="{{ collab.scheduled_date.isoformat() if collab.scheduled_date else '' }}">
+                                    {{ collab.scheduled_date.strftime('%b %d, %Y') if collab.scheduled_date else '-' }}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-600">
+                                    {{ collab.contact.name if collab.contact else '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        {% if collab.status == 'confirmed' %}
+                                            <form action="{{ url_for('collabs.complete_collab', id=collab.id) }}" method="post" class="inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">Complete</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if collab.follow_up_needed %}
+                                            <form action="{{ url_for('collabs.clear_followup', id=collab.id) }}" method="post" class="inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="text-xs font-medium text-orange-600 hover:text-orange-700">Clear</button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="{{ url_for('collabs.edit_collab', id=collab.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('collabs.delete_collab', id=collab.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this collaboration?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <p class="text-gray-500 mb-2">No collaborations found</p>
+                <a href="{{ url_for('collabs.new_collab') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first collab</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    {{ render_pagination(pagination, 'collabs.list_collabs', collab_type=current_type, status=current_status, search=search) }}
+    {% endif %}
+</div>
+{% endblock %}

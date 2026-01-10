@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination as render_pagination %}
+
+{% block title %}Sales Pipeline - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Sales Pipeline</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ pagination.total if pagination else deals|length }} deals</p>
+        </div>
+        <a href="{{ url_for('pipeline.new_deal') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Deal
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active Pipeline</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">${{ "%.0f"|format(stats.pipeline_value or 0) }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Leads</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.lead or 0 }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Negotiating</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ stats.negotiating or 0 }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Revenue</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">${{ "%.0f"|format(stats.total_revenue or 0) }}</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Deliverables..."
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
+                <select name="deal_type" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Types</option>
+                    <option value="paid_review" {% if current_type == 'paid_review' %}selected{% endif %}>Paid Review</option>
+                    <option value="podcast_ad" {% if current_type == 'podcast_ad' %}selected{% endif %}>Podcast Ad</option>
+                    <option value="sponsored_segment" {% if current_type == 'sponsored_segment' %}selected{% endif %}>Sponsored Segment</option>
+                    <option value="other" {% if current_type == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Statuses</option>
+                    <option value="lead" {% if current_status == 'lead' %}selected{% endif %}>Lead</option>
+                    <option value="negotiating" {% if current_status == 'negotiating' %}selected{% endif %}>Negotiating</option>
+                    <option value="confirmed" {% if current_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="lost" {% if current_status == 'lost' %}selected{% endif %}>Lost</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('pipeline.list_deals') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Deals Table -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+        {% if deals %}
+            <div class="overflow-x-auto">
+                <table class="w-full sortable">
+                    <thead>
+                        <tr class="border-b border-surface-200 bg-surface-50">
+                            <th data-sort="company" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
+                            <th data-sort="type" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                            <th data-sort="status" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Status</th>
+                            <th data-sort="rate" data-sort-type="number" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Rate</th>
+                            <th data-sort="deadline" data-sort-type="date" class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Deadline</th>
+                            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Payment</th>
+                            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-surface-200">
+                        {% for deal in deals %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-4 py-3" data-value="{{ deal.company.name if deal.company else '' }}">
+                                    <div class="font-medium text-gray-900">{{ deal.company.name if deal.company else 'N/A' }}</div>
+                                    {% if deal.contact %}
+                                        <div class="text-xs text-gray-500">{{ deal.contact.name }}</div>
+                                    {% endif %}
+                                    {% if deal.deliverables %}
+                                        <div class="text-xs text-gray-400 truncate max-w-[200px]">{{ deal.deliverables }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3" data-value="{{ deal.deal_type }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if deal.deal_type == 'paid_review' %}bg-violet-50 text-violet-700
+                                        {% elif deal.deal_type == 'podcast_ad' %}bg-blue-50 text-blue-700
+                                        {% elif deal.deal_type == 'sponsored_segment' %}bg-emerald-50 text-emerald-700
+                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {{ deal.deal_type|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ deal.status }}">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if deal.status == 'completed' %}bg-emerald-50 text-emerald-700
+                                        {% elif deal.status == 'confirmed' %}bg-blue-50 text-blue-700
+                                        {% elif deal.status == 'negotiating' %}bg-amber-50 text-amber-700
+                                        {% elif deal.status == 'lost' %}bg-red-50 text-red-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {{ deal.status|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell" data-value="{{ deal.rate_agreed or deal.rate_quoted or 0 }}">
+                                    {% if deal.rate_agreed %}
+                                        <span class="font-medium text-emerald-600">${{ "%.0f"|format(deal.rate_agreed) }}</span>
+                                    {% elif deal.rate_quoted %}
+                                        <span class="text-gray-600">${{ "%.0f"|format(deal.rate_quoted) }}</span>
+                                        <span class="text-xs text-gray-400">(quoted)</span>
+                                    {% else %}
+                                        <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-600" data-value="{{ deal.deadline.isoformat() if deal.deadline else '' }}">
+                                    {% if deal.deadline %}
+                                        <span class="{% if deal.deadline < now %}text-red-600 font-medium{% endif %}">
+                                            {{ deal.deadline.strftime('%b %d, %Y') }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell">
+                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
+                                        {% if deal.payment_status == 'paid' %}bg-emerald-50 text-emerald-700
+                                        {% elif deal.payment_status == 'invoiced' %}bg-amber-50 text-amber-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {{ deal.payment_status|title if deal.payment_status else 'Pending' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        {% if deal.status == 'confirmed' %}
+                                            <form action="{{ url_for('pipeline.mark_complete', id=deal.id) }}" method="post" class="inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">Complete</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if deal.status == 'completed' and deal.payment_status != 'paid' %}
+                                            <form action="{{ url_for('pipeline.mark_paid', id=deal.id) }}" method="post" class="inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="text-xs font-medium text-blue-600 hover:text-blue-700">Mark Paid</button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="{{ url_for('pipeline.edit_deal', id=deal.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <form action="{{ url_for('pipeline.delete_deal', id=deal.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this deal?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <p class="text-gray-500 mb-2">No deals found</p>
+                <a href="{{ url_for('pipeline.new_deal') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Add your first deal</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    {{ render_pagination(pagination, 'pipeline.list_deals', deal_type=current_type, status=current_status, search=search) }}
+    {% endif %}
+</div>
+{% endblock %}

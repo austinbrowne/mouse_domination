@@ -326,3 +326,131 @@ class AffiliateRevenue(db.Model):
             'notes': self.notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class Collaboration(db.Model):
+    """Track cross-promos, guest appearances, and outreach."""
+    __tablename__ = 'collaborations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=False, index=True)
+    collab_type = db.Column(db.String(30), default='collab_video', index=True)
+    # Types: guest_on_their_channel, guest_on_mousecast, cross_promo, collab_video
+    status = db.Column(db.String(20), default='idea', index=True)
+    # Status: idea, reached_out, confirmed, completed, declined
+    scheduled_date = db.Column(db.Date, nullable=True, index=True)
+    completed_date = db.Column(db.Date, nullable=True)
+    their_channel = db.Column(db.String(200), nullable=True)
+    their_platform = db.Column(db.String(50), nullable=True)  # youtube, twitter, twitch, etc.
+    audience_size = db.Column(db.Integer, nullable=True)
+    result_views = db.Column(db.Integer, nullable=True)
+    result_new_subs = db.Column(db.Integer, nullable=True)
+    result_notes = db.Column(db.Text, nullable=True)
+    follow_up_needed = db.Column(db.Boolean, default=False, index=True)
+    follow_up_date = db.Column(db.Date, nullable=True, index=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    contact = db.relationship('Contact', backref='collaborations')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'contact_id': self.contact_id,
+            'contact_name': self.contact.name if self.contact else None,
+            'collab_type': self.collab_type,
+            'status': self.status,
+            'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
+            'completed_date': self.completed_date.isoformat() if self.completed_date else None,
+            'their_channel': self.their_channel,
+            'their_platform': self.their_platform,
+            'audience_size': self.audience_size,
+            'result_views': self.result_views,
+            'result_new_subs': self.result_new_subs,
+            'result_notes': self.result_notes,
+            'follow_up_needed': self.follow_up_needed,
+            'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class SalesPipeline(db.Model):
+    """Track potential and active sponsorship deals."""
+    __tablename__ = 'sales_pipeline'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False, index=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=True, index=True)
+    deal_type = db.Column(db.String(30), default='paid_review', index=True)
+    # Types: paid_review, podcast_ad, sponsored_segment, other
+    status = db.Column(db.String(20), default='lead', index=True)
+    # Status: lead, negotiating, confirmed, completed, lost
+    rate_quoted = db.Column(db.Float, nullable=True)
+    rate_agreed = db.Column(db.Float, nullable=True)
+    deliverables = db.Column(db.Text, nullable=True)
+    deadline = db.Column(db.Date, nullable=True, index=True)
+    payment_status = db.Column(db.String(20), default='pending', index=True)
+    # Payment: pending, invoiced, paid
+    payment_date = db.Column(db.Date, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    follow_up_needed = db.Column(db.Boolean, default=False, index=True)
+    follow_up_date = db.Column(db.Date, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    company = db.relationship('Company', backref='deals')
+    contact = db.relationship('Contact', backref='deals')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'company_id': self.company_id,
+            'company_name': self.company.name if self.company else None,
+            'contact_id': self.contact_id,
+            'contact_name': self.contact.name if self.contact else None,
+            'deal_type': self.deal_type,
+            'status': self.status,
+            'rate_quoted': self.rate_quoted,
+            'rate_agreed': self.rate_agreed,
+            'deliverables': self.deliverables,
+            'deadline': self.deadline.isoformat() if self.deadline else None,
+            'payment_status': self.payment_status,
+            'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'notes': self.notes,
+            'follow_up_needed': self.follow_up_needed,
+            'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class OutreachTemplate(db.Model):
+    """Email/message templates for sponsors, collabs, and outreach."""
+    __tablename__ = 'outreach_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, index=True)
+    category = db.Column(db.String(30), default='sponsor', index=True)
+    # Categories: sponsor, collab, follow_up, thank_you, pitch, other
+    subject = db.Column(db.String(200), nullable=True)  # For emails
+    body = db.Column(db.Text, nullable=False)
+    # Placeholders: {{contact_name}}, {{company_name}}, {{my_channel}}, {{my_stats}}, etc.
+    notes = db.Column(db.Text, nullable=True)
+    times_used = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'category': self.category,
+            'subject': self.subject,
+            'body': self.body,
+            'notes': self.notes,
+            'times_used': self.times_used,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

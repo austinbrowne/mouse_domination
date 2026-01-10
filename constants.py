@@ -20,6 +20,19 @@ MARKETPLACE_CHOICES = ['ebay', 'reddit', 'discord', 'facebook', 'offerup', 'merc
 # Video choices
 VIDEO_TYPE_CHOICES = ['review', 'comparison', 'guide', 'tierlist', 'other']
 
+# Collaboration choices
+COLLAB_TYPE_CHOICES = ['guest_on_their_channel', 'guest_on_mousecast', 'cross_promo', 'collab_video']
+COLLAB_STATUS_CHOICES = ['idea', 'reached_out', 'confirmed', 'completed', 'declined']
+PLATFORM_CHOICES = ['youtube', 'twitter', 'twitch', 'discord', 'instagram', 'tiktok', 'other']
+
+# Sales Pipeline choices
+DEAL_TYPE_CHOICES = ['paid_review', 'podcast_ad', 'sponsored_segment', 'other']
+DEAL_STATUS_CHOICES = ['lead', 'negotiating', 'confirmed', 'completed', 'lost']
+PAYMENT_STATUS_CHOICES = ['pending', 'invoiced', 'paid']
+
+# Outreach Template choices
+TEMPLATE_CATEGORY_CHOICES = ['sponsor', 'collab', 'follow_up', 'thank_you', 'pitch', 'other']
+
 # Pagination defaults
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100

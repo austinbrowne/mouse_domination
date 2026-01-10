@@ -104,6 +104,10 @@
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                         Revenue
                     </a>
+                    <a href="{{ url_for('pipeline.list_deals') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'pipeline' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Pipeline
+                    </a>
                     <div class="w-px h-6 bg-surface-200 mx-2"></div>
                     <a href="{{ url_for('contacts.list_contacts') }}"
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'contacts' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
@@ -112,6 +116,14 @@
                     <a href="{{ url_for('companies.list_companies') }}"
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'companies' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                         Companies
+                    </a>
+                    <a href="{{ url_for('collabs.list_collabs') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'collabs' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Collabs
+                    </a>
+                    <a href="{{ url_for('templates.list_templates') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Templates
                     </a>
                 </div>
 
@@ -133,9 +145,12 @@
                 <a href="{{ url_for('videos.list_videos') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Videos</a>
                 <a href="{{ url_for('podcast.list_episodes') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Podcast</a>
                 <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
+                <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
                 <hr class="my-2 border-surface-200">
                 <a href="{{ url_for('contacts.list_contacts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Contacts</a>
                 <a href="{{ url_for('companies.list_companies') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Companies</a>
+                <a href="{{ url_for('collabs.list_collabs') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Collabs</a>
+                <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
             </div>
         </div>
     </nav>

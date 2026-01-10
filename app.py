@@ -28,6 +28,9 @@ def create_app(config_class=Config):
     from routes.videos import videos_bp
     from routes.podcast import podcast_bp
     from routes.affiliates import affiliates_bp
+    from routes.collabs import collabs_bp
+    from routes.pipeline import pipeline_bp
+    from routes.templates import templates_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(contacts_bp, url_prefix='/contacts')
@@ -36,6 +39,9 @@ def create_app(config_class=Config):
     app.register_blueprint(videos_bp, url_prefix='/videos')
     app.register_blueprint(podcast_bp, url_prefix='/podcast')
     app.register_blueprint(affiliates_bp, url_prefix='/affiliates')
+    app.register_blueprint(collabs_bp, url_prefix='/collabs')
+    app.register_blueprint(pipeline_bp, url_prefix='/pipeline')
+    app.register_blueprint(templates_bp, url_prefix='/templates')
 
     # Create database tables
     with app.app_context():

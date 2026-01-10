@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if deal else 'New' }} Deal - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <a href="{{ url_for('pipeline.list_deals') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-2">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to Pipeline
+        </a>
+        <h1 class="text-2xl font-bold text-gray-900">{{ 'Edit' if deal else 'New' }} Deal</h1>
+    </div>
+
+    <form method="post" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Basic Info -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Basic Info</h3>
+
+            <div class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Company *</label>
+                        <select name="company_id" required class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="">Select company...</option>
+                            {% for company in companies %}
+                                <option value="{{ company.id }}" {% if deal and deal.company_id == company.id %}selected{% endif %}>
+                                    {{ company.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact</label>
+                        <select name="contact_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="">Select contact...</option>
+                            {% for contact in contacts %}
+                                <option value="{{ contact.id }}" {% if deal and deal.contact_id == contact.id %}selected{% endif %}>
+                                    {{ contact.name }}{% if contact.company %} ({{ contact.company.name }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Deal Type *</label>
+                        <select name="deal_type" required class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="paid_review" {% if deal and deal.deal_type == 'paid_review' %}selected{% endif %}>Paid Review</option>
+                            <option value="podcast_ad" {% if deal and deal.deal_type == 'podcast_ad' %}selected{% endif %}>Podcast Ad</option>
+                            <option value="sponsored_segment" {% if deal and deal.deal_type == 'sponsored_segment' %}selected{% endif %}>Sponsored Segment</option>
+                            <option value="other" {% if deal and deal.deal_type == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                        <select name="status" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="lead" {% if not deal or deal.status == 'lead' %}selected{% endif %}>Lead</option>
+                            <option value="negotiating" {% if deal and deal.status == 'negotiating' %}selected{% endif %}>Negotiating</option>
+                            <option value="confirmed" {% if deal and deal.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                            <option value="completed" {% if deal and deal.status == 'completed' %}selected{% endif %}>Completed</option>
+                            <option value="lost" {% if deal and deal.status == 'lost' %}selected{% endif %}>Lost</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Deliverables</label>
+                    <textarea name="deliverables" rows="2" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                        placeholder="What you'll deliver (e.g., 1 dedicated review video + 3 IG stories)">{{ deal.deliverables if deal else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Pricing</h3>
+
+            <div class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Rate Quoted ($)</label>
+                        <input type="number" name="rate_quoted" value="{{ deal.rate_quoted if deal and deal.rate_quoted else '' }}" step="0.01" min="0"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Your initial quote">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Rate Agreed ($)</label>
+                        <input type="number" name="rate_agreed" value="{{ deal.rate_agreed if deal and deal.rate_agreed else '' }}" step="0.01" min="0"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Final agreed rate">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline & Payment -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Timeline & Payment</h3>
+
+            <div class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Deadline</label>
+                        <input type="date" name="deadline" value="{{ deal.deadline.isoformat() if deal and deal.deadline else '' }}"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Payment Status</label>
+                        <select name="payment_status" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                            <option value="pending" {% if not deal or deal.payment_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="invoiced" {% if deal and deal.payment_status == 'invoiced' %}selected{% endif %}>Invoiced</option>
+                            <option value="paid" {% if deal and deal.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Notes</h3>
+            <textarea name="notes" rows="4" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                placeholder="General notes about this deal...">{{ deal.notes if deal else '' }}</textarea>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <a href="{{ url_for('pipeline.list_deals') }}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {{ 'Save Changes' if deal else 'Create Deal' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
