@@ -38,3 +38,4 @@ backups/
 
 # Spreadsheet (user data, don't commit)
 Mouse_Mastersheet.xlsx
+logs/

@@ -102,7 +102,7 @@
 
     <!-- Pagination -->
     {% if pagination %}
-    {{ render_pagination(pagination, 'templates.list_templates', category=current_category, search=search) }}
+    {{ render_pagination(pagination, 'templates.list_templates', extra_params={'category': current_category, 'search': search}) }}
     {% endif %}
 </div>
 {% endblock %}

@@ -124,7 +124,7 @@
 
     <!-- Pagination -->
     {% if pagination %}
-    {{ render_pagination(pagination, 'contacts.list_contacts', role=current_role, status=current_status, search=search) }}
+    {{ render_pagination(pagination, 'contacts.list_contacts', extra_params={'role': current_role, 'status': current_status, 'search': search}) }}
     {% endif %}
 </div>
 {% endblock %}

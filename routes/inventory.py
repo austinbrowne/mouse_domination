@@ -8,11 +8,10 @@ from constants import (
     INVENTORY_STATUS_CHOICES, INVENTORY_CONDITION_CHOICES,
     MARKETPLACE_CHOICES, DEFAULT_PAGE_SIZE
 )
-from utils.validation import (
-    parse_date, parse_float, validate_required, validate_foreign_key,
-    or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_companies_for_dropdown
 
 inventory_bp = Blueprint('inventory', __name__)
 
@@ -47,7 +46,7 @@ def list_inventory():
     pagination = query.order_by(Inventory.date_acquired.desc()).paginate(
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
 
     # Calculate totals for current page
     total_profit_loss = sum(item.profit_loss for item in pagination.items if item.sold)
@@ -70,68 +69,34 @@ def new_item():
     """Create a new inventory item."""
     if request.method == 'POST':
         try:
-            # Validate required fields
-            product_name = validate_required(request.form.get('product_name', ''), 'Product Name')
+            form = FormData(request.form)
 
-            # Validate foreign key
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
-
-            # Validate choices using constants
-            category = request.form.get('category', 'mouse')
-            if category not in INVENTORY_CATEGORY_CHOICES:
-                category = 'mouse'
-
-            source_type = request.form.get('source_type', 'review_unit')
-            if source_type not in INVENTORY_SOURCE_TYPE_CHOICES:
-                source_type = 'review_unit'
-
-            status = request.form.get('status', 'in_queue')
-            if status not in INVENTORY_STATUS_CHOICES:
-                status = 'in_queue'
-
-            condition = request.form.get('condition', 'new')
-            if condition not in INVENTORY_CONDITION_CHOICES:
-                condition = 'new'
-
-            marketplace = or_none(request.form.get('marketplace', ''))
-            if marketplace and marketplace not in MARKETPLACE_CHOICES:
-                marketplace = None
-
-            # Parse numbers with validation
-            cost = parse_float(request.form.get('cost', ''), 'Cost', allow_negative=False) or 0.0
-            sale_price = parse_float(request.form.get('sale_price', ''), 'Sale Price', allow_negative=False)
-            fees = parse_float(request.form.get('fees', ''), 'Fees', allow_negative=False)
-            shipping = parse_float(request.form.get('shipping', ''), 'Shipping', allow_negative=False)
-
-            # Parse dates with error handling
-            date_acquired = parse_date(request.form.get('date_acquired', ''), 'Date Acquired')
-            deadline = parse_date(request.form.get('deadline', ''), 'Deadline')
-            short_publish_date = parse_date(request.form.get('short_publish_date', ''), 'Short Publish Date')
-            video_publish_date = parse_date(request.form.get('video_publish_date', ''), 'Video Publish Date')
+            # Handle marketplace choice validation
+            marketplace = form.choice('marketplace', MARKETPLACE_CHOICES)
 
             item = Inventory(
-                product_name=product_name,
-                company_id=company_id,
-                category=category,
-                source_type=source_type,
-                cost=cost,
-                on_amazon=request.form.get('on_amazon') == 'yes',
-                date_acquired=date_acquired,
-                deadline=deadline,
-                status=status,
-                condition=condition,
-                notes=or_none(request.form.get('notes', '')),
-                short_url=or_none(request.form.get('short_url', '')),
-                short_publish_date=short_publish_date,
-                video_url=or_none(request.form.get('video_url', '')),
-                video_publish_date=video_publish_date,
-                sold=request.form.get('sold') == 'yes',
-                sale_price=sale_price,
-                fees=fees,
-                shipping=shipping,
+                product_name=form.required('product_name'),
+                company_id=form.foreign_key('company_id', Company),
+                category=form.choice('category', INVENTORY_CATEGORY_CHOICES, default='mouse'),
+                source_type=form.choice('source_type', INVENTORY_SOURCE_TYPE_CHOICES, default='review_unit'),
+                cost=form.decimal('cost', allow_negative=False) or 0.0,
+                on_amazon=form.boolean('on_amazon'),
+                date_acquired=form.date('date_acquired'),
+                deadline=form.date('deadline'),
+                status=form.choice('status', INVENTORY_STATUS_CHOICES, default='in_queue'),
+                condition=form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new'),
+                notes=form.optional('notes'),
+                short_url=form.optional('short_url'),
+                short_publish_date=form.date('short_publish_date'),
+                video_url=form.optional('video_url'),
+                video_publish_date=form.date('video_publish_date'),
+                sold=form.boolean('sold'),
+                sale_price=form.decimal('sale_price', allow_negative=False),
+                fees=form.decimal('fees', allow_negative=False),
+                shipping=form.decimal('shipping', allow_negative=False),
                 marketplace=marketplace,
-                buyer=or_none(request.form.get('buyer', '')),
-                sale_notes=or_none(request.form.get('sale_notes', '')),
+                buyer=form.optional('buyer'),
+                sale_notes=form.optional('sale_notes'),
             )
 
             db.session.add(item)
@@ -141,87 +106,53 @@ def new_item():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('inventory/form.html', item=None, companies=companies)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('inventory/form.html', item=None, companies=companies)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     return render_template('inventory/form.html', item=None, companies=companies)
 
 
 @inventory_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_item(id):
     """Edit an existing inventory item."""
-    item = Inventory.query.get_or_404(id)
+    item = Inventory.query.options(joinedload(Inventory.company)).get_or_404(id)
 
     if request.method == 'POST':
         try:
-            # Validate required fields
-            product_name = validate_required(request.form.get('product_name', ''), 'Product Name')
+            form = FormData(request.form)
 
-            # Validate foreign key
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
+            # Handle marketplace choice validation
+            marketplace = form.choice('marketplace', MARKETPLACE_CHOICES)
 
-            # Validate choices using constants
-            category = request.form.get('category', 'mouse')
-            if category not in INVENTORY_CATEGORY_CHOICES:
-                category = 'mouse'
-
-            source_type = request.form.get('source_type', 'review_unit')
-            if source_type not in INVENTORY_SOURCE_TYPE_CHOICES:
-                source_type = 'review_unit'
-
-            status = request.form.get('status', 'in_queue')
-            if status not in INVENTORY_STATUS_CHOICES:
-                status = 'in_queue'
-
-            condition = request.form.get('condition', 'new')
-            if condition not in INVENTORY_CONDITION_CHOICES:
-                condition = 'new'
-
-            marketplace = or_none(request.form.get('marketplace', ''))
-            if marketplace and marketplace not in MARKETPLACE_CHOICES:
-                marketplace = None
-
-            # Parse numbers with validation
-            cost = parse_float(request.form.get('cost', ''), 'Cost', allow_negative=False) or 0.0
-            sale_price = parse_float(request.form.get('sale_price', ''), 'Sale Price', allow_negative=False)
-            fees = parse_float(request.form.get('fees', ''), 'Fees', allow_negative=False)
-            shipping = parse_float(request.form.get('shipping', ''), 'Shipping', allow_negative=False)
-
-            # Parse dates with error handling
-            date_acquired = parse_date(request.form.get('date_acquired', ''), 'Date Acquired')
-            deadline = parse_date(request.form.get('deadline', ''), 'Deadline')
-            short_publish_date = parse_date(request.form.get('short_publish_date', ''), 'Short Publish Date')
-            video_publish_date = parse_date(request.form.get('video_publish_date', ''), 'Video Publish Date')
-
-            item.product_name = product_name
-            item.company_id = company_id
-            item.category = category
-            item.source_type = source_type
-            item.cost = cost
-            item.on_amazon = request.form.get('on_amazon') == 'yes'
-            item.date_acquired = date_acquired
-            item.deadline = deadline
-            item.status = status
-            item.condition = condition
-            item.notes = or_none(request.form.get('notes', ''))
-            item.short_url = or_none(request.form.get('short_url', ''))
-            item.short_publish_date = short_publish_date
-            item.video_url = or_none(request.form.get('video_url', ''))
-            item.video_publish_date = video_publish_date
-            item.sold = request.form.get('sold') == 'yes'
-            item.sale_price = sale_price
-            item.fees = fees
-            item.shipping = shipping
+            item.product_name = form.required('product_name')
+            item.company_id = form.foreign_key('company_id', Company)
+            item.category = form.choice('category', INVENTORY_CATEGORY_CHOICES, default='mouse')
+            item.source_type = form.choice('source_type', INVENTORY_SOURCE_TYPE_CHOICES, default='review_unit')
+            item.cost = form.decimal('cost', allow_negative=False) or 0.0
+            item.on_amazon = form.boolean('on_amazon')
+            item.date_acquired = form.date('date_acquired')
+            item.deadline = form.date('deadline')
+            item.status = form.choice('status', INVENTORY_STATUS_CHOICES, default='in_queue')
+            item.condition = form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new')
+            item.notes = form.optional('notes')
+            item.short_url = form.optional('short_url')
+            item.short_publish_date = form.date('short_publish_date')
+            item.video_url = form.optional('video_url')
+            item.video_publish_date = form.date('video_publish_date')
+            item.sold = form.boolean('sold')
+            item.sale_price = form.decimal('sale_price', allow_negative=False)
+            item.fees = form.decimal('fees', allow_negative=False)
+            item.shipping = form.decimal('shipping', allow_negative=False)
             item.marketplace = marketplace
-            item.buyer = or_none(request.form.get('buyer', ''))
-            item.sale_notes = or_none(request.form.get('sale_notes', ''))
+            item.buyer = form.optional('buyer')
+            item.sale_notes = form.optional('sale_notes')
 
             db.session.commit()
             flash(f'Item "{item.product_name}" updated successfully.', 'success')
@@ -229,16 +160,16 @@ def edit_item(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('inventory/form.html', item=item, companies=companies)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('inventory/form.html', item=item, companies=companies)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     return render_template('inventory/form.html', item=item, companies=companies)
 
 

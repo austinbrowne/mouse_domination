@@ -7,11 +7,10 @@ from app import db
 from services.youtube import YouTubeService
 from datetime import datetime
 from constants import VIDEO_TYPE_CHOICES, DEFAULT_PAGE_SIZE
-from utils.validation import (
-    parse_date, parse_float, parse_int, validate_required, validate_foreign_key,
-    or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_companies_for_dropdown
 
 videos_bp = Blueprint('videos', __name__)
 
@@ -177,32 +176,30 @@ def refresh_stats():
 @videos_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_video(id):
     """Edit business metadata for a video."""
-    video = Video.query.get_or_404(id)
+    video = Video.query.options(
+        joinedload(Video.company),
+        joinedload(Video.products)
+    ).get_or_404(id)
 
     if request.method == 'POST':
         try:
+            form = FormData(request.form)
+
             # For non-synced videos, allow editing title/url/etc
             if not video.youtube_id:
-                video.title = validate_required(request.form.get('title', ''), 'Title')
-                video.url = or_none(request.form.get('url', ''))
-                video.views = parse_int(request.form.get('views', ''), 'Views', allow_negative=False)
-                video.publish_date = parse_date(request.form.get('publish_date', ''), 'Publish Date')
-                video.is_short = request.form.get('is_short') == 'yes'
+                video.title = form.required('title')
+                video.url = form.optional('url')
+                video.views = form.integer('views', allow_negative=False)
+                video.publish_date = form.date('publish_date')
+                video.is_short = form.boolean('is_short')
 
-            # Validate video type using constants
-            video_type = request.form.get('video_type', 'review')
-            if video_type not in VIDEO_TYPE_CHOICES:
-                video_type = 'review'
-            video.video_type = video_type
-
-            # Validate foreign key
-            video.company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
-
-            video.sponsored = request.form.get('sponsored') == 'yes'
-            video.sponsor_amount = parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False)
-            video.affiliate_links = request.form.get('affiliate_links') == 'yes'
-            video.notes = or_none(request.form.get('notes', ''))
-            video.is_podcast = request.form.get('is_podcast') == 'yes'
+            video.video_type = form.choice('video_type', VIDEO_TYPE_CHOICES, default='review')
+            video.company_id = form.foreign_key('company_id', Company)
+            video.sponsored = form.boolean('sponsored')
+            video.sponsor_amount = form.decimal('sponsor_amount', allow_negative=False)
+            video.affiliate_links = form.boolean('affiliate_links')
+            video.notes = form.optional('notes')
+            video.is_podcast = form.boolean('is_podcast')
 
             # Update linked products
             product_ids = request.form.getlist('product_ids')
@@ -218,18 +215,18 @@ def edit_video(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=video, companies=companies, products=products)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=video, companies=companies, products=products)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     products = Inventory.query.order_by(Inventory.product_name).all()
     return render_template('videos/form.html', video=video, companies=companies, products=products)
 
@@ -256,29 +253,21 @@ def new_video():
     """Manually create a video (fallback when API not configured)."""
     if request.method == 'POST':
         try:
-            title = validate_required(request.form.get('title', ''), 'Title')
-
-            # Validate video type using constants
-            video_type = request.form.get('video_type', 'review')
-            if video_type not in VIDEO_TYPE_CHOICES:
-                video_type = 'review'
-
-            # Validate foreign key
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
+            form = FormData(request.form)
 
             video = Video(
-                title=title,
-                url=or_none(request.form.get('url', '')),
-                video_type=video_type,
-                company_id=company_id,
-                sponsored=request.form.get('sponsored') == 'yes',
-                sponsor_amount=parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False),
-                affiliate_links=request.form.get('affiliate_links') == 'yes',
-                views=parse_int(request.form.get('views', ''), 'Views', allow_negative=False),
-                notes=or_none(request.form.get('notes', '')),
-                is_podcast=request.form.get('is_podcast') == 'yes',
-                is_short=request.form.get('is_short') == 'yes',
-                publish_date=parse_date(request.form.get('publish_date', ''), 'Publish Date'),
+                title=form.required('title'),
+                url=form.optional('url'),
+                video_type=form.choice('video_type', VIDEO_TYPE_CHOICES, default='review'),
+                company_id=form.foreign_key('company_id', Company),
+                sponsored=form.boolean('sponsored'),
+                sponsor_amount=form.decimal('sponsor_amount', allow_negative=False),
+                affiliate_links=form.boolean('affiliate_links'),
+                views=form.integer('views', allow_negative=False),
+                notes=form.optional('notes'),
+                is_podcast=form.boolean('is_podcast'),
+                is_short=form.boolean('is_short'),
+                publish_date=form.date('publish_date'),
             )
 
             # Link products
@@ -294,17 +283,17 @@ def new_video():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=None, companies=companies, products=products)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             products = Inventory.query.order_by(Inventory.product_name).all()
             return render_template('videos/form.html', video=None, companies=companies, products=products)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     products = Inventory.query.order_by(Inventory.product_name).all()
     return render_template('videos/form.html', video=None, companies=companies, products=products)

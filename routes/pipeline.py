@@ -7,11 +7,10 @@ from app import db
 from constants import (
     DEAL_TYPE_CHOICES, DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 )
-from utils.validation import (
-    parse_date, parse_float, validate_required, validate_foreign_key,
-    validate_choice, or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_companies_for_dropdown, get_contacts_for_dropdown
 
 pipeline_bp = Blueprint('pipeline', __name__)
 
@@ -60,8 +59,8 @@ def list_deals():
         ), 0).label('pipeline_value'),
     ).first()
 
-    companies = Company.query.order_by(Company.name).all()
-    contacts = Contact.query.order_by(Contact.name).all()
+    companies = get_companies_for_dropdown()
+    contacts = get_contacts_for_dropdown()
 
     return render_template('pipeline/list.html',
         deals=pagination.items,
@@ -85,50 +84,27 @@ def new_deal():
     """Create a new deal."""
     if request.method == 'POST':
         try:
-            # Validate company
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
+            form = FormData(request.form)
+
+            # Validate required company
+            company_id = form.foreign_key('company_id', Company)
             if not company_id:
                 raise ValidationError('Company', 'This field is required.')
 
-            # Validate contact (optional)
-            contact_id = validate_foreign_key(Contact, request.form.get('contact_id'), 'Contact')
-
-            # Validate choices
-            deal_type = request.form.get('deal_type', 'paid_review')
-            if deal_type not in DEAL_TYPE_CHOICES:
-                deal_type = 'paid_review'
-
-            status = request.form.get('status', 'lead')
-            if status not in DEAL_STATUS_CHOICES:
-                status = 'lead'
-
-            payment_status = request.form.get('payment_status', 'pending')
-            if payment_status not in PAYMENT_STATUS_CHOICES:
-                payment_status = 'pending'
-
-            # Parse numbers
-            rate_quoted = parse_float(request.form.get('rate_quoted', ''), 'Rate Quoted')
-            rate_agreed = parse_float(request.form.get('rate_agreed', ''), 'Rate Agreed')
-
-            # Parse dates
-            deadline = parse_date(request.form.get('deadline', ''), 'Deadline')
-            payment_date = parse_date(request.form.get('payment_date', ''), 'Payment Date')
-            follow_up_date = parse_date(request.form.get('follow_up_date', ''), 'Follow-up Date')
-
             deal = SalesPipeline(
                 company_id=company_id,
-                contact_id=contact_id,
-                deal_type=deal_type,
-                status=status,
-                rate_quoted=rate_quoted,
-                rate_agreed=rate_agreed,
-                deliverables=or_none(request.form.get('deliverables', '')),
-                deadline=deadline,
-                payment_status=payment_status,
-                payment_date=payment_date,
-                notes=or_none(request.form.get('notes', '')),
-                follow_up_needed=request.form.get('follow_up_needed') == 'yes',
-                follow_up_date=follow_up_date,
+                contact_id=form.foreign_key('contact_id', Contact),
+                deal_type=form.choice('deal_type', DEAL_TYPE_CHOICES, default='paid_review'),
+                status=form.choice('status', DEAL_STATUS_CHOICES, default='lead'),
+                rate_quoted=form.decimal('rate_quoted'),
+                rate_agreed=form.decimal('rate_agreed'),
+                deliverables=form.optional('deliverables'),
+                deadline=form.date('deadline'),
+                payment_status=form.choice('payment_status', PAYMENT_STATUS_CHOICES, default='pending'),
+                payment_date=form.date('payment_date'),
+                notes=form.optional('notes'),
+                follow_up_needed=form.boolean('follow_up_needed'),
+                follow_up_date=form.date('follow_up_date'),
             )
 
             db.session.add(deal)
@@ -138,72 +114,52 @@ def new_deal():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
-            contacts = Contact.query.order_by(Contact.name).all()
+            companies = get_companies_for_dropdown()
+            contacts = get_contacts_for_dropdown()
             return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
-            contacts = Contact.query.order_by(Contact.name).all()
+            companies = get_companies_for_dropdown()
+            contacts = get_contacts_for_dropdown()
             return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
 
-    companies = Company.query.order_by(Company.name).all()
-    contacts = Contact.query.order_by(Contact.name).all()
+    companies = get_companies_for_dropdown()
+    contacts = get_contacts_for_dropdown()
     return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
 
 
 @pipeline_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_deal(id):
     """Edit an existing deal."""
-    deal = SalesPipeline.query.get_or_404(id)
+    deal = SalesPipeline.query.options(
+        joinedload(SalesPipeline.company),
+        joinedload(SalesPipeline.contact)
+    ).get_or_404(id)
 
     if request.method == 'POST':
         try:
-            # Validate company
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
+            form = FormData(request.form)
+
+            # Validate required company
+            company_id = form.foreign_key('company_id', Company)
             if not company_id:
                 raise ValidationError('Company', 'This field is required.')
 
-            # Validate contact (optional)
-            contact_id = validate_foreign_key(Contact, request.form.get('contact_id'), 'Contact')
-
-            # Validate choices
-            deal_type = request.form.get('deal_type', 'paid_review')
-            if deal_type not in DEAL_TYPE_CHOICES:
-                deal_type = 'paid_review'
-
-            status = request.form.get('status', 'lead')
-            if status not in DEAL_STATUS_CHOICES:
-                status = 'lead'
-
-            payment_status = request.form.get('payment_status', 'pending')
-            if payment_status not in PAYMENT_STATUS_CHOICES:
-                payment_status = 'pending'
-
-            # Parse numbers
-            rate_quoted = parse_float(request.form.get('rate_quoted', ''), 'Rate Quoted')
-            rate_agreed = parse_float(request.form.get('rate_agreed', ''), 'Rate Agreed')
-
-            # Parse dates
-            deadline = parse_date(request.form.get('deadline', ''), 'Deadline')
-            payment_date = parse_date(request.form.get('payment_date', ''), 'Payment Date')
-            follow_up_date = parse_date(request.form.get('follow_up_date', ''), 'Follow-up Date')
-
             deal.company_id = company_id
-            deal.contact_id = contact_id
-            deal.deal_type = deal_type
-            deal.status = status
-            deal.rate_quoted = rate_quoted
-            deal.rate_agreed = rate_agreed
-            deal.deliverables = or_none(request.form.get('deliverables', ''))
-            deal.deadline = deadline
-            deal.payment_status = payment_status
-            deal.payment_date = payment_date
-            deal.notes = or_none(request.form.get('notes', ''))
-            deal.follow_up_needed = request.form.get('follow_up_needed') == 'yes'
-            deal.follow_up_date = follow_up_date
+            deal.contact_id = form.foreign_key('contact_id', Contact)
+            deal.deal_type = form.choice('deal_type', DEAL_TYPE_CHOICES, default='paid_review')
+            deal.status = form.choice('status', DEAL_STATUS_CHOICES, default='lead')
+            deal.rate_quoted = form.decimal('rate_quoted')
+            deal.rate_agreed = form.decimal('rate_agreed')
+            deal.deliverables = form.optional('deliverables')
+            deal.deadline = form.date('deadline')
+            deal.payment_status = form.choice('payment_status', PAYMENT_STATUS_CHOICES, default='pending')
+            deal.payment_date = form.date('payment_date')
+            deal.notes = form.optional('notes')
+            deal.follow_up_needed = form.boolean('follow_up_needed')
+            deal.follow_up_date = form.date('follow_up_date')
 
             db.session.commit()
             flash('Deal updated successfully.', 'success')
@@ -211,19 +167,19 @@ def edit_deal(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
-            contacts = Contact.query.order_by(Contact.name).all()
+            companies = get_companies_for_dropdown()
+            contacts = get_contacts_for_dropdown()
             return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
-            contacts = Contact.query.order_by(Contact.name).all()
+            companies = get_companies_for_dropdown()
+            contacts = get_contacts_for_dropdown()
             return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
 
-    companies = Company.query.order_by(Company.name).all()
-    contacts = Contact.query.order_by(Contact.name).all()
+    companies = get_companies_for_dropdown()
+    contacts = get_contacts_for_dropdown()
     return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
 
 

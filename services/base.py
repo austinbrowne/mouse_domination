@@ -1,4 +1,5 @@
 """Base service class with common CRUD operations and error handling."""
+from __future__ import annotations
 from functools import wraps
 from typing import TypeVar, Generic, Type, Any
 from flask import current_app

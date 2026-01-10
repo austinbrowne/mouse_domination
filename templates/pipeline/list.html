@@ -184,7 +184,7 @@
 
     <!-- Pagination -->
     {% if pagination %}
-    {{ render_pagination(pagination, 'pipeline.list_deals', deal_type=current_type, status=current_status, search=search) }}
+    {{ render_pagination(pagination, 'pipeline.list_deals', extra_params={'deal_type': current_type, 'status': current_status, 'search': search}) }}
     {% endif %}
 </div>
 {% endblock %}

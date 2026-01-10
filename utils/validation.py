@@ -97,7 +97,8 @@ def validate_url(value: str, field_name: str = 'url', max_length: int = 2048) ->
     # Must start with http:// or https://
     # Domain must have valid characters and at least one dot
     # Path/query can contain valid URL characters
-    pattern = r'^https?://[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+(/[a-zA-Z0-9._~:/?#\[\]@!$&\'()*+,;=%\-]*)?$'
+    # Support query params with or without path (e.g., https://example.com?query=value)
+    pattern = r'^https?://[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+(/[a-zA-Z0-9._~:/?#\[\]@!$&\'()*+,;=%\-]*|\?[a-zA-Z0-9._~:/?#\[\]@!$&\'()*+,;=%\-]*)?$'
     if not re.match(pattern, value):
         raise ValidationError(field_name, "Invalid URL format. Must be a valid http:// or https:// URL.")
 

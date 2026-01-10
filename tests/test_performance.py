@@ -76,11 +76,17 @@ class TestConnectionPoolingConfig:
     """Test database connection pooling configuration."""
 
     def test_pool_settings_configured(self, app):
-        """Test that connection pool settings are configured."""
-        # Check that pool settings exist in config
-        engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
+        """Test that connection pool settings are configured in base Config.
 
-        # These should be set (even if SQLite ignores them)
+        Note: TestConfig has empty engine options because SQLite doesn't support pooling.
+        We test the base Config class directly to verify pool settings exist.
+        """
+        from config import Config
+
+        # Check that pool settings exist in base Config
+        engine_options = Config.SQLALCHEMY_ENGINE_OPTIONS
+
+        # These should be set for production databases
         assert 'pool_size' in engine_options
         assert 'pool_recycle' in engine_options
         assert 'pool_pre_ping' in engine_options

@@ -4,10 +4,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import Contact, Company
 from app import db
 from constants import CONTACT_ROLE_CHOICES, CONTACT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
-from utils.validation import (
-    parse_date, validate_required, validate_email, validate_foreign_key,
-    validate_choice, or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
 from utils.queries import get_companies_for_dropdown
 
@@ -53,39 +51,20 @@ def new_contact():
     """Create a new contact."""
     if request.method == 'POST':
         try:
-            # Validate required fields
-            name = validate_required(request.form.get('name', ''), 'Name')
-
-            # Validate choices using constants
-            role = request.form.get('role', 'other')
-            if role not in CONTACT_ROLE_CHOICES:
-                role = 'other'
-
-            status = request.form.get('relationship_status', 'cold')
-            if status not in CONTACT_STATUS_CHOICES:
-                status = 'cold'
-
-            # Validate foreign key
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
-
-            # Validate email format
-            email = validate_email(request.form.get('email', ''), 'Email')
-
-            # Parse date with error handling
-            last_contact_date = parse_date(request.form.get('last_contact_date', ''), 'Last Contact Date')
+            form = FormData(request.form)
 
             contact = Contact(
-                name=name,
-                role=role,
-                company_id=company_id,
-                email=email,
-                twitter=or_none(request.form.get('twitter', '')),
-                discord=or_none(request.form.get('discord', '')),
-                youtube=or_none(request.form.get('youtube', '')),
-                relationship_status=status,
-                notes=or_none(request.form.get('notes', '')),
-                tags=or_none(request.form.get('tags', '')),
-                last_contact_date=last_contact_date,
+                name=form.required('name'),
+                role=form.choice('role', CONTACT_ROLE_CHOICES, default='other'),
+                company_id=form.foreign_key('company_id', Company),
+                email=form.email('email'),
+                twitter=form.optional('twitter'),
+                discord=form.optional('discord'),
+                youtube=form.optional('youtube'),
+                relationship_status=form.choice('relationship_status', CONTACT_STATUS_CHOICES, default='cold'),
+                notes=form.optional('notes'),
+                tags=form.optional('tags'),
+                last_contact_date=form.date('last_contact_date'),
             )
 
             db.session.add(contact)
@@ -111,42 +90,23 @@ def new_contact():
 @contacts_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_contact(id):
     """Edit an existing contact."""
-    contact = Contact.query.get_or_404(id)
+    contact = Contact.query.options(joinedload(Contact.company)).get_or_404(id)
 
     if request.method == 'POST':
         try:
-            # Validate required fields
-            name = validate_required(request.form.get('name', ''), 'Name')
+            form = FormData(request.form)
 
-            # Validate choices using constants
-            role = request.form.get('role', 'other')
-            if role not in CONTACT_ROLE_CHOICES:
-                role = 'other'
-
-            status = request.form.get('relationship_status', 'cold')
-            if status not in CONTACT_STATUS_CHOICES:
-                status = 'cold'
-
-            # Validate foreign key
-            company_id = validate_foreign_key(Company, request.form.get('company_id'), 'Company')
-
-            # Validate email format
-            email = validate_email(request.form.get('email', ''), 'Email')
-
-            # Parse date with error handling
-            last_contact_date = parse_date(request.form.get('last_contact_date', ''), 'Last Contact Date')
-
-            contact.name = name
-            contact.role = role
-            contact.company_id = company_id
-            contact.email = email
-            contact.twitter = or_none(request.form.get('twitter', ''))
-            contact.discord = or_none(request.form.get('discord', ''))
-            contact.youtube = or_none(request.form.get('youtube', ''))
-            contact.relationship_status = status
-            contact.notes = or_none(request.form.get('notes', ''))
-            contact.tags = or_none(request.form.get('tags', ''))
-            contact.last_contact_date = last_contact_date
+            contact.name = form.required('name')
+            contact.role = form.choice('role', CONTACT_ROLE_CHOICES, default='other')
+            contact.company_id = form.foreign_key('company_id', Company)
+            contact.email = form.email('email')
+            contact.twitter = form.optional('twitter')
+            contact.discord = form.optional('discord')
+            contact.youtube = form.optional('youtube')
+            contact.relationship_status = form.choice('relationship_status', CONTACT_STATUS_CHOICES, default='cold')
+            contact.notes = form.optional('notes')
+            contact.tags = form.optional('tags')
+            contact.last_contact_date = form.date('last_contact_date')
 
             db.session.commit()
             flash(f'Contact "{contact.name}" updated successfully.', 'success')

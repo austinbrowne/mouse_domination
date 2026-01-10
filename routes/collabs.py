@@ -7,11 +7,10 @@ from app import db
 from constants import (
     COLLAB_TYPE_CHOICES, COLLAB_STATUS_CHOICES, PLATFORM_CHOICES, DEFAULT_PAGE_SIZE
 )
-from utils.validation import (
-    parse_date, parse_int, validate_required, validate_foreign_key,
-    validate_choice, or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_contacts_for_dropdown
 
 collabs_bp = Blueprint('collabs', __name__)
 
@@ -43,24 +42,24 @@ def list_collabs():
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
 
-    # Stats - single aggregated query instead of 4 separate COUNT queries
-    stats = db.session.query(
-        func.count(Collaboration.id).label('total'),
-        func.sum(case(
-            (Collaboration.status.in_(['idea', 'reached_out', 'confirmed']), 1),
-            else_=0
-        )).label('active'),
-        func.sum(case(
-            (Collaboration.status == 'completed', 1),
-            else_=0
-        )).label('completed'),
-        func.sum(case(
-            (Collaboration.follow_up_needed == True, 1),
-            else_=0
-        )).label('need_follow_up')
+    # Stats - single aggregated query for all status counts
+    stats_result = db.session.query(
+        func.sum(case((Collaboration.status == 'idea', 1), else_=0)).label('idea'),
+        func.sum(case((Collaboration.status == 'reached_out', 1), else_=0)).label('reached_out'),
+        func.sum(case((Collaboration.status == 'confirmed', 1), else_=0)).label('confirmed'),
+        func.sum(case((Collaboration.status == 'completed', 1), else_=0)).label('completed'),
+        func.sum(case((Collaboration.follow_up_needed == True, 1), else_=0)).label('need_follow_up')
     ).first()
 
-    contacts = Contact.query.order_by(Contact.name).all()
+    # Create stats dict for template
+    stats = {
+        'idea': int(stats_result.idea or 0),
+        'reached_out': int(stats_result.reached_out or 0),
+        'confirmed': int(stats_result.confirmed or 0),
+        'completed': int(stats_result.completed or 0),
+    }
+
+    contacts = get_contacts_for_dropdown()
 
     return render_template('collabs/list.html',
         collabs=pagination.items,
@@ -70,10 +69,8 @@ def list_collabs():
         current_status=status,
         current_follow_up=follow_up,
         search=search,
-        total=stats.total or 0,
-        active=int(stats.active or 0),
-        completed=int(stats.completed or 0),
-        need_follow_up=int(stats.need_follow_up or 0),
+        stats=stats,
+        need_follow_up=int(stats_result.need_follow_up or 0),
     )
 
 
@@ -82,49 +79,33 @@ def new_collab():
     """Create a new collaboration."""
     if request.method == 'POST':
         try:
-            # Validate contact
-            contact_id = validate_foreign_key(Contact, request.form.get('contact_id'), 'Contact')
+            form = FormData(request.form)
+
+            # Validate required contact
+            contact_id = form.foreign_key('contact_id', Contact)
             if not contact_id:
                 raise ValidationError('Contact', 'This field is required.')
 
-            # Validate choices
-            collab_type = request.form.get('collab_type', 'collab_video')
-            if collab_type not in COLLAB_TYPE_CHOICES:
-                collab_type = 'collab_video'
-
-            status = request.form.get('status', 'idea')
-            if status not in COLLAB_STATUS_CHOICES:
-                status = 'idea'
-
-            platform = or_none(request.form.get('their_platform', ''))
-            if platform and platform not in PLATFORM_CHOICES:
+            # Handle platform choice with fallback
+            platform = form.choice('their_platform', PLATFORM_CHOICES)
+            if form.optional('their_platform') and not platform:
                 platform = 'other'
-
-            # Parse dates
-            scheduled_date = parse_date(request.form.get('scheduled_date', ''), 'Scheduled Date')
-            completed_date = parse_date(request.form.get('completed_date', ''), 'Completed Date')
-            follow_up_date = parse_date(request.form.get('follow_up_date', ''), 'Follow-up Date')
-
-            # Parse numbers
-            audience_size = parse_int(request.form.get('audience_size', ''), 'Audience Size')
-            result_views = parse_int(request.form.get('result_views', ''), 'Result Views')
-            result_new_subs = parse_int(request.form.get('result_new_subs', ''), 'New Subscribers')
 
             collab = Collaboration(
                 contact_id=contact_id,
-                collab_type=collab_type,
-                status=status,
-                scheduled_date=scheduled_date,
-                completed_date=completed_date,
-                their_channel=or_none(request.form.get('their_channel', '')),
+                collab_type=form.choice('collab_type', COLLAB_TYPE_CHOICES, default='collab_video'),
+                status=form.choice('status', COLLAB_STATUS_CHOICES, default='idea'),
+                scheduled_date=form.date('scheduled_date'),
+                completed_date=form.date('completed_date'),
+                their_channel=form.optional('their_channel'),
                 their_platform=platform,
-                audience_size=audience_size,
-                result_views=result_views,
-                result_new_subs=result_new_subs,
-                result_notes=or_none(request.form.get('result_notes', '')),
-                follow_up_needed=request.form.get('follow_up_needed') == 'yes',
-                follow_up_date=follow_up_date,
-                notes=or_none(request.form.get('notes', '')),
+                audience_size=form.integer('audience_size'),
+                result_views=form.integer('result_views'),
+                result_new_subs=form.integer('result_new_subs'),
+                result_notes=form.optional('result_notes'),
+                follow_up_needed=form.boolean('follow_up_needed'),
+                follow_up_date=form.date('follow_up_date'),
+                notes=form.optional('notes'),
             )
 
             db.session.add(collab)
@@ -134,68 +115,52 @@ def new_collab():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('collabs/form.html', collab=None, contacts=contacts)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('collabs/form.html', collab=None, contacts=contacts)
 
-    contacts = Contact.query.order_by(Contact.name).all()
+    contacts = get_contacts_for_dropdown()
     return render_template('collabs/form.html', collab=None, contacts=contacts)
 
 
 @collabs_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_collab(id):
     """Edit an existing collaboration."""
-    collab = Collaboration.query.get_or_404(id)
+    collab = Collaboration.query.options(joinedload(Collaboration.contact)).get_or_404(id)
 
     if request.method == 'POST':
         try:
-            # Validate contact
-            contact_id = validate_foreign_key(Contact, request.form.get('contact_id'), 'Contact')
+            form = FormData(request.form)
+
+            # Validate required contact
+            contact_id = form.foreign_key('contact_id', Contact)
             if not contact_id:
                 raise ValidationError('Contact', 'This field is required.')
 
-            # Validate choices
-            collab_type = request.form.get('collab_type', 'collab_video')
-            if collab_type not in COLLAB_TYPE_CHOICES:
-                collab_type = 'collab_video'
-
-            status = request.form.get('status', 'idea')
-            if status not in COLLAB_STATUS_CHOICES:
-                status = 'idea'
-
-            platform = or_none(request.form.get('their_platform', ''))
-            if platform and platform not in PLATFORM_CHOICES:
+            # Handle platform choice with fallback
+            platform = form.choice('their_platform', PLATFORM_CHOICES)
+            if form.optional('their_platform') and not platform:
                 platform = 'other'
 
-            # Parse dates
-            scheduled_date = parse_date(request.form.get('scheduled_date', ''), 'Scheduled Date')
-            completed_date = parse_date(request.form.get('completed_date', ''), 'Completed Date')
-            follow_up_date = parse_date(request.form.get('follow_up_date', ''), 'Follow-up Date')
-
-            # Parse numbers
-            audience_size = parse_int(request.form.get('audience_size', ''), 'Audience Size')
-            result_views = parse_int(request.form.get('result_views', ''), 'Result Views')
-            result_new_subs = parse_int(request.form.get('result_new_subs', ''), 'New Subscribers')
-
             collab.contact_id = contact_id
-            collab.collab_type = collab_type
-            collab.status = status
-            collab.scheduled_date = scheduled_date
-            collab.completed_date = completed_date
-            collab.their_channel = or_none(request.form.get('their_channel', ''))
+            collab.collab_type = form.choice('collab_type', COLLAB_TYPE_CHOICES, default='collab_video')
+            collab.status = form.choice('status', COLLAB_STATUS_CHOICES, default='idea')
+            collab.scheduled_date = form.date('scheduled_date')
+            collab.completed_date = form.date('completed_date')
+            collab.their_channel = form.optional('their_channel')
             collab.their_platform = platform
-            collab.audience_size = audience_size
-            collab.result_views = result_views
-            collab.result_new_subs = result_new_subs
-            collab.result_notes = or_none(request.form.get('result_notes', ''))
-            collab.follow_up_needed = request.form.get('follow_up_needed') == 'yes'
-            collab.follow_up_date = follow_up_date
-            collab.notes = or_none(request.form.get('notes', ''))
+            collab.audience_size = form.integer('audience_size')
+            collab.result_views = form.integer('result_views')
+            collab.result_new_subs = form.integer('result_new_subs')
+            collab.result_notes = form.optional('result_notes')
+            collab.follow_up_needed = form.boolean('follow_up_needed')
+            collab.follow_up_date = form.date('follow_up_date')
+            collab.notes = form.optional('notes')
 
             db.session.commit()
             flash('Collaboration updated successfully.', 'success')
@@ -203,16 +168,16 @@ def edit_collab(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('collabs/form.html', collab=collab, contacts=contacts)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('collabs/form.html', collab=collab, contacts=contacts)
 
-    contacts = Contact.query.order_by(Contact.name).all()
+    contacts = get_contacts_for_dropdown()
     return render_template('collabs/form.html', collab=collab, contacts=contacts)
 
 

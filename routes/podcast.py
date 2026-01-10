@@ -5,11 +5,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import PodcastEpisode, Contact
 from app import db
 from constants import DEFAULT_PAGE_SIZE
-from utils.validation import (
-    parse_date, parse_float, parse_int, validate_required,
-    or_none, ValidationError
-)
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_contacts_for_dropdown
 
 podcast_bp = Blueprint('podcast', __name__)
 
@@ -59,21 +58,18 @@ def new_episode():
     """Create a new podcast episode."""
     if request.method == 'POST':
         try:
-            title = validate_required(request.form.get('title', ''), 'Title')
-            episode_number = parse_int(request.form.get('episode_number', ''), 'Episode Number', allow_negative=False)
-            publish_date = parse_date(request.form.get('publish_date', ''), 'Publish Date')
-            sponsor_amount = parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False)
+            form = FormData(request.form)
 
             episode = PodcastEpisode(
-                episode_number=episode_number,
-                title=title,
-                youtube_url=or_none(request.form.get('youtube_url', '')),
-                topics=or_none(request.form.get('topics', '')),
-                sponsored=request.form.get('sponsored') == 'yes',
-                sponsor_name=or_none(request.form.get('sponsor_name', '')),
-                sponsor_amount=sponsor_amount,
-                notes=or_none(request.form.get('notes', '')),
-                publish_date=publish_date,
+                episode_number=form.integer('episode_number', allow_negative=False),
+                title=form.required('title'),
+                youtube_url=form.optional('youtube_url'),
+                topics=form.optional('topics'),
+                sponsored=form.boolean('sponsored'),
+                sponsor_name=form.optional('sponsor_name'),
+                sponsor_amount=form.decimal('sponsor_amount', allow_negative=False),
+                notes=form.optional('notes'),
+                publish_date=form.date('publish_date'),
             )
 
             # Link guests
@@ -89,7 +85,7 @@ def new_episode():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
             next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
             return render_template('podcast/form.html', episode=None, contacts=contacts, next_number=next_number)
@@ -97,12 +93,12 @@ def new_episode():
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
             next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
             return render_template('podcast/form.html', episode=None, contacts=contacts, next_number=next_number)
 
-    contacts = Contact.query.order_by(Contact.name).all()
+    contacts = get_contacts_for_dropdown()
     # Get next episode number
     last_episode = PodcastEpisode.query.order_by(PodcastEpisode.episode_number.desc()).first()
     next_number = (last_episode.episode_number or 0) + 1 if last_episode else 1
@@ -113,24 +109,21 @@ def new_episode():
 @podcast_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 def edit_episode(id):
     """Edit an existing podcast episode."""
-    episode = PodcastEpisode.query.get_or_404(id)
+    episode = PodcastEpisode.query.options(joinedload(PodcastEpisode.guests)).get_or_404(id)
 
     if request.method == 'POST':
         try:
-            title = validate_required(request.form.get('title', ''), 'Title')
-            episode_number = parse_int(request.form.get('episode_number', ''), 'Episode Number', allow_negative=False)
-            publish_date = parse_date(request.form.get('publish_date', ''), 'Publish Date')
-            sponsor_amount = parse_float(request.form.get('sponsor_amount', ''), 'Sponsor Amount', allow_negative=False)
+            form = FormData(request.form)
 
-            episode.episode_number = episode_number
-            episode.title = title
-            episode.youtube_url = or_none(request.form.get('youtube_url', ''))
-            episode.topics = or_none(request.form.get('topics', ''))
-            episode.sponsored = request.form.get('sponsored') == 'yes'
-            episode.sponsor_name = or_none(request.form.get('sponsor_name', ''))
-            episode.sponsor_amount = sponsor_amount
-            episode.notes = or_none(request.form.get('notes', ''))
-            episode.publish_date = publish_date
+            episode.episode_number = form.integer('episode_number', allow_negative=False)
+            episode.title = form.required('title')
+            episode.youtube_url = form.optional('youtube_url')
+            episode.topics = form.optional('topics')
+            episode.sponsored = form.boolean('sponsored')
+            episode.sponsor_name = form.optional('sponsor_name')
+            episode.sponsor_amount = form.decimal('sponsor_amount', allow_negative=False)
+            episode.notes = form.optional('notes')
+            episode.publish_date = form.date('publish_date')
 
             # Update guests
             guest_ids = request.form.getlist('guest_ids')
@@ -146,16 +139,16 @@ def edit_episode(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            contacts = Contact.query.order_by(Contact.name).all()
+            contacts = get_contacts_for_dropdown()
             return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
 
-    contacts = Contact.query.order_by(Contact.name).all()
+    contacts = get_contacts_for_dropdown()
     return render_template('podcast/form.html', episode=episode, contacts=contacts, next_number=None)
 
 

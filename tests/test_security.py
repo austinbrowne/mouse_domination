@@ -238,9 +238,12 @@ class TestXSSPrevention:
             response = client.get(f'/templates/{template.id}/preview?company_id={company.id}')
             assert response.status_code == 200
 
-            # The XSS payload should be escaped
+            # The XSS payload should be escaped - angle brackets become entities
             response_text = response.data.decode('utf-8')
-            assert 'onerror=alert' not in response_text
+            # The raw <img should be escaped to &lt;img (or double-escaped)
+            # Either escaped form is acceptable
+            assert '<img src=x onerror' not in response_text, "Unescaped XSS vector found"
+            assert '&lt;img' in response_text or '&amp;lt;img' in response_text, "Escaped company name not found"
 
 
 class TestConfigurationSecurity:

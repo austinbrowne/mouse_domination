@@ -85,3 +85,5 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False  # Disable CSRF for testing
     SESSION_COOKIE_SECURE = False
+    # SQLite doesn't support connection pooling options
+    SQLALCHEMY_ENGINE_OPTIONS = {}

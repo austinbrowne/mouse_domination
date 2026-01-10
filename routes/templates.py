@@ -4,8 +4,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import OutreachTemplate, Contact, Company
 from app import db
 from constants import TEMPLATE_CATEGORY_CHOICES, DEFAULT_PAGE_SIZE
-from utils.validation import validate_required, or_none, ValidationError
+from utils.validation import ValidationError
+from utils.routes import FormData
 from utils.logging import log_exception
+from utils.queries import get_companies_for_dropdown, get_contacts_for_dropdown
 
 templates_bp = Blueprint('templates', __name__)
 
@@ -42,20 +44,14 @@ def new_template():
     """Create a new outreach template."""
     if request.method == 'POST':
         try:
-            name = validate_required(request.form.get('name', ''), 'Template Name')
-            body = validate_required(request.form.get('body', ''), 'Body')
-
-            # Validate category
-            category = request.form.get('category', 'other')
-            if category not in TEMPLATE_CATEGORY_CHOICES:
-                category = 'other'
+            form = FormData(request.form)
 
             template = OutreachTemplate(
-                name=name,
-                category=category,
-                subject=or_none(request.form.get('subject', '')),
-                body=body,
-                notes=or_none(request.form.get('notes', '')),
+                name=form.required('name'),
+                category=form.choice('category', TEMPLATE_CATEGORY_CHOICES, default='other'),
+                subject=form.optional('subject'),
+                body=form.required('body'),
+                notes=form.optional('notes'),
             )
 
             db.session.add(template)
@@ -82,19 +78,13 @@ def edit_template(id):
 
     if request.method == 'POST':
         try:
-            name = validate_required(request.form.get('name', ''), 'Template Name')
-            body = validate_required(request.form.get('body', ''), 'Body')
+            form = FormData(request.form)
 
-            # Validate category
-            category = request.form.get('category', 'other')
-            if category not in TEMPLATE_CATEGORY_CHOICES:
-                category = 'other'
-
-            template.name = name
-            template.category = category
-            template.subject = or_none(request.form.get('subject', ''))
-            template.body = body
-            template.notes = or_none(request.form.get('notes', ''))
+            template.name = form.required('name')
+            template.category = form.choice('category', TEMPLATE_CATEGORY_CHOICES, default='other')
+            template.subject = form.optional('subject')
+            template.body = form.required('body')
+            template.notes = form.optional('notes')
 
             db.session.commit()
             flash(f'Template "{template.name}" updated successfully.', 'success')
@@ -163,8 +153,8 @@ def preview_template(id):
     subject = subject.replace('{{my_channel}}', channel_name)
 
     # Get all contacts and companies for the test form
-    contacts = Contact.query.order_by(Contact.name).all()
-    companies = Company.query.order_by(Company.name).all()
+    contacts = get_contacts_for_dropdown()
+    companies = get_companies_for_dropdown()
 
     return render_template('outreach/preview.html',
         template=template,
