@@ -1,4 +1,5 @@
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+from sqlalchemy import func, case
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Collaboration, Contact
@@ -42,13 +43,22 @@ def list_collabs():
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
 
-    # Stats
-    total = Collaboration.query.count()
-    active = Collaboration.query.filter(
-        Collaboration.status.in_(['idea', 'reached_out', 'confirmed'])
-    ).count()
-    completed = Collaboration.query.filter_by(status='completed').count()
-    need_follow_up = Collaboration.query.filter_by(follow_up_needed=True).count()
+    # Stats - single aggregated query instead of 4 separate COUNT queries
+    stats = db.session.query(
+        func.count(Collaboration.id).label('total'),
+        func.sum(case(
+            (Collaboration.status.in_(['idea', 'reached_out', 'confirmed']), 1),
+            else_=0
+        )).label('active'),
+        func.sum(case(
+            (Collaboration.status == 'completed', 1),
+            else_=0
+        )).label('completed'),
+        func.sum(case(
+            (Collaboration.follow_up_needed == True, 1),
+            else_=0
+        )).label('need_follow_up')
+    ).first()
 
     contacts = Contact.query.order_by(Contact.name).all()
 
@@ -60,10 +70,10 @@ def list_collabs():
         current_status=status,
         current_follow_up=follow_up,
         search=search,
-        total=total,
-        active=active,
-        completed=completed,
-        need_follow_up=need_follow_up,
+        total=stats.total or 0,
+        active=int(stats.active or 0),
+        completed=int(stats.completed or 0),
+        need_follow_up=int(stats.need_follow_up or 0),
     )
 
 

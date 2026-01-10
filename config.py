@@ -31,6 +31,16 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Database connection pooling (for non-SQLite databases)
+    # SQLite doesn't support connection pooling, but these settings
+    # will be used when switching to PostgreSQL/MySQL in production
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,           # Number of connections to keep open
+        'pool_recycle': 3600,      # Recycle connections after 1 hour
+        'pool_pre_ping': True,     # Verify connections before use
+        'max_overflow': 20,        # Allow up to 20 additional connections
+    }
+
     # Security settings
     DEBUG = False
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max request size

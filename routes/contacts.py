@@ -9,6 +9,7 @@ from utils.validation import (
     validate_choice, or_none, ValidationError
 )
 from utils.logging import log_exception
+from utils.queries import get_companies_for_dropdown
 
 contacts_bp = Blueprint('contacts', __name__)
 
@@ -35,7 +36,7 @@ def list_contacts():
     pagination = query.order_by(Contact.name).paginate(
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
 
     return render_template('contacts/list.html',
         contacts=pagination.items,
@@ -94,16 +95,16 @@ def new_contact():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('contacts/form.html', contact=None, companies=companies)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Create contact', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('contacts/form.html', contact=None, companies=companies)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     return render_template('contacts/form.html', contact=None, companies=companies)
 
 
@@ -153,16 +154,16 @@ def edit_contact(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('contacts/form.html', contact=contact, companies=companies)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Update contact', e, contact_id=id)
             flash('Database error occurred. Please try again.', 'error')
-            companies = Company.query.order_by(Company.name).all()
+            companies = get_companies_for_dropdown()
             return render_template('contacts/form.html', contact=contact, companies=companies)
 
-    companies = Company.query.order_by(Company.name).all()
+    companies = get_companies_for_dropdown()
     return render_template('contacts/form.html', contact=contact, companies=companies)
 
 

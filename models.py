@@ -171,14 +171,14 @@ class Inventory(db.Model):
 
 # Association table for Video <-> Inventory many-to-many
 video_inventory = db.Table('video_inventory',
-    db.Column('video_id', db.Integer, db.ForeignKey('videos.id'), primary_key=True),
-    db.Column('inventory_id', db.Integer, db.ForeignKey('inventory.id'), primary_key=True)
+    db.Column('video_id', db.Integer, db.ForeignKey('videos.id'), primary_key=True, index=True),
+    db.Column('inventory_id', db.Integer, db.ForeignKey('inventory.id'), primary_key=True, index=True)
 )
 
 # Association table for PodcastEpisode <-> Contact (guests) many-to-many
 episode_guests = db.Table('episode_guests',
-    db.Column('episode_id', db.Integer, db.ForeignKey('podcast_episodes.id'), primary_key=True),
-    db.Column('contact_id', db.Integer, db.ForeignKey('contacts.id'), primary_key=True)
+    db.Column('episode_id', db.Integer, db.ForeignKey('podcast_episodes.id'), primary_key=True, index=True),
+    db.Column('contact_id', db.Integer, db.ForeignKey('contacts.id'), primary_key=True, index=True)
 )
 
 
