@@ -1,0 +1,40 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Test/Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Backups (we'll store these in a specific folder)
+backups/
+
+# Spreadsheet (user data, don't commit)
+Mouse_Mastersheet.xlsx

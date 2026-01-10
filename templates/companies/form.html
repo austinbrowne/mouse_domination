@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if company else 'New' }} Company - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">{{ 'Edit' if company else 'New' }} Company</h1>
+
+    <form method="post" class="bg-white rounded-lg shadow p-6 space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+            <input type="text" name="name" value="{{ company.name if company else '' }}" required
+                class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select name="category" class="w-full border rounded-lg px-3 py-2">
+                    <option value="mice" {% if company and company.category == 'mice' %}selected{% endif %}>Mice</option>
+                    <option value="keyboards" {% if company and company.category == 'keyboards' %}selected{% endif %}>Keyboards</option>
+                    <option value="mousepads" {% if company and company.category == 'mousepads' %}selected{% endif %}>Mousepads</option>
+                    <option value="iems" {% if company and company.category == 'iems' %}selected{% endif %}>IEMs</option>
+                    <option value="other" {% if company and company.category == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                <input type="url" name="website" value="{{ company.website if company else '' }}" placeholder="https://..."
+                    class="w-full border rounded-lg px-3 py-2">
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Relationship Status</label>
+                <select name="relationship_status" class="w-full border rounded-lg px-3 py-2">
+                    <option value="no_contact" {% if company and company.relationship_status == 'no_contact' %}selected{% endif %}>No Contact</option>
+                    <option value="reached_out" {% if company and company.relationship_status == 'reached_out' %}selected{% endif %}>Reached Out</option>
+                    <option value="active" {% if company and company.relationship_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="affiliate_only" {% if company and company.relationship_status == 'affiliate_only' %}selected{% endif %}>Affiliate Only</option>
+                    <option value="past" {% if company and company.relationship_status == 'past' %}selected{% endif %}>Past</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select name="priority" class="w-full border rounded-lg px-3 py-2">
+                    <option value="low" {% if company and company.priority == 'low' %}selected{% endif %}>Low</option>
+                    <option value="active" {% if company and company.priority == 'active' %}selected{% endif %}>Active</option>
+                    <option value="target" {% if company and company.priority == 'target' %}selected{% endif %}>Target</option>
+                </select>
+            </div>
+        </div>
+
+        <hr class="my-4">
+        <h3 class="font-medium text-gray-800">Affiliate Program</h3>
+
+        <div class="grid md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Affiliate Status</label>
+                <select name="affiliate_status" class="w-full border rounded-lg px-3 py-2">
+                    <option value="no" {% if company and company.affiliate_status == 'no' %}selected{% endif %}>No</option>
+                    <option value="pending" {% if company and company.affiliate_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="yes" {% if company and company.affiliate_status == 'yes' %}selected{% endif %}>Yes</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Commission Rate (%)</label>
+                <input type="number" name="commission_rate" value="{{ company.commission_rate if company else '' }}" step="0.1" min="0" max="100" placeholder="e.g., 10"
+                    class="w-full border rounded-lg px-3 py-2">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Affiliate Code</label>
+            <input type="text" name="affiliate_code" value="{{ company.affiliate_code if company else '' }}" placeholder="DAZZ10"
+                class="w-full border rounded-lg px-3 py-2 font-mono">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Affiliate Link</label>
+            <input type="url" name="affiliate_link" value="{{ company.affiliate_link if company else '' }}" placeholder="https://company.com?ref=dazz"
+                class="w-full border rounded-lg px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea name="notes" rows="3" class="w-full border rounded-lg px-3 py-2">{{ company.notes if company else '' }}</textarea>
+        </div>
+
+        <div class="flex justify-between pt-4">
+            <a href="{{ url_for('companies.list_companies') }}" class="text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition">
+                {{ 'Save Changes' if company else 'Create Company' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Companies - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-800">Companies</h1>
+        <a href="{{ url_for('companies.new_company') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
+            + Add Company
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <form method="get" class="flex flex-wrap gap-4 items-end">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Name..."
+                    class="border rounded-lg px-3 py-2 w-48">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Category</label>
+                <select name="category" class="border rounded-lg px-3 py-2">
+                    <option value="">All Categories</option>
+                    <option value="mice" {% if current_category == 'mice' %}selected{% endif %}>Mice</option>
+                    <option value="keyboards" {% if current_category == 'keyboards' %}selected{% endif %}>Keyboards</option>
+                    <option value="mousepads" {% if current_category == 'mousepads' %}selected{% endif %}>Mousepads</option>
+                    <option value="iems" {% if current_category == 'iems' %}selected{% endif %}>IEMs</option>
+                    <option value="other" {% if current_category == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Status</label>
+                <select name="status" class="border rounded-lg px-3 py-2">
+                    <option value="">All Statuses</option>
+                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="affiliate_only" {% if current_status == 'affiliate_only' %}selected{% endif %}>Affiliate Only</option>
+                    <option value="reached_out" {% if current_status == 'reached_out' %}selected{% endif %}>Reached Out</option>
+                    <option value="no_contact" {% if current_status == 'no_contact' %}selected{% endif %}>No Contact</option>
+                    <option value="past" {% if current_status == 'past' %}selected{% endif %}>Past</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Priority</label>
+                <select name="priority" class="border rounded-lg px-3 py-2">
+                    <option value="">All Priorities</option>
+                    <option value="target" {% if current_priority == 'target' %}selected{% endif %}>Target</option>
+                    <option value="active" {% if current_priority == 'active' %}selected{% endif %}>Active</option>
+                    <option value="low" {% if current_priority == 'low' %}selected{% endif %}>Low</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Filter</button>
+            <a href="{{ url_for('companies.list_companies') }}" class="text-gray-500 hover:text-gray-700 px-4 py-2">Clear</a>
+        </form>
+    </div>
+
+    <!-- Companies List -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if companies %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Company</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Category</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Status</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Affiliate</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Code</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Rate</th>
+                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for company in companies %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">
+                                    <div class="font-medium">{{ company.name }}</div>
+                                    {% if company.priority == 'target' %}
+                                        <span class="text-xs text-orange-600">Target</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                        {{ company.category|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell">
+                                    <span class="text-xs px-2 py-1 rounded-full
+                                        {% if company.relationship_status == 'active' %}bg-green-100 text-green-700
+                                        {% elif company.relationship_status == 'affiliate_only' %}bg-blue-100 text-blue-700
+                                        {% elif company.relationship_status == 'reached_out' %}bg-yellow-100 text-yellow-700
+                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {{ company.relationship_status|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell">
+                                    {% if company.affiliate_status == 'yes' %}
+                                        <span class="text-green-600">Yes</span>
+                                    {% elif company.affiliate_status == 'pending' %}
+                                        <span class="text-yellow-600">Pending</span>
+                                    {% else %}
+                                        <span class="text-gray-400">No</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm font-mono text-gray-500">
+                                    {{ company.affiliate_code or '-' }}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-sm text-gray-500">
+                                    {{ (company.commission_rate|string + '%') if company.commission_rate else '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <a href="{{ url_for('companies.edit_company', id=company.id) }}" class="text-primary-600 hover:text-primary-800 mr-2">Edit</a>
+                                    <form action="{{ url_for('companies.delete_company', id=company.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this company?')">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-8 text-center text-gray-500">
+                No companies found. <a href="{{ url_for('companies.new_company') }}" class="text-primary-600 hover:underline">Add your first company</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="text-sm text-gray-500">{{ companies|length }} company(s)</div>
+</div>
+{% endblock %}

@@ -79,7 +79,7 @@ Track every peripheral company and your relationship with them.
 
 **Fields:**
 - Company name
-- Category: `mice` | `keyboards` | `mousepads` | `other`
+- Category: `mice` | `keyboards` | `mousepads` | `iems` | `other`
 - Website
 - Relationship status: `no_contact` | `reached_out` | `active` | `affiliate_only` | `past`
 - Primary contact (link to Contact)
@@ -103,28 +103,47 @@ Track every peripheral company and your relationship with them.
 
 ---
 
-### 3. Review Unit Inventory
+### 3. Inventory (Review Units + Personal Purchases)
 
-Track every product you receive.
+Track all products - both review units received and personal purchases.
 
 **Fields:**
-- Product name
-- Company (link to Company)
-- Date received
+- Product name (Model)
+- Company/Source (link to Company)
+- Category: `mouse` | `keyboard` | `mousepad` | `iem` | `other`
+- **Source type:** `review_unit` | `personal_purchase`
+- Date acquired
+- Cost (for personal purchases, $0 for review units)
+- On Amazon: `yes` | `no`
+- Deadline (optional - only for hard company deadlines)
 - Status: `in_queue` | `reviewing` | `reviewed` | `keeping` | `listed` | `sold`
-- Review video URL (if reviewed)
 - Condition: `new` | `open_box` | `used`
-- Sale channel: `ebay` | `reddit` | `discord` | `offerup` | `mercari` | `local` | `other`
-- Listed price
-- Sold price
-- Sold date
 - Notes
+
+**Content Links (when reviewed):**
+- Short URL (YouTube Short)
+- Short publish date
+- Video URL (full review)
+- Video publish date
+
+**Sales Tracking:**
+- Sold: `yes` | `no`
+- Sale price
+- Fees (platform fees)
+- Shipping cost
+- P/L (auto-calculated: sale price - fees - shipping - cost)
+- Marketplace: `ebay` | `reddit` | `discord` | `offerup` | `mercari` | `facebook` | `local` | `other`
+- Buyer (name/username)
+- Sale notes
 
 **Dashboard Metrics:**
 - Units in queue (not yet reviewed)
 - Units available to sell
+- Review units vs personal purchases breakdown
 - Total revenue from unit sales this month/year
+- Total P/L (profit/loss)
 - Average sale price
+- Upcoming deadlines
 
 ---
 
@@ -400,24 +419,57 @@ Sales Pipeline
 
 ---
 
-## Open Questions
+## Confirmed Decisions
 
-1. **Data Import:** Do you want to import your existing spreadsheet data, or start fresh?
+| Decision | Choice |
+|----------|--------|
+| **Data Import** | Import existing spreadsheet (Mouse_Mastersheet.xlsx) |
+| **Multi-user** | Single user for now, design for multi-user later |
+| **Backups** | Daily auto-backup to JSON/CSV, Supabase-ready architecture |
+| **Theme** | Clean, minimal, blue accent |
+| **Giveaways** | Skip for now (can add later) |
+| **Inventory** | Combined review units + personal purchases with source_type flag |
+| **Deadlines** | Optional field, only used for hard company deadlines |
 
-2. **Multi-user:** Should ManPhalanges have access too, or just you?
+---
 
-3. **Backup:** Do you want automatic backups (e.g., daily export to JSON/CSV)?
+## Data Import Mapping
 
-4. **Branding:** Any color preferences or just clean/minimal?
+From `Mouse_Mastersheet.xlsx`:
+
+| Spreadsheet Tab | → App Module |
+|-----------------|--------------|
+| Review Units | → Inventory (source_type: review_unit) |
+| Purchased Mice | → Inventory (source_type: personal_purchase) |
+| Affiliate Sales | → Companies (affiliate fields) |
+| Giveaways | → Skip for now |
+| Rakuten Dispute | → Ignore |
+
+**Field Mapping (Review Units → Inventory):**
+- Model → product_name
+- Acquired Date → date_acquired
+- Amazon? → on_amazon
+- Deadline → deadline
+- Done? → status (Y = reviewed)
+- Short Date → short_publish_date
+- Short → short_url
+- Video Date → video_publish_date
+- Video → video_url
+- Category → category
+- Source → company
+- Sold? → sold
+- Price → sale_price
+- Fees → fees
+- Shipping → shipping
+- P/L → profit_loss (auto-calc)
+- Marketplace → marketplace
+- Buyer → buyer
+- Notes/Notes 2 → notes
 
 ---
 
 ## Approval
 
-Please review this spec and confirm:
-- [ ] Core modules look correct
-- [ ] Fields capture what you need
-- [ ] Build phases make sense
-- [ ] Any additions or changes needed
+✅ Spec reviewed and refined based on existing spreadsheet data.
 
-Once approved, we start building Phase 1.
+Ready to build Phase 1.

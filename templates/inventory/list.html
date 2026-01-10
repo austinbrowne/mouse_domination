@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-800">Inventory</h1>
+        <a href="{{ url_for('inventory.new_item') }}" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition">
+            + Add Item
+        </a>
+    </div>
+
+    <!-- Summary -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex flex-wrap gap-6">
+            <div>
+                <span class="text-sm text-gray-500">Total Items:</span>
+                <span class="font-bold ml-1">{{ items|length }}</span>
+            </div>
+            <div>
+                <span class="text-sm text-gray-500">Total P/L:</span>
+                <span class="font-bold ml-1 {% if total_profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                    ${{ "%.2f"|format(total_profit_loss) }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <form method="get" class="flex flex-wrap gap-4 items-end">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Product name..."
+                    class="border rounded-lg px-3 py-2 w-48">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Type</label>
+                <select name="source_type" class="border rounded-lg px-3 py-2">
+                    <option value="">All Types</option>
+                    <option value="review_unit" {% if current_source_type == 'review_unit' %}selected{% endif %}>Review Unit</option>
+                    <option value="personal_purchase" {% if current_source_type == 'personal_purchase' %}selected{% endif %}>Personal Purchase</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Category</label>
+                <select name="category" class="border rounded-lg px-3 py-2">
+                    <option value="">All Categories</option>
+                    <option value="mouse" {% if current_category == 'mouse' %}selected{% endif %}>Mouse</option>
+                    <option value="keyboard" {% if current_category == 'keyboard' %}selected{% endif %}>Keyboard</option>
+                    <option value="mousepad" {% if current_category == 'mousepad' %}selected{% endif %}>Mousepad</option>
+                    <option value="iem" {% if current_category == 'iem' %}selected{% endif %}>IEM</option>
+                    <option value="other" {% if current_category == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Status</label>
+                <select name="status" class="border rounded-lg px-3 py-2">
+                    <option value="">All Statuses</option>
+                    <option value="in_queue" {% if current_status == 'in_queue' %}selected{% endif %}>In Queue</option>
+                    <option value="reviewing" {% if current_status == 'reviewing' %}selected{% endif %}>Reviewing</option>
+                    <option value="reviewed" {% if current_status == 'reviewed' %}selected{% endif %}>Reviewed</option>
+                    <option value="keeping" {% if current_status == 'keeping' %}selected{% endif %}>Keeping</option>
+                    <option value="listed" {% if current_status == 'listed' %}selected{% endif %}>Listed</option>
+                    <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>Sold</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Sold</label>
+                <select name="sold" class="border rounded-lg px-3 py-2">
+                    <option value="">All</option>
+                    <option value="yes" {% if current_sold == 'yes' %}selected{% endif %}>Sold</option>
+                    <option value="no" {% if current_sold == 'no' %}selected{% endif %}>Not Sold</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Filter</button>
+            <a href="{{ url_for('inventory.list_inventory') }}" class="text-gray-500 hover:text-gray-700 px-4 py-2">Clear</a>
+        </form>
+    </div>
+
+    <!-- Inventory List -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        {% if items %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Product</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Source</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden md:table-cell">Date</th>
+                            <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 hidden lg:table-cell">Content</th>
+                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">P/L</th>
+                            <th class="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for item in items %}
+                            <tr class="hover:bg-gray-50 {% if item.deadline and not item.sold %}bg-red-50{% endif %}">
+                                <td class="px-4 py-3">
+                                    <div class="font-medium">{{ item.product_name }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ item.company.name if item.company else 'Unknown' }} &middot; {{ item.category|title }}
+                                    </div>
+                                    {% if item.deadline %}
+                                        <div class="text-xs text-red-600">Deadline: {{ item.deadline.strftime('%b %d') }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell">
+                                    <span class="text-xs px-2 py-1 rounded-full
+                                        {% if item.source_type == 'review_unit' %}bg-blue-100 text-blue-700
+                                        {% else %}bg-purple-100 text-purple-700{% endif %}">
+                                        {{ item.source_type|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-xs px-2 py-1 rounded-full
+                                        {% if item.status == 'in_queue' %}bg-yellow-100 text-yellow-700
+                                        {% elif item.status == 'reviewing' %}bg-blue-100 text-blue-700
+                                        {% elif item.status == 'reviewed' %}bg-purple-100 text-purple-700
+                                        {% elif item.status == 'keeping' %}bg-gray-100 text-gray-700
+                                        {% elif item.status == 'listed' %}bg-orange-100 text-orange-700
+                                        {% elif item.status == 'sold' %}bg-green-100 text-green-700
+                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {{ item.status|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-500">
+                                    {{ item.date_acquired.strftime('%b %d, %Y') if item.date_acquired else '-' }}
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell">
+                                    {% if item.short_url %}
+                                        <a href="{{ item.short_url }}" target="_blank" class="text-primary-600 hover:underline text-sm">Short</a>
+                                    {% endif %}
+                                    {% if item.video_url %}
+                                        <a href="{{ item.video_url }}" target="_blank" class="text-primary-600 hover:underline text-sm ml-2">Video</a>
+                                    {% endif %}
+                                    {% if not item.short_url and not item.video_url %}
+                                        <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium {% if item.profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                    ${{ "%.2f"|format(item.profit_loss) }}
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    {% if not item.sold and item.status == 'listed' %}
+                                        <form action="{{ url_for('inventory.mark_sold', id=item.id) }}" method="post" class="inline">
+                                            <button type="submit" class="text-green-600 hover:text-green-800 mr-2">Sold</button>
+                                        </form>
+                                    {% endif %}
+                                    <a href="{{ url_for('inventory.edit_item', id=item.id) }}" class="text-primary-600 hover:text-primary-800 mr-2">Edit</a>
+                                    <form action="{{ url_for('inventory.delete_item', id=item.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this item?')">
+                                        <button type="submit" class="text-red-600 hover:text-red-800">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-8 text-center text-gray-500">
+                No inventory found. <a href="{{ url_for('inventory.new_item') }}" class="text-primary-600 hover:underline">Add your first item</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

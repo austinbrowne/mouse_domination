@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Item - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">{{ 'Edit' if item else 'New' }} Inventory Item</h1>
+
+    <form method="post" class="bg-white rounded-lg shadow p-6 space-y-6">
+        <!-- Basic Info -->
+        <div class="space-y-4">
+            <h3 class="font-medium text-gray-800 border-b pb-2">Basic Info</h3>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                <input type="text" name="product_name" value="{{ item.product_name if item else '' }}" required
+                    class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500">
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <select name="company_id" class="w-full border rounded-lg px-3 py-2">
+                        <option value="">None</option>
+                        {% for company in companies %}
+                            <option value="{{ company.id }}" {% if item and item.company_id == company.id %}selected{% endif %}>
+                                {{ company.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category" class="w-full border rounded-lg px-3 py-2">
+                        <option value="mouse" {% if item and item.category == 'mouse' %}selected{% endif %}>Mouse</option>
+                        <option value="keyboard" {% if item and item.category == 'keyboard' %}selected{% endif %}>Keyboard</option>
+                        <option value="mousepad" {% if item and item.category == 'mousepad' %}selected{% endif %}>Mousepad</option>
+                        <option value="iem" {% if item and item.category == 'iem' %}selected{% endif %}>IEM</option>
+                        <option value="other" {% if item and item.category == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Source Type</label>
+                    <select name="source_type" class="w-full border rounded-lg px-3 py-2">
+                        <option value="review_unit" {% if item and item.source_type == 'review_unit' %}selected{% endif %}>Review Unit</option>
+                        <option value="personal_purchase" {% if item and item.source_type == 'personal_purchase' %}selected{% endif %}>Personal Purchase</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date Acquired</label>
+                    <input type="date" name="date_acquired" value="{{ item.date_acquired.isoformat() if item and item.date_acquired else '' }}"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost ($)</label>
+                    <input type="number" name="cost" value="{{ item.cost if item else '0' }}" step="0.01" min="0"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select name="status" class="w-full border rounded-lg px-3 py-2">
+                        <option value="in_queue" {% if item and item.status == 'in_queue' %}selected{% endif %}>In Queue</option>
+                        <option value="reviewing" {% if item and item.status == 'reviewing' %}selected{% endif %}>Reviewing</option>
+                        <option value="reviewed" {% if item and item.status == 'reviewed' %}selected{% endif %}>Reviewed</option>
+                        <option value="keeping" {% if item and item.status == 'keeping' %}selected{% endif %}>Keeping</option>
+                        <option value="listed" {% if item and item.status == 'listed' %}selected{% endif %}>Listed</option>
+                        <option value="sold" {% if item and item.status == 'sold' %}selected{% endif %}>Sold</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                    <select name="condition" class="w-full border rounded-lg px-3 py-2">
+                        <option value="new" {% if item and item.condition == 'new' %}selected{% endif %}>New</option>
+                        <option value="open_box" {% if item and item.condition == 'open_box' %}selected{% endif %}>Open Box</option>
+                        <option value="used" {% if item and item.condition == 'used' %}selected{% endif %}>Used</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Deadline (optional)</label>
+                    <input type="date" name="deadline" value="{{ item.deadline.isoformat() if item and item.deadline else '' }}"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">On Amazon?</label>
+                    <select name="on_amazon" class="w-full border rounded-lg px-3 py-2">
+                        <option value="no" {% if not item or not item.on_amazon %}selected{% endif %}>No</option>
+                        <option value="yes" {% if item and item.on_amazon %}selected{% endif %}>Yes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Links -->
+        <div class="space-y-4">
+            <h3 class="font-medium text-gray-800 border-b pb-2">Content Links</h3>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Short URL</label>
+                    <input type="url" name="short_url" value="{{ item.short_url if item else '' }}" placeholder="https://youtube.com/shorts/..."
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Short Publish Date</label>
+                    <input type="date" name="short_publish_date" value="{{ item.short_publish_date.isoformat() if item and item.short_publish_date else '' }}"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+                    <input type="url" name="video_url" value="{{ item.video_url if item else '' }}" placeholder="https://youtube.com/watch?v=..."
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Video Publish Date</label>
+                    <input type="date" name="video_publish_date" value="{{ item.video_publish_date.isoformat() if item and item.video_publish_date else '' }}"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales Info -->
+        <div class="space-y-4">
+            <h3 class="font-medium text-gray-800 border-b pb-2">Sales Info</h3>
+
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sold?</label>
+                    <select name="sold" class="w-full border rounded-lg px-3 py-2">
+                        <option value="no" {% if not item or not item.sold %}selected{% endif %}>No</option>
+                        <option value="yes" {% if item and item.sold %}selected{% endif %}>Yes</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sale Price ($)</label>
+                    <input type="number" name="sale_price" value="{{ item.sale_price if item and item.sale_price else '' }}" step="0.01" min="0"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Marketplace</label>
+                    <select name="marketplace" class="w-full border rounded-lg px-3 py-2">
+                        <option value="">Select...</option>
+                        <option value="ebay" {% if item and item.marketplace == 'ebay' %}selected{% endif %}>eBay</option>
+                        <option value="reddit" {% if item and item.marketplace == 'reddit' %}selected{% endif %}>r/MouseMarket</option>
+                        <option value="discord" {% if item and item.marketplace == 'discord' %}selected{% endif %}>Discord</option>
+                        <option value="facebook" {% if item and item.marketplace == 'facebook' %}selected{% endif %}>Facebook</option>
+                        <option value="offerup" {% if item and item.marketplace == 'offerup' %}selected{% endif %}>OfferUp</option>
+                        <option value="mercari" {% if item and item.marketplace == 'mercari' %}selected{% endif %}>Mercari</option>
+                        <option value="local" {% if item and item.marketplace == 'local' %}selected{% endif %}>Local</option>
+                        <option value="other" {% if item and item.marketplace == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fees ($)</label>
+                    <input type="number" name="fees" value="{{ item.fees if item and item.fees else '' }}" step="0.01" min="0"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Shipping ($)</label>
+                    <input type="number" name="shipping" value="{{ item.shipping if item and item.shipping else '' }}" step="0.01" min="0"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Buyer</label>
+                    <input type="text" name="buyer" value="{{ item.buyer if item else '' }}" placeholder="Username"
+                        class="w-full border rounded-lg px-3 py-2">
+                </div>
+            </div>
+
+            {% if item and item.sold %}
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm text-gray-600">Calculated P/L:</span>
+                    <span class="font-bold ml-2 {% if item.profit_loss >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                        ${{ "%.2f"|format(item.profit_loss) }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Notes -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea name="notes" rows="3" class="w-full border rounded-lg px-3 py-2">{{ item.notes if item else '' }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sale Notes</label>
+            <textarea name="sale_notes" rows="2" class="w-full border rounded-lg px-3 py-2">{{ item.sale_notes if item else '' }}</textarea>
+        </div>
+
+        <div class="flex justify-between pt-4">
+            <a href="{{ url_for('inventory.list_inventory') }}" class="text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition">
+                {{ 'Save Changes' if item else 'Create Item' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

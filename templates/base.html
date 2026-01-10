@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mouse Domination{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-primary-700 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <a href="{{ url_for('main.dashboard') }}" class="font-bold text-xl">Mouse Domination</a>
+
+                <!-- Mobile menu button -->
+                <button @click="open = !open" x-data="{ open: false }" class="md:hidden p-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+
+                <!-- Desktop menu -->
+                <div class="hidden md:flex space-x-6">
+                    <a href="{{ url_for('main.dashboard') }}" class="hover:text-primary-200 transition">Dashboard</a>
+                    <a href="{{ url_for('contacts.list_contacts') }}" class="hover:text-primary-200 transition">Contacts</a>
+                    <a href="{{ url_for('companies.list_companies') }}" class="hover:text-primary-200 transition">Companies</a>
+                    <a href="{{ url_for('inventory.list_inventory') }}" class="hover:text-primary-200 transition">Inventory</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div x-data="{ open: false }" x-show="open" x-cloak class="md:hidden bg-primary-800 px-4 py-2">
+            <a href="{{ url_for('main.dashboard') }}" class="block py-2 hover:text-primary-200">Dashboard</a>
+            <a href="{{ url_for('contacts.list_contacts') }}" class="block py-2 hover:text-primary-200">Contacts</a>
+            <a href="{{ url_for('companies.list_companies') }}" class="block py-2 hover:text-primary-200">Companies</a>
+            <a href="{{ url_for('inventory.list_inventory') }}" class="block py-2 hover:text-primary-200">Inventory</a>
+        </div>
+    </nav>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="max-w-7xl mx-auto px-4 mt-4">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg mb-2 {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-100 border-t mt-auto py-4">
+        <div class="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
+            Mouse Domination &copy; dazztrazak
+        </div>
+    </footer>
+</body>
+</html>
