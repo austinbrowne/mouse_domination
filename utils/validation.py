@@ -49,11 +49,26 @@ def parse_int(value: str, field_name: str = 'value', allow_negative: bool = Fals
         raise ValidationError(field_name, "Invalid integer format.")
 
 
-def validate_required(value: str, field_name: str) -> str:
-    """Validate that a required field is not empty."""
+def validate_required(value: str, field_name: str, max_length: int = None) -> str:
+    """Validate that a required field is not empty and within length limit."""
     if not value or not value.strip():
         raise ValidationError(field_name, "This field is required.")
-    return value.strip()
+    value = value.strip()
+    if max_length and len(value) > max_length:
+        raise ValidationError(field_name, f"Must be at most {max_length} characters.")
+    return value
+
+
+def validate_length(value: str, field_name: str, min_length: int = None, max_length: int = None) -> str | None:
+    """Validate string length, returning None if empty."""
+    if not value or not value.strip():
+        return None
+    value = value.strip()
+    if min_length and len(value) < min_length:
+        raise ValidationError(field_name, f"Must be at least {min_length} characters.")
+    if max_length and len(value) > max_length:
+        raise ValidationError(field_name, f"Must be at most {max_length} characters.")
+    return value
 
 
 def validate_email(value: str, field_name: str = 'email') -> str | None:
@@ -68,15 +83,30 @@ def validate_email(value: str, field_name: str = 'email') -> str | None:
     return value
 
 
-def validate_url(value: str, field_name: str = 'url') -> str | None:
+def validate_url(value: str, field_name: str = 'url', max_length: int = 2048) -> str | None:
     """Validate URL format, returning None if empty."""
     if not value or not value.strip():
         return None
     value = value.strip()
-    # Basic URL pattern - allows http, https, or just starting with www
-    pattern = r'^(https?://|www\.)[^\s]+$'
-    if not re.match(pattern, value, re.IGNORECASE):
-        raise ValidationError(field_name, "Invalid URL format. Must start with http://, https://, or www.")
+
+    # Check length
+    if len(value) > max_length:
+        raise ValidationError(field_name, f"URL must be at most {max_length} characters.")
+
+    # More robust URL pattern
+    # Must start with http:// or https://
+    # Domain must have valid characters and at least one dot
+    # Path/query can contain valid URL characters
+    pattern = r'^https?://[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+(/[a-zA-Z0-9._~:/?#\[\]@!$&\'()*+,;=%\-]*)?$'
+    if not re.match(pattern, value):
+        raise ValidationError(field_name, "Invalid URL format. Must be a valid http:// or https:// URL.")
+
+    # Additional security checks
+    # Block javascript: URLs and data: URLs
+    lower_value = value.lower()
+    if lower_value.startswith('javascript:') or lower_value.startswith('data:'):
+        raise ValidationError(field_name, "Invalid URL scheme.")
+
     return value
 
 

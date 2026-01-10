@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from markupsafe import escape
 from sqlalchemy.exc import SQLAlchemyError
 from models import OutreachTemplate, Contact, Company
 from app import db
@@ -135,23 +136,27 @@ def preview_template(id):
     body = template.body
     subject = template.subject or ''
 
-    # Replace placeholders if data provided
+    # Replace placeholders if data provided (escape user data to prevent XSS)
     if contact_id:
         contact = Contact.query.get(contact_id)
         if contact:
-            body = body.replace('{{contact_name}}', contact.name)
-            subject = subject.replace('{{contact_name}}', contact.name)
+            safe_name = str(escape(contact.name))
+            body = body.replace('{{contact_name}}', safe_name)
+            subject = subject.replace('{{contact_name}}', safe_name)
 
     if company_id:
         company = Company.query.get(company_id)
         if company:
-            body = body.replace('{{company_name}}', company.name)
-            subject = subject.replace('{{company_name}}', company.name)
+            safe_name = str(escape(company.name))
+            body = body.replace('{{company_name}}', safe_name)
+            subject = subject.replace('{{company_name}}', safe_name)
 
-    # Default placeholders for my channel info
-    body = body.replace('{{my_channel}}', 'dazztrazak')
-    body = body.replace('{{my_stats}}', '4,000+ subscribers')
-    subject = subject.replace('{{my_channel}}', 'dazztrazak')
+    # Default placeholders for channel info from config
+    channel_name = current_app.config.get('CREATOR_CHANNEL_NAME', 'dazztrazak')
+    channel_stats = current_app.config.get('CREATOR_CHANNEL_STATS', '4,000+ subscribers')
+    body = body.replace('{{my_channel}}', channel_name)
+    body = body.replace('{{my_stats}}', channel_stats)
+    subject = subject.replace('{{my_channel}}', channel_name)
 
     # Get all contacts and companies for the test form
     contacts = Contact.query.order_by(Contact.name).all()

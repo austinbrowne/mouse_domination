@@ -1,20 +1,55 @@
-from flask import Flask
+import os
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
-from config import Config
+from config import Config, DevelopmentConfig, ProductionConfig
 
 db = SQLAlchemy()
 csrf = CSRFProtect()
 
 
-def create_app(config_class=Config):
+def get_config():
+    """Get configuration based on environment."""
+    env = os.environ.get('FLASK_ENV', 'development')
+    if env == 'production':
+        return ProductionConfig
+    return DevelopmentConfig
+
+
+def create_app(config_class=None):
     """Application factory pattern."""
+    if config_class is None:
+        config_class = get_config()
+
     app = Flask(__name__)
     app.config.from_object(config_class)
 
     # Initialize extensions
     db.init_app(app)
     csrf.init_app(app)
+
+    # Add security headers
+    @app.after_request
+    def add_security_headers(response):
+        # Prevent clickjacking
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        # Prevent MIME type sniffing
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        # XSS protection (legacy browsers)
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        # Referrer policy
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        # Content Security Policy (permissive for now, can be tightened)
+        if not app.debug:
+            response.headers['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' cdn.tailwindcss.com fonts.googleapis.com; "
+                "font-src 'self' fonts.gstatic.com; "
+                "img-src 'self' data: https:; "
+                "connect-src 'self'"
+            )
+        return response
 
     # Setup logging
     from utils.logging import setup_logging
@@ -52,5 +87,8 @@ def create_app(config_class=Config):
 
 if __name__ == '__main__':
     app = create_app()
-    # Use 0.0.0.0 to allow access from other devices on the network
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Debug mode is controlled by config, not hardcoded
+    # Use 127.0.0.1 by default for security; set HOST=0.0.0.0 to allow network access
+    host = os.environ.get('HOST', '127.0.0.1')
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host=host, port=port)

@@ -31,6 +31,13 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Security settings
+    DEBUG = False
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max request size
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+
     # Backup settings
     BACKUP_DIR = BASE_DIR / 'backups'
     BACKUP_RETENTION_DAYS = 30
@@ -39,8 +46,32 @@ class Config:
     YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
     YOUTUBE_CHANNEL_ID = os.environ.get('YOUTUBE_CHANNEL_ID')  # Your channel ID
 
+    # Creator channel settings (for outreach templates)
+    CREATOR_CHANNEL_NAME = os.environ.get('CREATOR_CHANNEL_NAME', 'dazztrazak')
+    CREATOR_CHANNEL_STATS = os.environ.get('CREATOR_CHANNEL_STATS', '4,000+ subscribers')
+
+
+class DevelopmentConfig(Config):
+    """Development configuration."""
+    DEBUG = True
+    SESSION_COOKIE_SECURE = False
+
+
+class ProductionConfig(Config):
+    """Production configuration."""
+    DEBUG = False
+    SESSION_COOKIE_SECURE = True
+
+    def __init__(self):
+        # Validate required production settings
+        if not os.environ.get('SECRET_KEY'):
+            raise RuntimeError("SECRET_KEY must be set in production")
+
 
 class TestConfig(Config):
     """Testing configuration."""
     TESTING = True
+    DEBUG = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False  # Disable CSRF for testing
+    SESSION_COOKIE_SECURE = False
