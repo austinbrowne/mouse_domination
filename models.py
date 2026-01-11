@@ -471,6 +471,11 @@ class EpisodeGuide(db.Model):
     total_duration_seconds = db.Column(db.Integer, nullable=True)
 
     notes = db.Column(db.Text, nullable=True)
+
+    # Poll fields for intro
+    previous_poll = db.Column(db.String(500), nullable=True)
+    new_poll = db.Column(db.String(500), nullable=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -501,6 +506,8 @@ class EpisodeGuide(db.Model):
             'total_duration_seconds': self.total_duration_seconds,
             'formatted_duration': self.formatted_duration,
             'notes': self.notes,
+            'previous_poll': self.previous_poll,
+            'new_poll': self.new_poll,
             'item_count': len(self.items) if self.items else 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

@@ -113,11 +113,9 @@
                         <li>"Hello everyone! I'm Phalanges. (and I'm dazztrazak) Welcome to MouseCast"</li>
                         <li>Subscribe</li>
                         <li>Discord - https://discord.gg/xPFzjD8r</li>
-                        <li>Shoutout aubi pinned hand message and other helpful things. People, join the discord!</li>
                         <li>What mice do you have inbound? & What's on your desk right now?</li>
-                        <li>Dazz Days of Giveaways</li>
-                        <li>Previous Poll: [UPDATE]</li>
-                        <li>New Poll: [UPDATE]</li>
+                        <li class="font-semibold">Previous Poll: {{ guide.previous_poll or '[Not set - edit guide to add]' }}</li>
+                        <li class="font-semibold">New Poll: {{ guide.new_poll or '[Not set - edit guide to add]' }}</li>
                     </ul>
                 </div>
                 {% endif %}

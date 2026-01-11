@@ -73,10 +73,22 @@ def new_guide():
         try:
             form = FormData(request.form)
 
+            episode_number = form.integer('episode_number')
+
+            # Auto-populate previous_poll from last episode if exists
+            previous_poll = None
+            if episode_number:
+                prev_guide = EpisodeGuide.query.filter(
+                    EpisodeGuide.episode_number == episode_number - 1
+                ).first()
+                if prev_guide and prev_guide.new_poll:
+                    previous_poll = prev_guide.new_poll
+
             guide = EpisodeGuide(
                 title=form.required('title'),
-                episode_number=form.integer('episode_number'),
+                episode_number=episode_number,
                 notes=form.optional('notes'),
+                previous_poll=previous_poll,
                 status='draft',
             )
 
@@ -210,7 +222,7 @@ def delete_guide(id):
 
 @episode_guide_bp.route('/<int:id>/metadata', methods=['PUT'])
 def update_metadata(id):
-    """Update guide metadata (title, episode_number) via AJAX."""
+    """Update guide metadata (title, episode_number, polls) via AJAX."""
     try:
         guide = EpisodeGuide.query.get_or_404(id)
         data = request.get_json()
@@ -222,7 +234,23 @@ def update_metadata(id):
             guide.title = title
 
         if 'episode_number' in data:
-            guide.episode_number = int(data['episode_number']) if data['episode_number'] else None
+            new_episode_num = int(data['episode_number']) if data['episode_number'] else None
+
+            # Auto-populate previous_poll if episode number changed and previous_poll is empty
+            if new_episode_num and new_episode_num != guide.episode_number and not guide.previous_poll:
+                prev_guide = EpisodeGuide.query.filter(
+                    EpisodeGuide.episode_number == new_episode_num - 1
+                ).first()
+                if prev_guide and prev_guide.new_poll:
+                    guide.previous_poll = prev_guide.new_poll
+
+            guide.episode_number = new_episode_num
+
+        if 'previous_poll' in data:
+            guide.previous_poll = data['previous_poll'].strip() if data['previous_poll'] else None
+
+        if 'new_poll' in data:
+            guide.new_poll = data['new_poll'].strip() if data['new_poll'] else None
 
         db.session.commit()
         return jsonify({'success': True, 'guide': guide.to_dict()})

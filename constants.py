@@ -55,11 +55,7 @@ INTRO_STATIC_CONTENT = [
     "Hello everyone! I'm Phalanges. (and I'm dazztrazak) Welcome to MouseCast",
     "Subscribe",
     "Discord - https://discord.gg/xPFzjD8r",
-    "Shoutout aubi pinned hand message and other helpful things. People, join the discord!",
     "What mice do you have inbound? & What's on your desk right now?",
-    "Dazz Days of Giveaways",
-    "Previous Poll: [UPDATE]",
-    "New Poll: [UPDATE]",
 ]
 
 # Static content for Outro section

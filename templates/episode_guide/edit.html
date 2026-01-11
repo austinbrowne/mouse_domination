@@ -3,7 +3,7 @@
 {% block title %}Edit: {{ guide.title }} - Mouse Domination{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }})">
+<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}')">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -43,6 +43,27 @@
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
                 Go Live
             </a>
+        </div>
+    </div>
+
+    <!-- Poll Fields -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <h3 class="font-semibold text-gray-900 mb-4">Intro Poll Settings</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Previous Poll (from last episode)</label>
+                <input type="text" x-model="previousPoll"
+                    @blur="saveGuideMetadata()"
+                    placeholder="What was last week's poll question?"
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">New Poll (this episode)</label>
+                <input type="text" x-model="newPoll"
+                    @blur="saveGuideMetadata()"
+                    placeholder="What's this week's poll question?"
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+            </div>
         </div>
     </div>
 
@@ -163,11 +184,13 @@
 
 {% block scripts %}
 <script>
-function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum) {
+function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialNewPoll) {
     return {
         guideId: guideId,
         guideTitle: initialTitle,
         episodeNumber: initialEpisodeNum,
+        previousPoll: initialPrevPoll,
+        newPoll: initialNewPoll,
         editingTitle: false,
         editingEpisodeNum: false,
         editingItemId: null,
@@ -193,13 +216,18 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum) {
                     },
                     body: JSON.stringify({
                         title: this.guideTitle.trim(),
-                        episode_number: this.episodeNumber || null
+                        episode_number: this.episodeNumber || null,
+                        previous_poll: this.previousPoll || null,
+                        new_poll: this.newPoll || null
                     })
                 });
 
                 const data = await response.json();
                 if (!data.success) {
                     alert('Failed to save: ' + (data.error || 'Unknown error'));
+                } else if (data.guide && data.guide.previous_poll && !this.previousPoll) {
+                    // Auto-populated from previous episode
+                    this.previousPoll = data.guide.previous_poll;
                 }
             } catch (error) {
                 console.error('Failed to save metadata:', error);
