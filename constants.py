@@ -36,3 +36,45 @@ TEMPLATE_CATEGORY_CHOICES = ['sponsor', 'collab', 'follow_up', 'thank_you', 'pit
 # Pagination defaults
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
+
+# Episode Guide sections (key, display_name, parent_section)
+# parent_section is used for grouping subsections under a main section
+EPISODE_GUIDE_SECTIONS = [
+    ('introduction', 'Introduction', None),
+    ('news_mice', 'Mice', 'news'),
+    ('news_other', 'Other', 'news'),
+    ('news_pads', 'Pads', 'news'),
+    ('news_keyboards', 'Keyboards', 'news'),
+    ('community_recap', 'Community Recap', None),
+    ('personal_ramblings', 'Personal Ramblings', None),
+    ('outro', 'Outro', None),
+]
+
+# Static content for Introduction section
+INTRO_STATIC_CONTENT = [
+    "Hello everyone! I'm Phalanges. (and I'm dazztrazak) Welcome to MouseCast",
+    "Subscribe",
+    "Discord - https://discord.gg/xPFzjD8r",
+    "Shoutout aubi pinned hand message and other helpful things. People, join the discord!",
+    "What mice do you have inbound? & What's on your desk right now?",
+    "Dazz Days of Giveaways",
+    "Previous Poll: [UPDATE]",
+    "New Poll: [UPDATE]",
+]
+
+# Static content for Outro section
+OUTRO_STATIC_CONTENT = [
+    "Thank you all for listening.",
+    "MouseCast next week - [UPDATE DATE/TIME]",
+    "Like & share the video, it helps the algorithm.",
+    "If you have a question or want to submit a discussion topic, leave it in the comments!",
+    "We'll be back next Friday with another episode.",
+]
+
+# Helper lookups for Episode Guide
+EPISODE_GUIDE_SECTION_CHOICES = [s[0] for s in EPISODE_GUIDE_SECTIONS]
+EPISODE_GUIDE_SECTION_NAMES = {s[0]: s[1] for s in EPISODE_GUIDE_SECTIONS}
+EPISODE_GUIDE_SECTION_PARENTS = {s[0]: s[2] for s in EPISODE_GUIDE_SECTIONS}
+
+# Episode Guide status choices
+EPISODE_GUIDE_STATUS_CHOICES = ['draft', 'recording', 'completed']

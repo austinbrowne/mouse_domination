@@ -454,3 +454,112 @@ class OutreachTemplate(db.Model):
             'times_used': self.times_used,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class EpisodeGuide(db.Model):
+    """Episode guide for live podcast recording with timestamp tracking."""
+    __tablename__ = 'episode_guides'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False, index=True)
+    episode_number = db.Column(db.Integer, nullable=True, index=True)
+
+    # Recording state
+    status = db.Column(db.String(20), default='draft', index=True)  # draft, recording, completed
+    recording_started_at = db.Column(db.DateTime, nullable=True)
+    recording_ended_at = db.Column(db.DateTime, nullable=True)
+    total_duration_seconds = db.Column(db.Integer, nullable=True)
+
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    items = db.relationship('EpisodeGuideItem', back_populates='guide', cascade='all, delete-orphan',
+                           order_by='EpisodeGuideItem.section, EpisodeGuideItem.position', lazy='select')
+
+    @property
+    def formatted_duration(self):
+        """Return formatted duration as HH:MM:SS or MM:SS."""
+        if self.total_duration_seconds is None:
+            return None
+        hrs = self.total_duration_seconds // 3600
+        mins = (self.total_duration_seconds % 3600) // 60
+        secs = self.total_duration_seconds % 60
+        if hrs > 0:
+            return f"{hrs}:{mins:02d}:{secs:02d}"
+        return f"{mins:02d}:{secs:02d}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'episode_number': self.episode_number,
+            'status': self.status,
+            'recording_started_at': self.recording_started_at.isoformat() if self.recording_started_at else None,
+            'recording_ended_at': self.recording_ended_at.isoformat() if self.recording_ended_at else None,
+            'total_duration_seconds': self.total_duration_seconds,
+            'formatted_duration': self.formatted_duration,
+            'notes': self.notes,
+            'item_count': len(self.items) if self.items else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class EpisodeGuideItem(db.Model):
+    """Individual topic/item within an episode guide section."""
+    __tablename__ = 'episode_guide_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    guide_id = db.Column(db.Integer, db.ForeignKey('episode_guides.id'), nullable=False, index=True)
+
+    # Section identification (using predefined constants)
+    section = db.Column(db.String(30), nullable=False, index=True)  # introduction, news_mice, etc.
+
+    # Item content
+    title = db.Column(db.String(500), nullable=False)
+    link = db.Column(db.String(500), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+
+    # Ordering within section
+    position = db.Column(db.Integer, default=0, index=True)
+
+    # Timestamp (captured during live recording - seconds from start)
+    timestamp_seconds = db.Column(db.Integer, nullable=True)
+
+    # Status tracking
+    discussed = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    guide = db.relationship('EpisodeGuide', back_populates='items')
+
+    @property
+    def formatted_timestamp(self):
+        """Return MM:SS or HH:MM:SS formatted timestamp."""
+        if self.timestamp_seconds is None:
+            return None
+        hrs = self.timestamp_seconds // 3600
+        mins = (self.timestamp_seconds % 3600) // 60
+        secs = self.timestamp_seconds % 60
+        if hrs > 0:
+            return f"{hrs}:{mins:02d}:{secs:02d}"
+        return f"{mins:02d}:{secs:02d}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'guide_id': self.guide_id,
+            'section': self.section,
+            'title': self.title,
+            'link': self.link,
+            'notes': self.notes,
+            'position': self.position,
+            'timestamp_seconds': self.timestamp_seconds,
+            'formatted_timestamp': self.formatted_timestamp,
+            'discussed': self.discussed,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

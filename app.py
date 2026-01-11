@@ -68,6 +68,7 @@ def create_app(config_class=None):
     from routes.collabs import collabs_bp
     from routes.pipeline import pipeline_bp
     from routes.templates import templates_bp
+    from routes.episode_guide import episode_guide_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(contacts_bp, url_prefix='/contacts')
@@ -79,6 +80,7 @@ def create_app(config_class=None):
     app.register_blueprint(collabs_bp, url_prefix='/collabs')
     app.register_blueprint(pipeline_bp, url_prefix='/pipeline')
     app.register_blueprint(templates_bp, url_prefix='/templates')
+    app.register_blueprint(episode_guide_bp, url_prefix='/guide')
 
     # Create database tables
     with app.app_context():

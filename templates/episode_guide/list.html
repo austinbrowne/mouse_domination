@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination as render_pagination %}
+
+{% block title %}Episode Guides - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Episode Guides</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ stats.total }} guides</p>
+        </div>
+        <a href="{{ url_for('episode_guide.new_guide') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Guide
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ stats.drafts }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.completed }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.total }}</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by title..."
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Status</option>
+                    <option value="draft" {% if current_status == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="recording" {% if current_status == 'recording' %}selected{% endif %}>Recording</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+                <a href="{{ url_for('episode_guide.list_guides') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Guides List -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+        {% if guides %}
+            <div class="divide-y divide-surface-200">
+                {% for guide in guides %}
+                    <div class="p-4 hover:bg-surface-50 flex items-center justify-between gap-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-3">
+                                {% if guide.episode_number %}
+                                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
+                                        #{{ guide.episode_number }}
+                                    </span>
+                                {% endif %}
+                                <div>
+                                    <h3 class="font-medium text-gray-900 truncate">{{ guide.title }}</h3>
+                                    <div class="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                        <span>{{ guide.created_at.strftime('%b %d, %Y') }}</span>
+                                        {% if guide.items %}
+                                            <span>{{ guide.items|length }} items</span>
+                                        {% endif %}
+                                        {% if guide.formatted_duration %}
+                                            <span>{{ guide.formatted_duration }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <!-- Status Badge -->
+                            <span class="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full
+                                {% if guide.status == 'completed' %}bg-emerald-50 text-emerald-700
+                                {% elif guide.status == 'recording' %}bg-red-50 text-red-700 animate-pulse
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {% if guide.status == 'recording' %}
+                                    <span class="w-2 h-2 bg-red-500 rounded-full mr-1.5"></span>
+                                {% endif %}
+                                {{ guide.status|title }}
+                            </span>
+
+                            <!-- Actions -->
+                            <div class="flex items-center gap-2">
+                                {% if guide.status == 'draft' %}
+                                    <a href="{{ url_for('episode_guide.edit_guide', id=guide.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                    <a href="{{ url_for('episode_guide.live_mode', id=guide.id) }}" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">Go Live</a>
+                                {% elif guide.status == 'recording' %}
+                                    <a href="{{ url_for('episode_guide.live_mode', id=guide.id) }}" class="text-xs font-medium text-red-600 hover:text-red-700">Resume</a>
+                                {% else %}
+                                    <a href="{{ url_for('episode_guide.view_guide', id=guide.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">View</a>
+                                {% endif %}
+                                <form action="{{ url_for('episode_guide.copy_guide', source_id=guide.id) }}" method="post" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-xs font-medium text-gray-500 hover:text-gray-700">Copy</button>
+                                </form>
+                                <form action="{{ url_for('episode_guide.delete_guide', id=guide.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this guide?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p class="text-gray-500 mb-2">No episode guides yet</p>
+                <a href="{{ url_for('episode_guide.new_guide') }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">Create your first guide</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination and pagination.pages > 1 %}
+    {{ render_pagination(pagination, 'episode_guide.list_guides', extra_params={'status': current_status, 'search': search}) }}
+    {% endif %}
+</div>
+{% endblock %}
