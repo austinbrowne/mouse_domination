@@ -1,11 +1,31 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, jsonify
 from models import Contact, Company, Inventory, Video, PodcastEpisode, AffiliateRevenue
 from app import db
-from sqlalchemy import func, case, and_
+from sqlalchemy import func, case, and_, text
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 
 main_bp = Blueprint('main', __name__)
+
+
+@main_bp.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and load balancers."""
+    try:
+        # Test database connectivity
+        db.session.execute(text('SELECT 1'))
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
 
 
 @main_bp.route('/')

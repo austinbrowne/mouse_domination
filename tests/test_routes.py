@@ -4,6 +4,19 @@ from models import Contact, Company, Inventory, Video, PodcastEpisode, Affiliate
 from datetime import date
 
 
+class TestHealthCheck:
+    """Tests for health check endpoint."""
+
+    def test_health_check_returns_200(self, client):
+        """Test health check endpoint returns 200 when healthy."""
+        response = client.get('/health')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['status'] == 'healthy'
+        assert data['database'] == 'connected'
+        assert 'timestamp' in data
+
+
 class TestDashboard:
     """Tests for dashboard route."""
 
