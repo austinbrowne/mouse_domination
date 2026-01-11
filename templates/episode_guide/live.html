@@ -82,10 +82,20 @@
             {% set section_items = section_data.get('items', []) %}
 
             <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
-                <!-- Banner Reminder -->
+                <!-- Banner Reminder (only for major sections: News, Community Recap, Personal Ramblings) -->
+                {% if section_key == 'news_mice' %}
                 <div class="bg-red-600 text-white px-4 py-2 text-center font-bold text-sm uppercase tracking-wide">
-                    SWITCH BANNER TO: {{ section_name }}
+                    SWITCH BANNER TO: NEWS
                 </div>
+                {% elif section_key == 'community_recap' %}
+                <div class="bg-red-600 text-white px-4 py-2 text-center font-bold text-sm uppercase tracking-wide">
+                    SWITCH BANNER TO: COMMUNITY RECAP
+                </div>
+                {% elif section_key == 'personal_ramblings' %}
+                <div class="bg-red-600 text-white px-4 py-2 text-center font-bold text-sm uppercase tracking-wide">
+                    SWITCH BANNER TO: PERSONAL RAMBLINGS
+                </div>
+                {% endif %}
 
                 <!-- Section Header -->
                 <div class="p-4 border-b border-surface-200 bg-surface-50">
