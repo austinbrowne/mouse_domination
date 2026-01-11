@@ -1,0 +1,81 @@
+# Mouse Domination CRM - Production Docker Compose with Caddy
+# Use: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # Caddy reverse proxy with automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: mouse_domination_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - mouse_net
+
+  # Flask application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mouse_domination_app
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mouse}:${POSTGRES_PASSWORD:-mouse}@db:5432/${POSTGRES_DB:-mouse_domination}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - YOUTUBE_CHANNEL_ID=${YOUTUBE_CHANNEL_ID:-}
+      - CREATOR_CHANNEL_NAME=${CREATOR_CHANNEL_NAME:-dazztrazak}
+      - CREATOR_CHANNEL_STATS=${CREATOR_CHANNEL_STATS:-}
+    expose:
+      - "5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mouse_net
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: mouse_domination_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-mouse}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mouse}
+      - POSTGRES_DB=${POSTGRES_DB:-mouse_domination}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mouse} -d ${POSTGRES_DB:-mouse_domination}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - mouse_net
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  mouse_net:
+    driver: bridge
