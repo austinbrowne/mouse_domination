@@ -150,27 +150,27 @@
 <script>
 function copyTimestamps() {
     const timestamps = [];
+
+    // Always start with Intro at 0:00
+    timestamps.push({ time: '0:00', title: 'Intro', seconds: 0 });
+
     {% for section_key in ['introduction', 'news_mice', 'news_other', 'news_pads', 'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'] %}
         {% set section_data = sections.get(section_key, {}) %}
         {% for item in section_data.get('items', []) %}
-            {% if item.formatted_timestamp %}
-    timestamps.push({ time: '{{ item.formatted_timestamp }}', title: '{{ item.title | replace("'", "\\'") }}' });
+            {% if item.formatted_timestamp and item.timestamp_seconds %}
+    timestamps.push({ time: '{{ item.formatted_timestamp }}', title: '{{ item.title | replace("'", "\\'") }}', seconds: {{ item.timestamp_seconds }} });
             {% endif %}
         {% endfor %}
     {% endfor %}
 
-    // Sort by timestamp
-    timestamps.sort((a, b) => {
-        const timeToSec = t => {
-            const parts = t.split(':').map(Number);
-            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-            return parts[0] * 60 + parts[1];
-        };
-        return timeToSec(a.time) - timeToSec(b.time);
-    });
+    // Sort by seconds and remove duplicates at 0:00 (keep only our Intro)
+    timestamps.sort((a, b) => a.seconds - b.seconds);
+
+    // Remove any items at 0 seconds except our Intro
+    const filtered = timestamps.filter((t, i) => i === 0 || t.seconds > 0);
 
     // Format for YouTube
-    const text = timestamps.map(t => `${t.time} ${t.title}`).join('\n');
+    const text = filtered.map(t => `${t.time} ${t.title}`).join('\n');
 
     navigator.clipboard.writeText(text).then(() => {
         console.log('Timestamps copied to clipboard');

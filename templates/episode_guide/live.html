@@ -217,21 +217,30 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
         },
 
         init() {
-            // Resume timer if already recording
+            // If status is draft, clear any stale localStorage and start fresh
+            if ('{{ guide.status }}' === 'draft') {
+                localStorage.removeItem(`guide_${this.guideId}_state`);
+                this.startTime = null;
+                this.timerRunning = false;
+                this.elapsedSeconds = 0;
+                return;
+            }
+
+            // Resume timer if already recording (use client-side tracking)
             if (this.timerRunning && this.startTime) {
-                this.elapsedSeconds = Math.floor((Date.now() - this.startTime.getTime()) / 1000);
+                this.elapsedSeconds = Math.max(0, Math.floor((Date.now() - this.startTime.getTime()) / 1000));
                 this.startTimerInterval();
             }
 
-            // Try to restore from localStorage
+            // Try to restore from localStorage (only if not already set from server)
             const saved = localStorage.getItem(`guide_${this.guideId}_state`);
-            if (saved) {
+            if (saved && !this.startTime) {
                 const state = JSON.parse(saved);
-                if (state.startTime && !this.startTime) {
+                if (state.startTime) {
                     this.startTime = new Date(state.startTime);
+                    this.elapsedSeconds = Math.max(0, Math.floor((Date.now() - this.startTime.getTime()) / 1000));
                     if (state.timerRunning) {
                         this.timerRunning = true;
-                        this.elapsedSeconds = Math.floor((Date.now() - this.startTime.getTime()) / 1000);
                         this.startTimerInterval();
                     }
                 }
@@ -256,6 +265,9 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
 
         async startRecording() {
             try {
+                // Use client time to avoid timezone issues
+                const clientStartTime = new Date();
+
                 const response = await fetch(`/guide/${this.guideId}/start`, {
                     method: 'POST',
                     headers: {
@@ -266,7 +278,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
 
                 const data = await response.json();
                 if (data.success) {
-                    this.startTime = new Date(data.started_at);
+                    this.startTime = clientStartTime;
                     this.timerRunning = true;
                     this.elapsedSeconds = 0;
                     this.startTimerInterval();
