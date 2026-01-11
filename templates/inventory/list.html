@@ -133,13 +133,13 @@
                                         {% if not item.sold and item.status == 'listed' %}
                                             <form action="{{ url_for('inventory.mark_sold', id=item.id) }}" method="post" class="inline">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">Sold</button>
+                                                <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Sold</button>
                                             </form>
                                         {% endif %}
-                                        <a href="{{ url_for('inventory.edit_item', id=item.id) }}" class="text-xs font-medium text-primary-600 hover:text-primary-700">Edit</a>
+                                        <a href="{{ url_for('inventory.edit_item', id=item.id) }}" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200">Edit</a>
                                         <form action="{{ url_for('inventory.delete_item', id=item.id) }}" method="post" class="inline" onsubmit="return confirm('Delete this item?')">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700">Delete</button>
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200">Delete</button>
                                         </form>
                                     </div>
                                 </td>
