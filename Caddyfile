@@ -1,0 +1,47 @@
+# Mouse Domination CRM - Caddy Configuration
+# Automatic HTTPS with Let's Encrypt
+
+# Replace with your actual domain
+{$DOMAIN:localhost} {
+    # Enable compression
+    encode gzip zstd
+
+    # Security headers
+    header {
+        # Prevent XSS attacks
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        # Strict Transport Security
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Referrer policy
+        Referrer-Policy strict-origin-when-cross-origin
+        # Remove server identification
+        -Server
+    }
+
+    # Reverse proxy to Flask app
+    reverse_proxy app:5000 {
+        # Health checks
+        health_uri /health
+        health_interval 30s
+        health_timeout 10s
+
+        # Headers
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Request logging
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+
+# Health check endpoint for load balancers (HTTP only)
+:80 {
+    respond /health 200
+}

@@ -1,0 +1,8 @@
+# Include base requirements
+-r requirements.txt
+
+# Production WSGI server
+gunicorn>=21.2.0
+
+# PostgreSQL driver
+psycopg2-binary>=2.9.9

@@ -1,0 +1,28 @@
+# Mouse Domination CRM - Development Docker Compose
+# Use: docker compose -f docker-compose.dev.yml up
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mouse_domination_dev
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SECRET_KEY=dev-secret-key-not-for-production
+      - DATABASE_URL=sqlite:////app/data/mouse_domination.db
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      # Persist SQLite database
+      - ./data:/app/data
+    command: >
+      sh -c "
+        pip install -r requirements.txt &&
+        python -c 'from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()' &&
+        flask run --host=0.0.0.0 --debug
+      "

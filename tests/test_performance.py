@@ -75,21 +75,39 @@ class TestQueryOptimizations:
 class TestConnectionPoolingConfig:
     """Test database connection pooling configuration."""
 
-    def test_pool_settings_configured(self, app):
-        """Test that connection pool settings are configured in base Config.
+    def test_pool_settings_configured_for_postgresql(self, app, monkeypatch):
+        """Test that connection pool settings are configured for PostgreSQL.
 
-        Note: TestConfig has empty engine options because SQLite doesn't support pooling.
-        We test the base Config class directly to verify pool settings exist.
+        Pool settings should only be applied for non-SQLite databases.
         """
-        from config import Config
+        import os
+        import config
 
-        # Check that pool settings exist in base Config
-        engine_options = Config.SQLALCHEMY_ENGINE_OPTIONS
+        # Simulate PostgreSQL environment
+        monkeypatch.setenv('DATABASE_URL', 'postgresql://user:pass@localhost/db')
 
-        # These should be set for production databases
+        # Reload the config module to pick up new env var
+        import importlib
+        importlib.reload(config)
+
+        # Check that pool settings exist when using PostgreSQL
+        assert config.is_sqlite() is False
+        engine_options = config.Config.SQLALCHEMY_ENGINE_OPTIONS
         assert 'pool_size' in engine_options
         assert 'pool_recycle' in engine_options
         assert 'pool_pre_ping' in engine_options
+
+        # Clean up - reload with original settings
+        monkeypatch.delenv('DATABASE_URL', raising=False)
+        importlib.reload(config)
+
+    def test_pool_settings_empty_for_sqlite(self, app):
+        """Test that pool settings are empty for SQLite."""
+        from config import Config, is_sqlite
+
+        # When using SQLite, pool settings should be empty
+        if is_sqlite():
+            assert Config.SQLALCHEMY_ENGINE_OPTIONS == {}
 
 
 class TestEagerLoading:

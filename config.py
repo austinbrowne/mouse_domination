@@ -2,7 +2,30 @@ import os
 import secrets
 from pathlib import Path
 
+# Load environment variables from .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, use system env vars
+
 BASE_DIR = Path(__file__).parent.absolute()
+
+
+def get_database_url():
+    """Get database URL, handling PostgreSQL URL format variations."""
+    url = os.environ.get('DATABASE_URL')
+    if url:
+        # Fix postgres:// to postgresql:// (Railway/Heroku use postgres://)
+        if url.startswith('postgres://'):
+            url = url.replace('postgres://', 'postgresql://', 1)
+        return url
+    return f'sqlite:///{BASE_DIR}/mouse_domination.db'
+
+
+def is_sqlite():
+    """Check if using SQLite database."""
+    return get_database_url().startswith('sqlite://')
 
 
 def get_secret_key():
@@ -25,16 +48,12 @@ def get_secret_key():
 class Config:
     """Base configuration."""
     SECRET_KEY = get_secret_key()
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL',
-        f'sqlite:///{BASE_DIR}/mouse_domination.db'
-    )
+    SQLALCHEMY_DATABASE_URI = get_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Database connection pooling (for non-SQLite databases)
-    # SQLite doesn't support connection pooling, but these settings
-    # will be used when switching to PostgreSQL/MySQL in production
-    SQLALCHEMY_ENGINE_OPTIONS = {
+    # Database connection pooling (for PostgreSQL/MySQL only)
+    # SQLite doesn't support these options
+    SQLALCHEMY_ENGINE_OPTIONS = {} if is_sqlite() else {
         'pool_size': 10,           # Number of connections to keep open
         'pool_recycle': 3600,      # Recycle connections after 1 hour
         'pool_pre_ping': True,     # Verify connections before use
