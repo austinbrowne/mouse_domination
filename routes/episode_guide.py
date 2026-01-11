@@ -177,12 +177,16 @@ def edit_guide(id):
 
     sections = get_sections_with_items(guide)
 
+    # Pre-serialize items for JavaScript (to_dict is a method, not attribute)
+    items_json = [item.to_dict() for item in guide.items] if guide.items else []
+
     return render_template('episode_guide/edit.html',
         guide=guide,
         sections=sections,
         section_names=EPISODE_GUIDE_SECTION_NAMES,
         section_parents=EPISODE_GUIDE_SECTION_PARENTS,
         all_sections=EPISODE_GUIDE_SECTIONS,
+        items_json=items_json,
     )
 
 

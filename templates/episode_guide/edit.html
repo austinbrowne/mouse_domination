@@ -131,7 +131,7 @@
 function episodeGuideEdit(guideId) {
     return {
         guideId: guideId,
-        items: {{ guide.items | map(attribute='to_dict') | list | tojson | safe }}.reduce((acc, item) => {
+        items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
             if (!acc[item.section]) acc[item.section] = [];
             acc[item.section].push(item);
             return acc;
