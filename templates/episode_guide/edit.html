@@ -101,7 +101,7 @@
                                     <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
                                         <div class="font-medium text-gray-900" x-text="item.title"></div>
                                         <template x-if="item.link">
-                                            <a :href="item.link" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block" x-text="item.link"></a>
+                                            <a :href="item.link.startsWith('http') ? item.link : 'https://' + item.link" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block" x-text="item.link"></a>
                                         </template>
                                         <template x-if="item.notes">
                                             <div class="text-xs text-gray-500 mt-1" x-text="item.notes"></div>

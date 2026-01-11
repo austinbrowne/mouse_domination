@@ -128,7 +128,7 @@
                                     {{ item.title }}
                                 </div>
                                 {% if item.link %}
-                                    <a href="{{ item.link }}" target="_blank" class="text-xs text-primary-600 hover:underline truncate block">{{ item.link }}</a>
+                                    <a href="{{ item.link if item.link.startswith('http') else 'https://' + item.link }}" target="_blank" class="text-xs text-primary-600 hover:underline truncate block">{{ item.link }}</a>
                                 {% endif %}
                                 {% if item.notes %}
                                     <div class="text-xs text-gray-500 mt-1">{{ item.notes }}</div>
