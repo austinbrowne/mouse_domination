@@ -3,19 +3,37 @@
 {% block title %}Edit: {{ guide.title }} - Mouse Domination{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }})">
+<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }})">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <div class="flex items-center gap-3">
-                {% if guide.episode_number %}
-                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary-100 text-primary-700 font-bold">
-                        #{{ guide.episode_number }}
-                    </span>
-                {% endif %}
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">{{ guide.title }}</h1>
-                    <p class="text-sm text-gray-500">Edit episode guide content</p>
+                <!-- Editable Episode Number -->
+                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary-100 text-primary-700 font-bold cursor-pointer"
+                    @click="editingEpisodeNum = true"
+                    x-show="!editingEpisodeNum">
+                    <span x-text="episodeNumber ? '#' + episodeNumber : '#'"></span>
+                </div>
+                <input x-show="editingEpisodeNum" x-ref="episodeNumInput"
+                    type="number" x-model="episodeNumber"
+                    @blur="saveGuideMetadata(); editingEpisodeNum = false"
+                    @keydown.enter="saveGuideMetadata(); editingEpisodeNum = false"
+                    @keydown.escape="editingEpisodeNum = false"
+                    class="w-16 h-10 text-center border border-primary-300 rounded-full text-primary-700 font-bold focus:ring-2 focus:ring-primary-500">
+                <div class="flex-1">
+                    <!-- Editable Title -->
+                    <h1 class="text-2xl font-bold text-gray-900 cursor-pointer hover:bg-surface-100 px-2 py-1 -mx-2 rounded"
+                        x-show="!editingTitle"
+                        @click="editingTitle = true; $nextTick(() => $refs.titleInput.focus())"
+                        x-text="guideTitle">
+                    </h1>
+                    <input x-show="editingTitle" x-ref="titleInput"
+                        type="text" x-model="guideTitle"
+                        @blur="saveGuideMetadata(); editingTitle = false"
+                        @keydown.enter="saveGuideMetadata(); editingTitle = false"
+                        @keydown.escape="editingTitle = false"
+                        class="text-2xl font-bold text-gray-900 w-full border border-primary-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500">
+                    <p class="text-sm text-gray-500">Click title or episode number to edit</p>
                 </div>
             </div>
         </div>
@@ -27,24 +45,6 @@
             </a>
         </div>
     </div>
-
-    <!-- Guide Metadata Form -->
-    <form method="post" class="bg-white rounded-xl border border-surface-200 p-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="flex flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[200px]">
-                <label class="block text-xs font-medium text-gray-600 mb-1">Title</label>
-                <input type="text" name="title" value="{{ guide.title }}" required
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-            </div>
-            <div class="w-24">
-                <label class="block text-xs font-medium text-gray-600 mb-1">Episode #</label>
-                <input type="number" name="episode_number" value="{{ guide.episode_number or '' }}"
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-            </div>
-            <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Save</button>
-        </div>
-    </form>
 
     <!-- Sections -->
     <div class="space-y-4">
@@ -95,20 +95,55 @@
                     <!-- Items List -->
                     <div class="divide-y divide-surface-200">
                         <template x-for="item in items['{{ section_key }}'] || []" :key="item.id">
-                            <div class="p-4 hover:bg-surface-50 flex items-start gap-3 group">
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-gray-900" x-text="item.title"></div>
-                                    <template x-if="item.link">
-                                        <a :href="item.link" target="_blank" class="text-xs text-primary-600 hover:underline truncate block" x-text="item.link"></a>
-                                    </template>
-                                    <template x-if="item.notes">
-                                        <div class="text-xs text-gray-500 mt-1" x-text="item.notes"></div>
-                                    </template>
+                            <div class="p-4 hover:bg-surface-50 group">
+                                <!-- View Mode -->
+                                <div x-show="editingItemId !== item.id" class="flex items-start gap-3">
+                                    <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
+                                        <div class="font-medium text-gray-900" x-text="item.title"></div>
+                                        <template x-if="item.link">
+                                            <a :href="item.link" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block" x-text="item.link"></a>
+                                        </template>
+                                        <template x-if="item.notes">
+                                            <div class="text-xs text-gray-500 mt-1" x-text="item.notes"></div>
+                                        </template>
+                                    </div>
+                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                                        <button type="button" @click="startEditingItem(item)"
+                                            class="text-gray-400 hover:text-primary-600 p-1" title="Edit">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </button>
+                                        <button type="button" @click="deleteItem('{{ section_key }}', item.id)"
+                                            class="text-gray-400 hover:text-red-600 p-1" title="Delete">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <button type="button" @click="deleteItem('{{ section_key }}', item.id)"
-                                    class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
+
+                                <!-- Edit Mode -->
+                                <div x-show="editingItemId === item.id" class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                                        <input type="text" x-model="editingItem.title"
+                                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                                            @keydown.enter.prevent="saveItem('{{ section_key }}')">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Link (optional)</label>
+                                        <input type="text" x-model="editingItem.link"
+                                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
+                                        <textarea x-model="editingItem.notes" rows="2"
+                                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"></textarea>
+                                    </div>
+                                    <div class="flex justify-end gap-2">
+                                        <button type="button" @click="cancelEditingItem()"
+                                            class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                                        <button type="button" @click="saveItem('{{ section_key }}')"
+                                            class="bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 text-sm font-medium">Save</button>
+                                    </div>
+                                </div>
                             </div>
                         </template>
 
@@ -128,14 +163,98 @@
 
 {% block scripts %}
 <script>
-function episodeGuideEdit(guideId) {
+function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum) {
     return {
         guideId: guideId,
+        guideTitle: initialTitle,
+        episodeNumber: initialEpisodeNum,
+        editingTitle: false,
+        editingEpisodeNum: false,
+        editingItemId: null,
+        editingItem: { title: '', link: '', notes: '' },
         items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
             if (!acc[item.section]) acc[item.section] = [];
             acc[item.section].push(item);
             return acc;
         }, {}),
+
+        async saveGuideMetadata() {
+            if (!this.guideTitle.trim()) {
+                alert('Title is required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/guide/${this.guideId}/metadata`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        title: this.guideTitle.trim(),
+                        episode_number: this.episodeNumber || null
+                    })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    alert('Failed to save: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to save metadata:', error);
+            }
+        },
+
+        startEditingItem(item) {
+            this.editingItemId = item.id;
+            this.editingItem = {
+                title: item.title,
+                link: item.link || '',
+                notes: item.notes || ''
+            };
+        },
+
+        cancelEditingItem() {
+            this.editingItemId = null;
+            this.editingItem = { title: '', link: '', notes: '' };
+        },
+
+        async saveItem(section) {
+            if (!this.editingItem.title.trim()) {
+                alert('Title is required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/guide/${this.guideId}/items/${this.editingItemId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        title: this.editingItem.title.trim(),
+                        link: this.editingItem.link.trim() || null,
+                        notes: this.editingItem.notes.trim() || null
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Update the item in our local state
+                    const itemIndex = this.items[section].findIndex(i => i.id === this.editingItemId);
+                    if (itemIndex !== -1) {
+                        this.items[section][itemIndex] = data.item;
+                    }
+                    this.cancelEditingItem();
+                } else {
+                    alert('Failed to save: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to save item:', error);
+            }
+        },
 
         async addItem(section, title, link) {
             if (!title.trim()) return;

@@ -206,6 +206,33 @@ def delete_guide(id):
     return redirect(url_for('episode_guide.list_guides'))
 
 
+# ---- AJAX Endpoints for Guide Metadata ----
+
+@episode_guide_bp.route('/<int:id>/metadata', methods=['PUT'])
+def update_metadata(id):
+    """Update guide metadata (title, episode_number) via AJAX."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+        data = request.get_json()
+
+        if 'title' in data:
+            title = data['title'].strip() if data['title'] else ''
+            if not title:
+                return jsonify({'success': False, 'error': 'Title is required'}), 400
+            guide.title = title
+
+        if 'episode_number' in data:
+            guide.episode_number = int(data['episode_number']) if data['episode_number'] else None
+
+        db.session.commit()
+        return jsonify({'success': True, 'guide': guide.to_dict()})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
 # ---- AJAX Endpoints for Item Management ----
 
 @episode_guide_bp.route('/<int:id>/items', methods=['POST'])
