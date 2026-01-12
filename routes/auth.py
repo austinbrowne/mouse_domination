@@ -4,13 +4,10 @@ from urllib.parse import urlparse, urljoin
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
-from extensions import db, limiter, csrf
+from extensions import db, limiter
 from models import User
 
 auth_bp = Blueprint('auth', __name__)
-
-# Exempt auth blueprint from CSRF - these are public forms and rate-limited
-csrf.exempt(auth_bp)
 
 
 def validate_password_strength(password: str) -> list[str]:
