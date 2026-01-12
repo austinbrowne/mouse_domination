@@ -41,21 +41,23 @@
 
 <!-- Items List -->
 <div class="divide-y divide-surface-200 sortable-list" id="sortable-{{ section_key }}" data-section="{{ section_key }}">
-    <template x-for="item in items['{{ section_key }}'] || []" :key="item.id">
-        <div :id="'item-' + item.id" class="p-4 hover:bg-surface-50 group sortable-item scroll-mt-24" :class="{'editing': editingItemId === item.id}" :data-id="item.id">
+    <template x-for="(item, idx) in items['{{ section_key }}'] || []" :key="item.id">
+        <div :id="'item-' + item.id" class="py-1.5 px-3 hover:bg-surface-50 group sortable-item scroll-mt-24" :class="{'editing': editingItemId === item.id}" :data-id="item.id">
             <!-- View Mode -->
-            <div x-show="editingItemId !== item.id" class="flex items-start gap-3">
+            <div x-show="editingItemId !== item.id" class="flex items-start gap-2">
                 <!-- Drag Handle -->
-                <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 pt-1 flex-shrink-0" title="Drag to reorder">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                         <circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/>
                         <circle cx="9" cy="15" r="1.5"/><circle cx="15" cy="15" r="1.5"/>
                         <circle cx="9" cy="20" r="1.5"/><circle cx="15" cy="20" r="1.5"/>
                     </svg>
                 </div>
+                <!-- Topic Number -->
+                <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
                 <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
-                    <div class="font-medium text-gray-900" x-text="item.title"></div>
+                    <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
                     <template x-if="item.links && item.links.length">
                         <div class="space-y-0.5">
                             <template x-for="link in item.links" :key="link">
@@ -117,8 +119,8 @@
     </template>
 
     <!-- Empty state placeholder for drop target -->
-    <div x-show="!items['{{ section_key }}'] || items['{{ section_key }}'].length === 0" class="p-8 text-center text-gray-400 text-sm empty-placeholder">
-        No topics yet. Drag items here or click "+ Add" to add topics.
+    <div x-show="!items['{{ section_key }}'] || items['{{ section_key }}'].length === 0" class="p-4 text-center text-gray-400 text-xs empty-placeholder">
+        No topics yet. Drag items here or click "+ Add".
     </div>
 </div>
 {% endmacro %}
@@ -214,12 +216,12 @@
     </div>
 
     <!-- Sections -->
-    <div class="space-y-6">
+    <div class="space-y-4">
         <!-- INTRO Section -->
         <div>
-            <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-t-xl px-6 py-3">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-t-xl px-4 py-2">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wide">INTRO</h2>
+                    <h2 class="text-base font-bold text-white uppercase tracking-wide">INTRO</h2>
                     <span class="text-white/70 text-sm" x-text="'(' + (items['introduction']?.length || 0) + ' topics)'"></span>
                 </div>
             </div>
@@ -230,8 +232,8 @@
 
         <!-- NEWS Section -->
         <div>
-            <div class="bg-gradient-to-r from-red-600 to-red-700 rounded-t-xl px-6 py-3">
-                <h2 class="text-xl font-bold text-white uppercase tracking-wide">NEWS</h2>
+            <div class="bg-gradient-to-r from-red-600 to-red-700 rounded-t-xl px-4 py-2">
+                <h2 class="text-base font-bold text-white uppercase tracking-wide">NEWS</h2>
             </div>
             <div class="bg-white rounded-b-xl border border-t-0 border-surface-200 overflow-hidden">
                 {% for sub_key, sub_name in [('news_mice', 'Mice'), ('news_other', 'Other'), ('news_pads', 'Pads'), ('news_keyboards', 'Keyboards')] %}
@@ -256,9 +258,9 @@
 
         <!-- COMMUNITY RECAP Section -->
         <div>
-            <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-t-xl px-6 py-3">
+            <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-t-xl px-4 py-2">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wide">COMMUNITY RECAP</h2>
+                    <h2 class="text-base font-bold text-white uppercase tracking-wide">COMMUNITY RECAP</h2>
                     <span class="text-white/70 text-sm" x-text="'(' + (items['community_recap']?.length || 0) + ' topics)'"></span>
                 </div>
             </div>
@@ -269,9 +271,9 @@
 
         <!-- PERSONAL RAMBLINGS Section -->
         <div>
-            <div class="bg-gradient-to-r from-amber-600 to-amber-700 rounded-t-xl px-6 py-3">
+            <div class="bg-gradient-to-r from-amber-600 to-amber-700 rounded-t-xl px-4 py-2">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wide">PERSONAL RAMBLINGS</h2>
+                    <h2 class="text-base font-bold text-white uppercase tracking-wide">PERSONAL RAMBLINGS</h2>
                     <span class="text-white/70 text-sm" x-text="'(' + (items['personal_ramblings']?.length || 0) + ' topics)'"></span>
                 </div>
             </div>
@@ -282,9 +284,9 @@
 
         <!-- OUTRO Section -->
         <div>
-            <div class="bg-gradient-to-r from-gray-600 to-gray-700 rounded-t-xl px-6 py-3">
+            <div class="bg-gradient-to-r from-gray-600 to-gray-700 rounded-t-xl px-4 py-2">
                 <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wide">OUTRO</h2>
+                    <h2 class="text-base font-bold text-white uppercase tracking-wide">OUTRO</h2>
                     <span class="text-white/70 text-sm" x-text="'(' + (items['outro']?.length || 0) + ' topics)'"></span>
                 </div>
             </div>
