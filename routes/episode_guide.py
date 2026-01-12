@@ -460,6 +460,27 @@ def stop_recording(id):
         return jsonify({'success': False, 'error': 'Database error'}), 500
 
 
+@episode_guide_bp.route('/<int:id>/reopen', methods=['POST'])
+@login_required
+def reopen_guide(id):
+    """Reopen a completed guide as a draft for further editing."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+
+        guide.status = 'draft'
+        # Keep the recording data (timestamps, duration) intact
+
+        db.session.commit()
+        flash(f'Episode "{guide.title}" reopened as draft.', 'success')
+        return redirect(url_for('episode_guide.edit_guide', id=guide.id))
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        flash('Database error occurred. Please try again.', 'error')
+        return redirect(url_for('episode_guide.view_guide', id=id))
+
+
 @episode_guide_bp.route('/<int:id>/timestamp/<int:item_id>', methods=['POST'])
 @login_required
 def capture_timestamp(id, item_id):
