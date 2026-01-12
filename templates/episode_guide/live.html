@@ -121,8 +121,18 @@
                         <li>Subscribe</li>
                         <li>Discord - https://discord.gg/xPFzjD8r</li>
                         <li>What mice do you have inbound? & What's on your desk right now?</li>
-                        <li class="font-semibold">Previous Poll: {{ guide.previous_poll or '[Not set]' }}</li>
-                        <li class="font-semibold">New Poll: {{ guide.new_poll or '[Not set]' }}</li>
+                        <li class="font-semibold">
+                            Previous Poll: {{ guide.previous_poll or '[Not set]' }}
+                            {% if guide.previous_poll_link %}
+                            <a href="{{ guide.previous_poll_link if guide.previous_poll_link.startswith('http') else 'https://' + guide.previous_poll_link }}" target="_blank" class="text-blue-600 hover:underline ml-2">[Link]</a>
+                            {% endif %}
+                        </li>
+                        <li class="font-semibold">
+                            New Poll: {{ guide.new_poll or '[Not set]' }}
+                            {% if guide.new_poll_link %}
+                            <a href="{{ guide.new_poll_link if guide.new_poll_link.startswith('http') else 'https://' + guide.new_poll_link }}" target="_blank" class="text-blue-600 hover:underline ml-2">[Link]</a>
+                            {% endif %}
+                        </li>
                     </ul>
                 </div>
                 {% set intro_items = sections.get('introduction', {}).get('items', []) %}

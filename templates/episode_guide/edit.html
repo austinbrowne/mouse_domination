@@ -92,7 +92,7 @@
 {% endmacro %}
 
 {% block content %}
-<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}')">
+<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}')">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -141,20 +141,42 @@
     <!-- Poll Fields -->
     <div class="bg-white rounded-xl border border-surface-200 p-4">
         <h3 class="font-semibold text-gray-900 mb-4">Intro Poll Settings</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Previous Poll (from last episode)</label>
-                <input type="text" x-model="previousPoll"
-                    @blur="saveGuideMetadata()"
-                    placeholder="What was last week's poll question?"
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Previous Poll -->
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Previous Poll (from last episode)</label>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                    <input type="text" x-model="previousPoll"
+                        @blur="saveGuideMetadata()"
+                        placeholder="What was last week's poll question?"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Link</label>
+                    <input type="text" x-model="previousPollLink"
+                        @blur="saveGuideMetadata()"
+                        placeholder="https://x.com/... or poll results link"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">New Poll (this episode)</label>
-                <input type="text" x-model="newPoll"
-                    @blur="saveGuideMetadata()"
-                    placeholder="What's this week's poll question?"
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+            <!-- New Poll -->
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">New Poll (this episode)</label>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                    <input type="text" x-model="newPoll"
+                        @blur="saveGuideMetadata()"
+                        placeholder="What's this week's poll question?"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Link</label>
+                    <input type="text" x-model="newPollLink"
+                        @blur="saveGuideMetadata()"
+                        placeholder="https://x.com/... or new poll link"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
         </div>
     </div>
@@ -244,13 +266,15 @@
 
 {% block scripts %}
 <script>
-function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialNewPoll) {
+function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink) {
     return {
         guideId: guideId,
         guideTitle: initialTitle,
         episodeNumber: initialEpisodeNum,
         previousPoll: initialPrevPoll,
+        previousPollLink: initialPrevPollLink,
         newPoll: initialNewPoll,
+        newPollLink: initialNewPollLink,
         editingTitle: false,
         editingEpisodeNum: false,
         editingItemId: null,
@@ -278,7 +302,9 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                         title: this.guideTitle.trim(),
                         episode_number: this.episodeNumber || null,
                         previous_poll: this.previousPoll || null,
-                        new_poll: this.newPoll || null
+                        previous_poll_link: this.previousPollLink || null,
+                        new_poll: this.newPoll || null,
+                        new_poll_link: this.newPollLink || null
                     })
                 });
 

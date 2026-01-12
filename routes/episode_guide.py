@@ -80,18 +80,21 @@ def new_guide():
 
             # Auto-populate previous_poll from last episode if exists
             previous_poll = None
+            previous_poll_link = None
             if episode_number:
                 prev_guide = EpisodeGuide.query.filter(
                     EpisodeGuide.episode_number == episode_number - 1
                 ).first()
                 if prev_guide and prev_guide.new_poll:
                     previous_poll = prev_guide.new_poll
+                    previous_poll_link = prev_guide.new_poll_link
 
             guide = EpisodeGuide(
                 title=form.required('title'),
                 episode_number=episode_number,
                 notes=form.optional('notes'),
                 previous_poll=previous_poll,
+                previous_poll_link=previous_poll_link,
                 status='draft',
             )
 
@@ -244,21 +247,28 @@ def update_metadata(id):
         if 'episode_number' in data:
             new_episode_num = int(data['episode_number']) if data['episode_number'] else None
 
-            # Auto-populate previous_poll if episode number changed and previous_poll is empty
+            # Auto-populate previous_poll from last episode if episode number changed and previous_poll is empty
             if new_episode_num and new_episode_num != guide.episode_number and not guide.previous_poll:
                 prev_guide = EpisodeGuide.query.filter(
                     EpisodeGuide.episode_number == new_episode_num - 1
                 ).first()
                 if prev_guide and prev_guide.new_poll:
                     guide.previous_poll = prev_guide.new_poll
+                    guide.previous_poll_link = prev_guide.new_poll_link
 
             guide.episode_number = new_episode_num
 
         if 'previous_poll' in data:
             guide.previous_poll = data['previous_poll'].strip() if data['previous_poll'] else None
 
+        if 'previous_poll_link' in data:
+            guide.previous_poll_link = data['previous_poll_link'].strip() if data['previous_poll_link'] else None
+
         if 'new_poll' in data:
             guide.new_poll = data['new_poll'].strip() if data['new_poll'] else None
+
+        if 'new_poll_link' in data:
+            guide.new_poll_link = data['new_poll_link'].strip() if data['new_poll_link'] else None
 
         db.session.commit()
         return jsonify({'success': True, 'guide': guide.to_dict()})
