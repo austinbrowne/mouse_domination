@@ -306,8 +306,8 @@ def add_item(id):
             guide_id=id,
             section=section,
             title=title,
-            link=data.get('link', '').strip() or None,
-            notes=data.get('notes', '').strip() or None,
+            link=(data.get('link') or '').strip() or None,
+            notes=(data.get('notes') or '').strip() or None,
             position=max_pos + 1,
         )
 

@@ -374,19 +374,23 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             if (!title || !title.trim()) return;
 
             try {
+                const payload = { section, title: title.trim(), link: (link && link.trim()) || null };
+
                 const response = await fetch(`/guide/${this.guideId}/items`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({ section, title: title.trim(), link: (link && link.trim()) || null })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
                 if (data.success) {
                     if (!this.items[section]) this.items[section] = [];
                     this.items[section].push(data.item);
+                } else {
+                    console.error('Server returned error:', data.error);
                 }
             } catch (error) {
                 console.error('Failed to add item:', error);
