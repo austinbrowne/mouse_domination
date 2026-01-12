@@ -371,7 +371,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         },
 
         async addItem(section, title, link) {
-            if (!title.trim()) return;
+            if (!title || !title.trim()) return;
 
             try {
                 const response = await fetch(`/guide/${this.guideId}/items`, {
@@ -380,7 +380,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({ section, title: title.trim(), link: link.trim() || null })
+                    body: JSON.stringify({ section, title: title.trim(), link: (link && link.trim()) || null })
                 });
 
                 const data = await response.json();
