@@ -520,7 +520,8 @@ class EpisodeGuideItem(db.Model):
 
     # Item content
     title = db.Column(db.String(500), nullable=False)
-    link = db.Column(db.String(500), nullable=True)
+    link = db.Column(db.String(500), nullable=True)  # Legacy single link (kept for migration)
+    links = db.Column(db.JSON, nullable=True)  # Multiple links as ["url1", "url2"]
     notes = db.Column(db.Text, nullable=True)
 
     # Ordering within section
@@ -550,6 +551,15 @@ class EpisodeGuideItem(db.Model):
             return f"{hrs}:{mins:02d}:{secs:02d}"
         return f"{mins:02d}:{secs:02d}"
 
+    @property
+    def all_links(self):
+        """Return list of all links (handles migration from single link)."""
+        if self.links:
+            return self.links
+        if self.link:
+            return [self.link]
+        return []
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -557,6 +567,7 @@ class EpisodeGuideItem(db.Model):
             'section': self.section,
             'title': self.title,
             'link': self.link,
+            'links': self.all_links,
             'notes': self.notes,
             'position': self.position,
             'timestamp_seconds': self.timestamp_seconds,

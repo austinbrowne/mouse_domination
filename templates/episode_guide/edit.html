@@ -4,16 +4,28 @@
 
 {% macro render_section_content(section_key, show_header=true) %}
 <!-- Add Item Form -->
-<div x-show="adding" class="p-4 bg-primary-50 border-b border-primary-100">
+<div x-show="adding" class="p-4 bg-primary-50 border-b border-primary-100" x-data="{ newLinks: [''], newNotes: '' }">
     <div class="space-y-3">
         <input type="text" x-ref="newTitle{{ section_key }}" placeholder="Topic title..."
             class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
-            @keydown.enter.prevent="addItem('{{ section_key }}', $refs.newTitle{{ section_key }}.value, $refs.newLink{{ section_key }}.value); $refs.newTitle{{ section_key }}.value = ''; $refs.newLink{{ section_key }}.value = ''">
-        <input type="text" x-ref="newLink{{ section_key }}" placeholder="Link (optional)..."
-            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+            @keydown.enter.prevent="addItem('{{ section_key }}', $refs.newTitle{{ section_key }}.value, newLinks, newNotes); $refs.newTitle{{ section_key }}.value = ''; newLinks = ['']; newNotes = ''">
+        <!-- Multiple link inputs -->
+        <div class="space-y-2">
+            <template x-for="(link, idx) in newLinks" :key="idx">
+                <div class="flex gap-2">
+                    <input type="text" x-model="newLinks[idx]" placeholder="Link (optional)..."
+                        class="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <button type="button" @click="newLinks.splice(idx, 1)" x-show="newLinks.length > 1"
+                        class="text-red-500 hover:text-red-700 px-2 text-lg font-bold">-</button>
+                </div>
+            </template>
+            <button type="button" @click="newLinks.push('')" class="text-primary-600 hover:text-primary-700 text-sm font-medium">+ Add Link</button>
+        </div>
+        <textarea x-model="newNotes" placeholder="Notes (optional)..." rows="2"
+            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"></textarea>
         <div class="flex justify-end gap-2">
-            <button type="button" @click="adding = false" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
-            <button type="button" @click="addItem('{{ section_key }}', $refs.newTitle{{ section_key }}.value, $refs.newLink{{ section_key }}.value); $refs.newTitle{{ section_key }}.value = ''; $refs.newLink{{ section_key }}.value = ''; adding = false"
+            <button type="button" @click="adding = false; newLinks = ['']; newNotes = ''" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+            <button type="button" @click="addItem('{{ section_key }}', $refs.newTitle{{ section_key }}.value, newLinks, newNotes); $refs.newTitle{{ section_key }}.value = ''; newLinks = ['']; newNotes = ''; adding = false"
                 class="bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 text-sm font-medium">Add Item</button>
         </div>
     </div>
@@ -28,15 +40,28 @@
 {% endif %}
 
 <!-- Items List -->
-<div class="divide-y divide-surface-200">
+<div class="divide-y divide-surface-200 sortable-list" id="sortable-{{ section_key }}" data-section="{{ section_key }}">
     <template x-for="item in items['{{ section_key }}'] || []" :key="item.id">
-        <div class="p-4 hover:bg-surface-50 group">
+        <div :id="'item-' + item.id" class="p-4 hover:bg-surface-50 group sortable-item scroll-mt-24" :class="{'editing': editingItemId === item.id}" :data-id="item.id">
             <!-- View Mode -->
             <div x-show="editingItemId !== item.id" class="flex items-start gap-3">
+                <!-- Drag Handle -->
+                <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 pt-1 flex-shrink-0" title="Drag to reorder">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                        <circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/>
+                        <circle cx="9" cy="15" r="1.5"/><circle cx="15" cy="15" r="1.5"/>
+                        <circle cx="9" cy="20" r="1.5"/><circle cx="15" cy="20" r="1.5"/>
+                    </svg>
+                </div>
                 <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
                     <div class="font-medium text-gray-900" x-text="item.title"></div>
-                    <template x-if="item.link">
-                        <a :href="item.link.startsWith('http') ? item.link : 'https://' + item.link" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block" x-text="item.link"></a>
+                    <template x-if="item.links && item.links.length">
+                        <div class="space-y-0.5">
+                            <template x-for="link in item.links" :key="link">
+                                <a :href="link.startsWith('http') ? link : 'https://' + link" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block" x-text="link"></a>
+                            </template>
+                        </div>
                     </template>
                     <template x-if="item.notes">
                         <div class="text-xs text-gray-500 mt-1" x-text="item.notes"></div>
@@ -63,9 +88,18 @@
                         @keydown.enter.prevent="saveItem('{{ section_key }}')">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Link (optional)</label>
-                    <input type="text" x-model="editingItem.link"
-                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Links (optional)</label>
+                    <div class="space-y-2">
+                        <template x-for="(link, idx) in editingItem.links" :key="idx">
+                            <div class="flex gap-2">
+                                <input type="text" x-model="editingItem.links[idx]"
+                                    class="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                <button type="button" @click="editingItem.links.splice(idx, 1)" x-show="editingItem.links.length > 1"
+                                    class="text-red-500 hover:text-red-700 px-2 text-lg font-bold">-</button>
+                            </div>
+                        </template>
+                        <button type="button" @click="editingItem.links.push('')" class="text-primary-600 hover:text-primary-700 text-sm font-medium">+ Add Link</button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
@@ -82,12 +116,10 @@
         </div>
     </template>
 
-    <!-- Empty state -->
-    <template x-if="!items['{{ section_key }}'] || items['{{ section_key }}'].length === 0">
-        <div class="p-8 text-center text-gray-400 text-sm">
-            No topics yet. Click "+ Add" to add topics.
-        </div>
-    </template>
+    <!-- Empty state placeholder for drop target -->
+    <div x-show="!items['{{ section_key }}'] || items['{{ section_key }}'].length === 0" class="p-8 text-center text-gray-400 text-sm empty-placeholder">
+        No topics yet. Drag items here or click "+ Add" to add topics.
+    </div>
 </div>
 {% endmacro %}
 
@@ -265,6 +297,33 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- SortableJS for drag-and-drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+/* Drag-and-drop styles */
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #dbeafe !important;
+}
+.sortable-chosen {
+    background-color: #eff6ff !important;
+}
+.sortable-drag {
+    opacity: 1;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+.drag-handle {
+    cursor: grab;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+.sortable-list {
+    min-height: 20px;
+}
+</style>
+
 <script>
 function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink) {
     return {
@@ -278,12 +337,146 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         editingTitle: false,
         editingEpisodeNum: false,
         editingItemId: null,
-        editingItem: { title: '', link: '', notes: '' },
+        editingItem: { title: '', links: [''], notes: '' },
         items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
             if (!acc[item.section]) acc[item.section] = [];
             acc[item.section].push(item);
             return acc;
         }, {}),
+        sortableInstances: [],
+
+        init() {
+            // Initialize SortableJS after Alpine has rendered the DOM
+            this.$nextTick(() => {
+                this.initSortables();
+            });
+        },
+
+        initSortables() {
+            // Destroy existing instances if reinitializing
+            this.sortableInstances.forEach(s => s.destroy());
+            this.sortableInstances = [];
+
+            const sections = [
+                'introduction', 'news_mice', 'news_other', 'news_pads',
+                'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'
+            ];
+
+            sections.forEach(section => {
+                const el = document.getElementById(`sortable-${section}`);
+                if (!el) return;
+
+                const sortable = Sortable.create(el, {
+                    group: 'episode-guide-items',
+                    handle: '.drag-handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    dragClass: 'sortable-drag',
+                    filter: '.editing, .empty-placeholder',
+                    preventOnFilter: false,
+                    onEnd: (evt) => this.handleDragEnd(evt)
+                });
+
+                this.sortableInstances.push(sortable);
+            });
+        },
+
+        async handleDragEnd(evt) {
+            const itemId = parseInt(evt.item.dataset.id);
+            const fromSection = evt.from.dataset.section;
+            const toSection = evt.to.dataset.section;
+            const newIndex = evt.newIndex;
+
+            // Skip if nothing changed
+            if (fromSection === toSection && evt.oldIndex === newIndex) return;
+
+            // Debug logging
+            console.log('Moving item:', { itemId, fromSection, toSection, newIndex, guideId: this.guideId });
+            const url = `/guide/${this.guideId}/items/move`;
+            console.log('Request URL:', url);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        item_id: itemId,
+                        target_section: toSection,
+                        new_position: newIndex
+                    })
+                });
+
+                // Check if response is OK before parsing JSON
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Server error:', response.status, text);
+                    this.revertDomMove(evt);
+                    alert('Server error: ' + response.status);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update local Alpine state to match the move
+                    this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
+                } else {
+                    console.error('Move failed:', data.error);
+                    this.revertDomMove(evt);
+                    alert('Failed to save position: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Move request failed:', error);
+                this.revertDomMove(evt);
+                alert('Failed to save position. Please try again.');
+            }
+        },
+
+        syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
+            // Remove from old section in Alpine state
+            if (this.items[fromSection]) {
+                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
+            }
+
+            // Add to new section at correct position
+            if (!this.items[toSection]) {
+                this.items[toSection] = [];
+            }
+
+            // Insert the updated item at the new position
+            this.items[toSection].splice(newPosition, 0, updatedItem);
+
+            // Update positions in local state to match
+            this.items[toSection].forEach((item, idx) => {
+                item.position = idx;
+            });
+            if (fromSection !== toSection && this.items[fromSection]) {
+                this.items[fromSection].forEach((item, idx) => {
+                    item.position = idx;
+                });
+            }
+        },
+
+        revertDomMove(evt) {
+            // Revert the DOM change made by SortableJS
+            if (evt.from !== evt.to) {
+                // Cross-section move: put the item back in original section
+                evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
+            } else {
+                // Same section: reorder back
+                const parent = evt.from;
+                const children = Array.from(parent.children).filter(c => !c.classList.contains('empty-placeholder'));
+                if (evt.oldIndex < evt.newIndex) {
+                    parent.insertBefore(evt.item, children[evt.oldIndex] || null);
+                } else {
+                    parent.insertBefore(evt.item, children[evt.oldIndex + 1] || null);
+                }
+            }
+        },
 
         async saveGuideMetadata() {
             if (!this.guideTitle.trim()) {
@@ -324,14 +517,14 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             this.editingItemId = item.id;
             this.editingItem = {
                 title: item.title,
-                link: item.link || '',
+                links: item.links && item.links.length ? [...item.links] : [''],
                 notes: item.notes || ''
             };
         },
 
         cancelEditingItem() {
             this.editingItemId = null;
-            this.editingItem = { title: '', link: '', notes: '' };
+            this.editingItem = { title: '', links: [''], notes: '' };
         },
 
         async saveItem(section) {
@@ -339,6 +532,11 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 alert('Title is required');
                 return;
             }
+
+            // Filter empty links
+            const cleanLinks = this.editingItem.links
+                .filter(l => l && l.trim())
+                .map(l => l.trim());
 
             try {
                 const response = await fetch(`/guide/${this.guideId}/items/${this.editingItemId}`, {
@@ -349,7 +547,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                     },
                     body: JSON.stringify({
                         title: this.editingItem.title.trim(),
-                        link: this.editingItem.link.trim() || null,
+                        links: cleanLinks.length ? cleanLinks : null,
                         notes: this.editingItem.notes.trim() || null
                     })
                 });
@@ -370,11 +568,21 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             }
         },
 
-        async addItem(section, title, link) {
+        async addItem(section, title, links, notes) {
             if (!title || !title.trim()) return;
 
+            // Filter empty links
+            const cleanLinks = (links || [])
+                .filter(l => l && l.trim())
+                .map(l => l.trim());
+
             try {
-                const payload = { section, title: title.trim(), link: (link && link.trim()) || null };
+                const payload = {
+                    section,
+                    title: title.trim(),
+                    links: cleanLinks.length ? cleanLinks : null,
+                    notes: (notes && notes.trim()) || null
+                };
 
                 const response = await fetch(`/guide/${this.guideId}/items`, {
                     method: 'POST',

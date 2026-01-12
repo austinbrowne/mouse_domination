@@ -2,7 +2,7 @@ import pytest
 import re
 from flask_login import login_user
 from app import create_app, db
-from models import User
+from models import User, EpisodeGuide, EpisodeGuideItem
 from config import TestConfig
 
 
@@ -171,3 +171,39 @@ def get_csrf_token(client, url='/'):
         return input_match.group(1)
 
     return None
+
+
+@pytest.fixture
+def guide(app):
+    """Create a test episode guide."""
+    with app.app_context():
+        guide = EpisodeGuide(title='Test Episode', status='draft')
+        db.session.add(guide)
+        db.session.commit()
+        guide_id = guide.id
+    return {'id': guide_id, 'title': 'Test Episode'}
+
+
+@pytest.fixture
+def guide_with_items(app, guide):
+    """Create guide with sample items including multi-links."""
+    with app.app_context():
+        item1 = EpisodeGuideItem(
+            guide_id=guide['id'],
+            section='introduction',
+            title='Item 1',
+            links=['https://example.com'],
+            notes='Notes 1',
+            position=0
+        )
+        item2 = EpisodeGuideItem(
+            guide_id=guide['id'],
+            section='news_mice',
+            title='Item 2',
+            links=['https://test1.com', 'https://test2.com'],
+            position=0
+        )
+        db.session.add_all([item1, item2])
+        db.session.commit()
+        item1_id, item2_id = item1.id, item2.id
+    return {'guide_id': guide['id'], 'item_ids': [item1_id, item2_id]}

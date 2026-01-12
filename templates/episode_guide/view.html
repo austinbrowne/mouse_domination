@@ -119,7 +119,7 @@
 
                 <div class="divide-y divide-surface-200">
                     {% for item in section_items %}
-                        <div class="p-4 flex items-center gap-4">
+                        <div id="item-{{ item.id }}" class="p-4 flex items-center gap-4 scroll-mt-24">
                             <!-- Timestamp -->
                             <div class="flex-shrink-0 w-20 text-center">
                                 {% if item.formatted_timestamp %}
@@ -136,9 +136,9 @@
                                 <div class="font-medium text-gray-900 {% if item.discussed %}{% endif %}">
                                     {{ item.title }}
                                 </div>
-                                {% if item.link %}
-                                    <a href="{{ item.link if item.link.startswith('http') else 'https://' + item.link }}" target="_blank" class="text-xs text-primary-600 hover:underline truncate block">{{ item.link }}</a>
-                                {% endif %}
+                                {% for link in item.all_links %}
+                                    <a href="{{ link if link.startswith('http') else 'https://' + link }}" target="_blank" class="text-xs text-primary-600 hover:underline truncate block">{{ link }}</a>
+                                {% endfor %}
                                 {% if item.notes %}
                                     <div class="text-xs text-gray-500 mt-1">{{ item.notes }}</div>
                                 {% endif %}

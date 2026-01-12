@@ -38,7 +38,7 @@
         <form method="get" class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[180px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Search by title..."
+                <input type="text" name="search" value="{{ search }}" placeholder="Search episodes and topics..."
                     class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
@@ -81,6 +81,29 @@
                                             <span>{{ guide.formatted_duration }}</span>
                                         {% endif %}
                                     </div>
+                                    <!-- Matching items indicator (only when searching) -->
+                                    {% if search and matching_items.get(guide.id) %}
+                                    <div x-data="{ expanded: false }" class="mt-2">
+                                        <button @click="expanded = !expanded" type="button"
+                                                class="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                                            <svg class="w-3 h-3 transition-transform" :class="expanded ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                            {{ matching_items[guide.id]|length }} matching topic(s)
+                                        </button>
+                                        <div x-show="expanded" x-collapse class="mt-2 pl-4 border-l-2 border-primary-200">
+                                            {% for item in matching_items[guide.id][:5] %}
+                                            <a href="{% if guide.status == 'completed' %}{{ url_for('episode_guide.view_guide', id=guide.id) }}{% else %}{{ url_for('episode_guide.edit_guide', id=guide.id) }}{% endif %}#item-{{ item.id }}"
+                                               class="text-xs text-primary-600 hover:text-primary-800 hover:underline py-1 block">
+                                                {{ item.title }}
+                                            </a>
+                                            {% endfor %}
+                                            {% if matching_items[guide.id]|length > 5 %}
+                                            <div class="text-xs text-gray-400 py-1">+{{ matching_items[guide.id]|length - 5 }} more...</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -133,4 +156,29 @@
     {{ render_pagination(pagination, 'episode_guide.list_guides', extra_params={'status': current_status, 'search': search}) }}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('input[name="search"]');
+    const form = searchInput.closest('form');
+    let debounceTimer;
+
+    // Auto-search with debounce
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            form.submit();
+        }, 300);
+    });
+
+    // Restore focus after search if there's a search term
+    if (searchInput.value) {
+        searchInput.focus();
+        // Move cursor to end of input
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+});
+</script>
 {% endblock %}

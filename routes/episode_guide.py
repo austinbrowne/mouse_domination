@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from flask_login import login_required
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from sqlalchemy import or_, exists
 from sqlalchemy.exc import SQLAlchemyError
 from models import EpisodeGuide, EpisodeGuideItem
 from extensions import db
@@ -47,12 +48,52 @@ def list_guides():
 
     if status and status in EPISODE_GUIDE_STATUS_CHOICES:
         query = query.filter_by(status=status)
+
     if search:
-        query = query.filter(EpisodeGuide.title.ilike(f"%{search}%"))
+        search_term = f"%{search}%"
+
+        # Search in EpisodeGuide fields
+        guide_conditions = or_(
+            EpisodeGuide.title.ilike(search_term),
+            EpisodeGuide.notes.ilike(search_term),
+            EpisodeGuide.previous_poll.ilike(search_term),
+            EpisodeGuide.new_poll.ilike(search_term),
+        )
+
+        # Subquery: check if any related EpisodeGuideItem matches
+        item_exists = exists().where(
+            EpisodeGuideItem.guide_id == EpisodeGuide.id,
+            or_(
+                EpisodeGuideItem.title.ilike(search_term),
+                EpisodeGuideItem.link.ilike(search_term),  # Legacy single link
+                EpisodeGuideItem.links.cast(db.String).ilike(search_term),  # Multiple links JSON
+                EpisodeGuideItem.notes.ilike(search_term),
+            )
+        )
+
+        query = query.filter(or_(guide_conditions, item_exists))
 
     pagination = query.order_by(EpisodeGuide.created_at.desc()).paginate(
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
+
+    # Find matching items for display (only when searching)
+    matching_items = {}
+    if search:
+        search_term = f"%{search}%"
+        guide_ids = [g.id for g in pagination.items]
+        if guide_ids:
+            items = EpisodeGuideItem.query.filter(
+                EpisodeGuideItem.guide_id.in_(guide_ids),
+                or_(
+                    EpisodeGuideItem.title.ilike(search_term),
+                    EpisodeGuideItem.link.ilike(search_term),  # Legacy single link
+                    EpisodeGuideItem.links.cast(db.String).ilike(search_term),  # Multiple links JSON
+                    EpisodeGuideItem.notes.ilike(search_term),
+                )
+            ).all()
+            for item in items:
+                matching_items.setdefault(item.guide_id, []).append(item)
 
     # Stats
     total = EpisodeGuide.query.count()
@@ -64,6 +105,7 @@ def list_guides():
         pagination=pagination,
         current_status=status,
         search=search,
+        matching_items=matching_items,
         stats={'total': total, 'drafts': drafts, 'completed': completed},
     )
 
@@ -137,7 +179,7 @@ def copy_guide(source_id):
                 guide_id=guide.id,
                 section=item.section,
                 title=item.title,
-                link=item.link,
+                links=item.all_links.copy() if item.all_links else None,
                 notes=item.notes,
                 position=item.position,
                 timestamp_seconds=None,
@@ -302,11 +344,19 @@ def add_item(id):
             guide_id=id, section=section
         ).scalar() or -1
 
+        # Handle links (support both new 'links' array and legacy 'link' single value)
+        links = data.get('links', [])
+        single_link = (data.get('link') or '').strip()
+        if single_link and not links:
+            links = [single_link]
+        # Filter empty strings and strip whitespace
+        links = [l.strip() for l in links if l and l.strip()] or None
+
         item = EpisodeGuideItem(
             guide_id=id,
             section=section,
             title=title,
-            link=(data.get('link') or '').strip() or None,
+            links=links,
             notes=(data.get('notes') or '').strip() or None,
             position=max_pos + 1,
         )
@@ -343,8 +393,14 @@ def update_or_delete_item(id, item_id):
                 return jsonify({'success': False, 'error': 'Title is required'}), 400
             item.title = title
 
-        if 'link' in data:
-            item.link = (data['link'] or '').strip() or None
+        if 'links' in data:
+            # Handle links array
+            links = data['links'] if isinstance(data['links'], list) else []
+            item.links = [l.strip() for l in links if l and l.strip()] or None
+        elif 'link' in data:
+            # Legacy single link support
+            single_link = (data['link'] or '').strip()
+            item.links = [single_link] if single_link else None
 
         if 'notes' in data:
             item.notes = (data['notes'] or '').strip() or None
@@ -384,6 +440,84 @@ def reorder_items(id):
 
         db.session.commit()
         return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@episode_guide_bp.route('/<int:id>/items/move', methods=['POST'])
+@login_required
+def move_item(id):
+    """Move an item to a different section and/or position (AJAX)."""
+    try:
+        data = request.get_json()
+        item_id = data.get('item_id')
+        target_section = data.get('target_section')
+        new_position = data.get('new_position', 0)
+
+        if not item_id:
+            return jsonify({'success': False, 'error': 'item_id is required'}), 400
+        if target_section not in EPISODE_GUIDE_SECTION_CHOICES:
+            return jsonify({'success': False, 'error': 'Invalid target section'}), 400
+        if not isinstance(new_position, int) or new_position < 0:
+            return jsonify({'success': False, 'error': 'Invalid position'}), 400
+
+        item = EpisodeGuideItem.query.filter_by(id=item_id, guide_id=id).first_or_404()
+        old_section = item.section
+        old_position = item.position
+
+        if old_section != target_section:
+            # Cross-section move: update positions in both sections
+            # Shift items down in old section (items after this one move up)
+            EpisodeGuideItem.query.filter(
+                EpisodeGuideItem.guide_id == id,
+                EpisodeGuideItem.section == old_section,
+                EpisodeGuideItem.position > old_position
+            ).update({EpisodeGuideItem.position: EpisodeGuideItem.position - 1}, synchronize_session=False)
+
+            # Shift items down in new section (items at/after target move down)
+            EpisodeGuideItem.query.filter(
+                EpisodeGuideItem.guide_id == id,
+                EpisodeGuideItem.section == target_section,
+                EpisodeGuideItem.position >= new_position
+            ).update({EpisodeGuideItem.position: EpisodeGuideItem.position + 1}, synchronize_session=False)
+
+            item.section = target_section
+            item.position = new_position
+        else:
+            # Same section reorder
+            if new_position > old_position:
+                # Moving down: shift items between old and new position up
+                EpisodeGuideItem.query.filter(
+                    EpisodeGuideItem.guide_id == id,
+                    EpisodeGuideItem.section == old_section,
+                    EpisodeGuideItem.position > old_position,
+                    EpisodeGuideItem.position <= new_position
+                ).update({EpisodeGuideItem.position: EpisodeGuideItem.position - 1}, synchronize_session=False)
+            elif new_position < old_position:
+                # Moving up: shift items between new and old position down
+                EpisodeGuideItem.query.filter(
+                    EpisodeGuideItem.guide_id == id,
+                    EpisodeGuideItem.section == old_section,
+                    EpisodeGuideItem.position >= new_position,
+                    EpisodeGuideItem.position < old_position
+                ).update({EpisodeGuideItem.position: EpisodeGuideItem.position + 1}, synchronize_session=False)
+
+            item.position = new_position
+
+        # Refresh the item to get accurate position after bulk updates
+        db.session.refresh(item)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'item': item.to_dict(),
+            'old_section': old_section,
+            'new_section': target_section
+        })
 
     except SQLAlchemyError as e:
         db.session.rollback()
