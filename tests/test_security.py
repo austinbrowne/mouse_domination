@@ -45,15 +45,15 @@ class TestCSRFProtection:
         # Should get a 400 Bad Request due to missing CSRF
         assert response.status_code == 400
 
-    def test_post_with_csrf_succeeds(self, csrf_client):
+    def test_post_with_csrf_succeeds(self, csrf_auth_client):
         """Test that POST requests with valid CSRF token succeed."""
         from tests.conftest import get_csrf_token
 
         # Get a CSRF token from the form page
-        token = get_csrf_token(csrf_client, '/contacts/new')
+        token = get_csrf_token(csrf_auth_client, '/contacts/new')
         assert token is not None, "Failed to get CSRF token"
 
-        response = csrf_client.post('/contacts/new', data={
+        response = csrf_auth_client.post('/contacts/new', data={
             'csrf_token': token,
             'name': 'Test Contact',
             'email': 'test@example.com',
@@ -185,7 +185,7 @@ class TestEmailValidation:
 class TestXSSPrevention:
     """Test XSS prevention in template preview."""
 
-    def test_template_preview_escapes_contact_name(self, app, client):
+    def test_template_preview_escapes_contact_name(self, app, auth_client):
         """Test that contact names are escaped in template preview."""
         with app.app_context():
             # Create a contact with XSS payload in name
@@ -206,7 +206,7 @@ class TestXSSPrevention:
             db.session.commit()
 
             # Preview the template with the contact
-            response = client.get(f'/templates/{template.id}/preview?contact_id={contact.id}')
+            response = auth_client.get(f'/templates/{template.id}/preview?contact_id={contact.id}')
             assert response.status_code == 200
 
             # The script tag should be escaped in the response
@@ -214,7 +214,7 @@ class TestXSSPrevention:
             assert '<script>alert' not in response_text
             assert '&lt;script&gt;' in response_text or 'alert' not in response_text
 
-    def test_template_preview_escapes_company_name(self, app, client):
+    def test_template_preview_escapes_company_name(self, app, auth_client):
         """Test that company names are escaped in template preview."""
         with app.app_context():
             # Create a company with XSS payload in name
@@ -235,7 +235,7 @@ class TestXSSPrevention:
             db.session.commit()
 
             # Preview the template with the company
-            response = client.get(f'/templates/{template.id}/preview?company_id={company.id}')
+            response = auth_client.get(f'/templates/{template.id}/preview?company_id={company.id}')
             assert response.status_code == 200
 
             # The XSS payload should be escaped - angle brackets become entities
@@ -288,15 +288,15 @@ class TestConfigurationSecurity:
 class TestSQLInjectionPrevention:
     """Test SQL injection prevention."""
 
-    def test_search_parameter_safe(self, app, client):
+    def test_search_parameter_safe(self, app, auth_client):
         """Test search parameters are safely handled."""
         with app.app_context():
             # Try SQL injection in search parameter
-            response = client.get("/contacts/?search=' OR '1'='1")
+            response = auth_client.get("/contacts/?search=' OR '1'='1")
             assert response.status_code == 200
 
             # Try another SQL injection attempt
-            response = client.get("/contacts/?search='; DROP TABLE contacts; --")
+            response = auth_client.get("/contacts/?search='; DROP TABLE contacts; --")
             assert response.status_code == 200
 
     def test_id_parameter_validated(self, client):

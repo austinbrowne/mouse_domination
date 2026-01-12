@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 from app import db
-from models import Contact, Company, Inventory, AffiliateRevenue
+from models import Contact, Company, Inventory, AffiliateRevenue, User
 
 
 class TestCompanyModel:
@@ -126,15 +126,17 @@ class TestContactModel:
 class TestInventoryModel:
     """Tests for Inventory model."""
 
-    def test_create_review_unit(self, app):
+    def test_create_review_unit(self, app, test_user):
         """Test creating a review unit."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             item = Inventory(
                 product_name='Pulsar X2',
                 category='mouse',
                 source_type='review_unit',
                 cost=0.0,
                 status='in_queue',
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()
@@ -144,15 +146,17 @@ class TestInventoryModel:
             assert item.source_type == 'review_unit'
             assert item.cost == 0.0
 
-    def test_create_personal_purchase(self, app):
+    def test_create_personal_purchase(self, app, test_user):
         """Test creating a personal purchase."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             item = Inventory(
                 product_name='GPX Superlight',
                 category='mouse',
                 source_type='personal_purchase',
                 cost=149.99,
                 date_acquired=date(2025, 6, 15),
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()
@@ -160,9 +164,10 @@ class TestInventoryModel:
             assert item.source_type == 'personal_purchase'
             assert item.cost == 149.99
 
-    def test_inventory_with_company(self, app):
+    def test_inventory_with_company(self, app, test_user):
         """Test inventory linked to company."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             company = Company(name='Pulsar')
             db.session.add(company)
             db.session.commit()
@@ -171,6 +176,7 @@ class TestInventoryModel:
                 product_name='Pulsar X2',
                 company_id=company.id,
                 source_type='review_unit',
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()
@@ -178,15 +184,17 @@ class TestInventoryModel:
             assert item.company.name == 'Pulsar'
             assert item in company.inventory_items
 
-    def test_profit_loss_calculation_unsold(self, app):
+    def test_profit_loss_calculation_unsold(self, app, test_user):
         """Test P/L calculation for unsold item."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             # Review unit (free) - no loss
             item1 = Inventory(
                 product_name='Free Mouse',
                 source_type='review_unit',
                 cost=0.0,
                 sold=False,
+                user_id=user.id,
             )
             db.session.add(item1)
 
@@ -196,6 +204,7 @@ class TestInventoryModel:
                 source_type='personal_purchase',
                 cost=100.0,
                 sold=False,
+                user_id=user.id,
             )
             db.session.add(item2)
             db.session.commit()
@@ -203,9 +212,10 @@ class TestInventoryModel:
             assert item1.profit_loss == 0.0
             assert item2.profit_loss == -100.0
 
-    def test_profit_loss_calculation_sold(self, app):
+    def test_profit_loss_calculation_sold(self, app, test_user):
         """Test P/L calculation for sold item."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             # Sold review unit - pure profit
             item1 = Inventory(
                 product_name='Sold Review Unit',
@@ -215,6 +225,7 @@ class TestInventoryModel:
                 sale_price=80.0,
                 fees=10.0,
                 shipping=5.0,
+                user_id=user.id,
             )
             db.session.add(item1)
 
@@ -227,6 +238,7 @@ class TestInventoryModel:
                 sale_price=85.0,
                 fees=12.0,
                 shipping=0.0,  # Buyer paid
+                user_id=user.id,
             )
             db.session.add(item2)
             db.session.commit()
@@ -237,9 +249,10 @@ class TestInventoryModel:
             # 85 - 12 - 0 - 100 = -27
             assert item2.profit_loss == -27.0
 
-    def test_profit_loss_with_none_values(self, app):
+    def test_profit_loss_with_none_values(self, app, test_user):
         """Test P/L handles None values gracefully."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             item = Inventory(
                 product_name='Test',
                 sold=True,
@@ -247,6 +260,7 @@ class TestInventoryModel:
                 fees=None,
                 shipping=None,
                 cost=None,
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()
@@ -254,10 +268,11 @@ class TestInventoryModel:
             # 50 - 0 - 0 - 0 = 50
             assert item.profit_loss == 50.0
 
-    def test_inventory_defaults(self, app):
+    def test_inventory_defaults(self, app, test_user):
         """Test inventory default values."""
         with app.app_context():
-            item = Inventory(product_name='Test Mouse')
+            user = User.query.filter_by(email='test@example.com').first()
+            item = Inventory(product_name='Test Mouse', user_id=user.id)
             db.session.add(item)
             db.session.commit()
 
@@ -269,9 +284,10 @@ class TestInventoryModel:
             assert item.condition == 'new'
             assert item.sold is False
 
-    def test_inventory_content_links(self, app):
+    def test_inventory_content_links(self, app, test_user):
         """Test inventory with content links."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             item = Inventory(
                 product_name='Reviewed Mouse',
                 status='reviewed',
@@ -279,6 +295,7 @@ class TestInventoryModel:
                 short_publish_date=date(2025, 3, 8),
                 video_url='https://youtube.com/watch?v=xyz789',
                 video_publish_date=date(2025, 3, 19),
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()
@@ -286,9 +303,10 @@ class TestInventoryModel:
             assert item.short_url == 'https://youtube.com/shorts/abc123'
             assert item.video_publish_date == date(2025, 3, 19)
 
-    def test_inventory_to_dict(self, app):
+    def test_inventory_to_dict(self, app, test_user):
         """Test inventory serialization."""
         with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
             item = Inventory(
                 product_name='Serialized Mouse',
                 category='mouse',
@@ -297,6 +315,7 @@ class TestInventoryModel:
                 fees=10.0,
                 shipping=5.0,
                 cost=0.0,
+                user_id=user.id,
             )
             db.session.add(item)
             db.session.commit()

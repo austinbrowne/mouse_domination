@@ -338,16 +338,16 @@ def update_or_delete_item(id, item_id):
         data = request.get_json()
 
         if 'title' in data:
-            title = data['title'].strip()
+            title = (data['title'] or '').strip()
             if not title:
                 return jsonify({'success': False, 'error': 'Title is required'}), 400
             item.title = title
 
         if 'link' in data:
-            item.link = data['link'].strip() or None
+            item.link = (data['link'] or '').strip() or None
 
         if 'notes' in data:
-            item.notes = data['notes'].strip() or None
+            item.notes = (data['notes'] or '').strip() or None
 
         if 'discussed' in data:
             item.discussed = bool(data['discussed'])

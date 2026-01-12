@@ -9,7 +9,7 @@ from utils.queries import get_companies_for_dropdown, get_contacts_for_dropdown
 class TestQueryOptimizations:
     """Test query optimizations are working correctly."""
 
-    def test_collabs_stats_single_query(self, app, client):
+    def test_collabs_stats_single_query(self, app, auth_client):
         """Test that collab stats use a single aggregated query."""
         with app.app_context():
             # Create some test data
@@ -30,7 +30,7 @@ class TestQueryOptimizations:
             db.session.commit()
 
             # Request the list page
-            response = client.get('/collabs/')
+            response = auth_client.get('/collabs/')
             assert response.status_code == 200
 
             # Verify stats are in the response
@@ -98,7 +98,7 @@ class TestConnectionPoolingConfig:
 class TestEagerLoading:
     """Test that eager loading is used correctly."""
 
-    def test_contacts_list_eager_loads_company(self, app, client):
+    def test_contacts_list_eager_loads_company(self, app, auth_client):
         """Test that contacts list view eager loads company relationship."""
         with app.app_context():
             # Create a company and contact
@@ -115,7 +115,7 @@ class TestEagerLoading:
             db.session.commit()
 
             # Request the list page - should not cause N+1
-            response = client.get('/contacts/')
+            response = auth_client.get('/contacts/')
             assert response.status_code == 200
 
             # Company name should appear in response
@@ -126,7 +126,7 @@ class TestEagerLoading:
 class TestAggregatedQueries:
     """Test that aggregated queries are used instead of multiple separate queries."""
 
-    def test_collab_stats_values_correct(self, app, client):
+    def test_collab_stats_values_correct(self, app, auth_client):
         """Test that aggregated collab stats return correct values."""
         with app.app_context():
             # Create a contact
@@ -154,7 +154,7 @@ class TestAggregatedQueries:
             ))
             db.session.commit()
 
-            response = client.get('/collabs/')
+            response = auth_client.get('/collabs/')
             assert response.status_code == 200
 
             # The stats should reflect our test data
