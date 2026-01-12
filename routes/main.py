@@ -1,5 +1,5 @@
-from functools import wraps
-from flask import Blueprint, render_template, jsonify, g, abort
+from flask import Blueprint, render_template, jsonify, g
+from flask_login import login_required, current_user
 from models import Contact, Company, Inventory, AffiliateRevenue
 from app import db
 from sqlalchemy import func, case, and_, text
@@ -7,16 +7,6 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 
 main_bp = Blueprint('main', __name__)
-
-
-def require_login(f):
-    """Decorator to require authenticated user."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not g.current_user:
-            abort(401)
-        return f(*args, **kwargs)
-    return decorated
 
 
 @main_bp.route('/health')
@@ -40,7 +30,7 @@ def health_check():
 
 
 @main_bp.route('/')
-@require_login
+@login_required
 def dashboard():
     """Main dashboard with overview metrics - optimized with database aggregations."""
 
@@ -52,7 +42,7 @@ def dashboard():
     ).count()
 
     # Inventory stats - filtered by current user
-    user_id = g.current_user.id
+    user_id = current_user.id
     inventory_stats = db.session.query(
         func.count(Inventory.id).label('total'),
         func.sum(case((Inventory.status == 'in_queue', 1), else_=0)).label('in_queue'),

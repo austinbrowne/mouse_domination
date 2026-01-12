@@ -1,8 +1,8 @@
 import os
-from datetime import datetime, timezone
-from flask import Flask, request, g
+from flask import Flask, g
+from flask_login import current_user
 from config import Config, DevelopmentConfig, ProductionConfig
-from extensions import db, csrf
+from extensions import db, csrf, login_manager, limiter
 import uuid
 
 
@@ -25,53 +25,37 @@ def create_app(config_class=None):
     # Initialize extensions
     db.init_app(app)
     csrf.init_app(app)
+    login_manager.init_app(app)
+    limiter.init_app(app)
+
+    # Configure Flask-Login
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+    login_manager.session_protection = 'strong'
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        from models import User
+        return User.query.get(int(user_id))
 
     # Add request ID for logging context
     @app.before_request
     def add_request_id():
         g.request_id = str(uuid.uuid4())[:8]
 
-    # Load current user from Cloudflare Access header
+    # Backward compatibility: set g.current_user from Flask-Login
     @app.before_request
-    def load_current_user():
-        """Load or create user from Cloudflare Access header."""
-        from models import User
-
-        g.current_user = None
-
-        # Get email from Cloudflare Access
-        email = request.headers.get('Cf-Access-Authenticated-User-Email')
-
-        # Fallback for local development
-        if not email and app.debug:
-            email = os.environ.get('DEV_USER_EMAIL')
-
-        if email:
-            # Get or create user
-            user = User.query.filter_by(email=email).first()
-            if not user:
-                user = User(email=email)
-                db.session.add(user)
-                db.session.commit()
-            else:
-                # Update last login
-                user.last_login_at = datetime.now(timezone.utc)
-                db.session.commit()
-
-            g.current_user = user
+    def set_current_user():
+        g.current_user = current_user if current_user.is_authenticated else None
 
     # Add security headers
     @app.after_request
     def add_security_headers(response):
-        # Prevent clickjacking
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-        # Prevent MIME type sniffing
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        # XSS protection (legacy browsers)
         response.headers['X-XSS-Protection'] = '1; mode=block'
-        # Referrer policy
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        # Content Security Policy (permissive for now, can be tightened)
         if not app.debug:
             response.headers['Content-Security-Policy'] = (
                 "default-src 'self'; "
@@ -89,6 +73,8 @@ def create_app(config_class=None):
 
     # Register blueprints
     from routes.main import main_bp
+    from routes.auth import auth_bp
+    from routes.admin import admin_bp
     from routes.contacts import contacts_bp
     from routes.companies import companies_bp
     from routes.inventory import inventory_bp
@@ -99,6 +85,8 @@ def create_app(config_class=None):
     from routes.episode_guide import episode_guide_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(contacts_bp, url_prefix='/contacts')
     app.register_blueprint(companies_bp, url_prefix='/companies')
     app.register_blueprint(inventory_bp, url_prefix='/inventory')
@@ -117,8 +105,6 @@ def create_app(config_class=None):
 
 if __name__ == '__main__':
     app = create_app()
-    # Debug mode is controlled by config, not hardcoded
-    # Use 127.0.0.1 by default for security; set HOST=0.0.0.0 to allow network access
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', 5000))
     app.run(host=host, port=port)

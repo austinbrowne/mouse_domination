@@ -1,25 +1,105 @@
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from extensions import db
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, InvalidHashError
 
 
 class User(db.Model):
-    """Authenticated users - linked via Cloudflare Access email."""
+    """Authenticated users with Flask-Login support."""
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    name = db.Column(db.String(100), nullable=True)  # Optional display name
+    name = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_login_at = db.Column(db.DateTime, nullable=True)
 
+    # Authentication fields
+    password_hash = db.Column(db.String(255), nullable=True)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
+
+    # Authorization fields
+    is_approved = db.Column(db.Boolean, default=False)
+    is_admin = db.Column(db.Boolean, default=False)
+
     # Relationships
     inventory_items = db.relationship('Inventory', back_populates='user', lazy='dynamic')
+
+    # Argon2id password hasher (OWASP recommended)
+    _ph = PasswordHasher(
+        time_cost=3,
+        memory_cost=65536,
+        parallelism=4,
+        hash_len=32,
+        salt_len=16
+    )
+
+    # Flask-Login required properties
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return self.is_approved
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
+    # Password methods
+    def set_password(self, password: str) -> None:
+        """Hash and set password using Argon2id."""
+        self.password_hash = self._ph.hash(password)
+        self.password_changed_at = datetime.now(timezone.utc)
+
+    def check_password(self, password: str) -> bool:
+        """Verify password. Returns False for any error."""
+        if not self.password_hash:
+            return False
+        try:
+            self._ph.verify(self.password_hash, password)
+            if self._ph.check_needs_rehash(self.password_hash):
+                self.password_hash = self._ph.hash(password)
+            return True
+        except (VerifyMismatchError, InvalidHashError):
+            return False
+
+    def is_locked(self) -> bool:
+        """Check if account is locked due to failed attempts."""
+        if not self.locked_until:
+            return False
+        if datetime.now(timezone.utc) >= self.locked_until:
+            self.locked_until = None
+            self.failed_login_attempts = 0
+            return False
+        return True
+
+    def record_failed_login(self) -> None:
+        """Record failed login and apply progressive lockout."""
+        self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
+        if self.failed_login_attempts >= 5:
+            lockout_minutes = [5, 15, 60, 1440][min(self.failed_login_attempts - 5, 3)]
+            self.locked_until = datetime.now(timezone.utc) + timedelta(minutes=lockout_minutes)
+
+    def record_successful_login(self) -> None:
+        """Reset failed attempts and update last login."""
+        self.failed_login_attempts = 0
+        self.locked_until = None
+        self.last_login_at = datetime.now(timezone.utc)
 
     def to_dict(self):
         return {
             'id': self.id,
             'email': self.email,
             'name': self.name,
+            'is_approved': self.is_approved,
+            'is_admin': self.is_admin,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
         }

@@ -1,3 +1,4 @@
+from flask_login import login_required
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -16,6 +17,7 @@ pipeline_bp = Blueprint('pipeline', __name__)
 
 
 @pipeline_bp.route('/')
+@login_required
 def list_deals():
     """List all deals with optional filtering and pagination."""
     deal_type = request.args.get('type')
@@ -82,6 +84,7 @@ def list_deals():
 
 
 @pipeline_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_deal():
     """Create a new deal."""
     if request.method == 'POST':
@@ -133,6 +136,7 @@ def new_deal():
 
 
 @pipeline_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_deal(id):
     """Edit an existing deal."""
     deal = SalesPipeline.query.options(
@@ -186,6 +190,7 @@ def edit_deal(id):
 
 
 @pipeline_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_deal(id):
     """Delete a deal."""
     try:
@@ -201,6 +206,7 @@ def delete_deal(id):
 
 
 @pipeline_bp.route('/<int:id>/mark-complete', methods=['POST'])
+@login_required
 def mark_complete(id):
     """Quick action to mark a deal as completed."""
     try:
@@ -216,6 +222,7 @@ def mark_complete(id):
 
 
 @pipeline_bp.route('/<int:id>/mark-paid', methods=['POST'])
+@login_required
 def mark_paid(id):
     """Quick action to mark a deal as paid."""
     try:

@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_login import login_required
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Contact, Company
@@ -13,6 +14,7 @@ contacts_bp = Blueprint('contacts', __name__)
 
 
 @contacts_bp.route('/')
+@login_required
 def list_contacts():
     """List all contacts with optional filtering and pagination."""
     role = request.args.get('role')
@@ -47,6 +49,7 @@ def list_contacts():
 
 
 @contacts_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_contact():
     """Create a new contact."""
     if request.method == 'POST':
@@ -88,6 +91,7 @@ def new_contact():
 
 
 @contacts_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_contact(id):
     """Edit an existing contact."""
     contact = Contact.query.options(joinedload(Contact.company)).get_or_404(id)
@@ -128,6 +132,7 @@ def edit_contact(id):
 
 
 @contacts_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_contact(id):
     """Delete a contact."""
     try:

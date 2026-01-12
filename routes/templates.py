@@ -1,3 +1,4 @@
+from flask_login import login_required
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from markupsafe import escape
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,6 +14,7 @@ templates_bp = Blueprint('templates', __name__)
 
 
 @templates_bp.route('/')
+@login_required
 def list_templates():
     """List all outreach templates with optional filtering."""
     category = request.args.get('category')
@@ -40,6 +42,7 @@ def list_templates():
 
 
 @templates_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_template():
     """Create a new outreach template."""
     if request.method == 'POST':
@@ -72,6 +75,7 @@ def new_template():
 
 
 @templates_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_template(id):
     """Edit an existing outreach template."""
     template = OutreachTemplate.query.get_or_404(id)
@@ -103,6 +107,7 @@ def edit_template(id):
 
 
 @templates_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_template(id):
     """Delete a template."""
     try:
@@ -119,6 +124,7 @@ def delete_template(id):
 
 
 @templates_bp.route('/<int:id>/preview')
+@login_required
 def preview_template(id):
     """Preview a template with optional placeholder data."""
     template = OutreachTemplate.query.get_or_404(id)
@@ -166,6 +172,7 @@ def preview_template(id):
 
 
 @templates_bp.route('/<int:id>/use', methods=['POST'])
+@login_required
 def use_template(id):
     """Increment usage counter for a template."""
     try:
@@ -180,6 +187,7 @@ def use_template(id):
 
 
 @templates_bp.route('/<int:id>/copy', methods=['POST'])
+@login_required
 def copy_template(id):
     """Create a copy of an existing template."""
     try:

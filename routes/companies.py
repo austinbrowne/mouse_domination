@@ -1,3 +1,4 @@
+from flask_login import login_required
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.exc import SQLAlchemyError
 from models import Company
@@ -17,6 +18,7 @@ companies_bp = Blueprint('companies', __name__)
 
 
 @companies_bp.route('/')
+@login_required
 def list_companies():
     """List all companies with optional filtering."""
     category = request.args.get('category')
@@ -53,6 +55,7 @@ def list_companies():
 
 
 @companies_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_company():
     """Create a new company."""
     if request.method == 'POST':
@@ -123,6 +126,7 @@ def new_company():
 
 
 @companies_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_company(id):
     """Edit an existing company."""
     company = Company.query.get_or_404(id)
@@ -195,6 +199,7 @@ def edit_company(id):
 
 
 @companies_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_company(id):
     """Delete a company."""
     try:

@@ -1,3 +1,4 @@
+from flask_login import login_required
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func, case
 from sqlalchemy.orm import joinedload
@@ -16,6 +17,7 @@ collabs_bp = Blueprint('collabs', __name__)
 
 
 @collabs_bp.route('/')
+@login_required
 def list_collabs():
     """List all collaborations with optional filtering and pagination."""
     collab_type = request.args.get('type')
@@ -75,6 +77,7 @@ def list_collabs():
 
 
 @collabs_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_collab():
     """Create a new collaboration."""
     if request.method == 'POST':
@@ -129,6 +132,7 @@ def new_collab():
 
 
 @collabs_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_collab(id):
     """Edit an existing collaboration."""
     collab = Collaboration.query.options(joinedload(Collaboration.contact)).get_or_404(id)
@@ -182,6 +186,7 @@ def edit_collab(id):
 
 
 @collabs_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_collab(id):
     """Delete a collaboration."""
     try:
@@ -197,6 +202,7 @@ def delete_collab(id):
 
 
 @collabs_bp.route('/<int:id>/complete', methods=['POST'])
+@login_required
 def complete_collab(id):
     """Quick action to mark a collaboration as completed."""
     try:
@@ -213,6 +219,7 @@ def complete_collab(id):
 
 
 @collabs_bp.route('/<int:id>/clear-followup', methods=['POST'])
+@login_required
 def clear_followup(id):
     """Clear follow-up flag."""
     try:

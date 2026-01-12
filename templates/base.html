@@ -67,7 +67,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-surface-50 min-h-screen flex flex-col font-sans text-gray-900 antialiased">
-    <!-- Navigation -->
+    <!-- Navigation (only show when authenticated) -->
+    {% if current_user.is_authenticated %}
     <nav class="bg-white border-b border-surface-200 sticky top-0 z-50" x-data="{ mobileOpen: false }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6">
             <div class="flex justify-between items-center h-16">
@@ -127,9 +128,28 @@
                         </div>
                     </div>
 
-                    {% if g.current_user %}
+                    {% if current_user.is_authenticated %}
                     <div class="w-px h-6 bg-surface-200 mx-2"></div>
-                    <span class="text-sm text-gray-500">{{ g.current_user.email }}</span>
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin.list_users') }}"
+                       class="p-2 rounded-lg {% if current_endpoint and 'admin' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-500 hover:bg-surface-100 hover:text-gray-700{% endif %}"
+                       title="User Management">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </a>
+                    {% endif %}
+                    <span class="text-sm text-gray-500">{{ current_user.email }}</span>
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="p-2 rounded-lg text-gray-500 hover:bg-surface-100 hover:text-gray-700"
+                                title="Logout">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                        </button>
+                    </form>
                     {% endif %}
                 </div>
 
@@ -162,6 +182,7 @@
             </div>
         </div>
     </nav>
+    {% endif %}
 
     <!-- Flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from flask_login import login_required
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from sqlalchemy.exc import SQLAlchemyError
 from models import EpisodeGuide, EpisodeGuideItem
@@ -35,6 +36,7 @@ def get_sections_with_items(guide):
 
 
 @episode_guide_bp.route('/')
+@login_required
 def list_guides():
     """List all episode guides with filtering by status."""
     status = request.args.get('status')
@@ -67,6 +69,7 @@ def list_guides():
 
 
 @episode_guide_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_guide():
     """Create a new episode guide."""
     if request.method == 'POST':
@@ -110,6 +113,7 @@ def new_guide():
 
 
 @episode_guide_bp.route('/new-from/<int:source_id>', methods=['POST'])
+@login_required
 def copy_guide(source_id):
     """Create new guide by copying items from previous episode."""
     try:
@@ -150,6 +154,7 @@ def copy_guide(source_id):
 
 
 @episode_guide_bp.route('/<int:id>')
+@login_required
 def view_guide(id):
     """View a completed episode guide with timestamps."""
     guide = EpisodeGuide.query.get_or_404(id)
@@ -164,6 +169,7 @@ def view_guide(id):
 
 
 @episode_guide_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_guide(id):
     """Edit episode guide metadata and items."""
     guide = EpisodeGuide.query.get_or_404(id)
@@ -203,6 +209,7 @@ def edit_guide(id):
 
 
 @episode_guide_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_guide(id):
     """Delete an episode guide."""
     try:
@@ -221,6 +228,7 @@ def delete_guide(id):
 # ---- AJAX Endpoints for Guide Metadata ----
 
 @episode_guide_bp.route('/<int:id>/metadata', methods=['PUT'])
+@login_required
 def update_metadata(id):
     """Update guide metadata (title, episode_number, polls) via AJAX."""
     try:
@@ -264,6 +272,7 @@ def update_metadata(id):
 # ---- AJAX Endpoints for Item Management ----
 
 @episode_guide_bp.route('/<int:id>/items', methods=['POST'])
+@login_required
 def add_item(id):
     """Add new item to a section (AJAX)."""
     try:
@@ -304,6 +313,7 @@ def add_item(id):
 
 
 @episode_guide_bp.route('/<int:id>/items/<int:item_id>', methods=['PUT', 'DELETE'])
+@login_required
 def update_or_delete_item(id, item_id):
     """Update or delete an item (AJAX)."""
     try:
@@ -345,6 +355,7 @@ def update_or_delete_item(id, item_id):
 
 
 @episode_guide_bp.route('/<int:id>/items/reorder', methods=['POST'])
+@login_required
 def reorder_items(id):
     """Reorder items within a section (AJAX)."""
     try:
@@ -373,6 +384,7 @@ def reorder_items(id):
 # ---- Live Recording Mode ----
 
 @episode_guide_bp.route('/<int:id>/live')
+@login_required
 def live_mode(id):
     """Live recording interface with timer and timestamp buttons."""
     guide = EpisodeGuide.query.get_or_404(id)
@@ -388,6 +400,7 @@ def live_mode(id):
 
 
 @episode_guide_bp.route('/<int:id>/start', methods=['POST'])
+@login_required
 def start_recording(id):
     """Start the timer / begin recording (AJAX)."""
     try:
@@ -412,6 +425,7 @@ def start_recording(id):
 
 
 @episode_guide_bp.route('/<int:id>/stop', methods=['POST'])
+@login_required
 def stop_recording(id):
     """Stop the timer / end recording (AJAX)."""
     try:
@@ -437,6 +451,7 @@ def stop_recording(id):
 
 
 @episode_guide_bp.route('/<int:id>/timestamp/<int:item_id>', methods=['POST'])
+@login_required
 def capture_timestamp(id, item_id):
     """Capture current timestamp for an item (AJAX)."""
     try:

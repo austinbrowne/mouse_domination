@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Mouse Domination{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-6 px-4">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+            <p class="text-sm text-gray-500 mt-1">Approve new users and manage access</p>
+        </div>
+    </div>
+
+    {% if pending %}
+    <div class="bg-white rounded-xl shadow-sm border border-surface-200 mb-6">
+        <div class="px-6 py-4 border-b border-surface-200 bg-amber-50">
+            <h2 class="font-semibold text-amber-800 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Pending Approval ({{ pending|length }})
+            </h2>
+        </div>
+        <div class="divide-y divide-surface-100">
+            {% for user in pending %}
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <div class="font-medium text-gray-900">{{ user.email }}</div>
+                    {% if user.name %}
+                    <div class="text-sm text-gray-500">{{ user.name }}</div>
+                    {% endif %}
+                    <div class="text-xs text-gray-400 mt-1">
+                        Registered {{ user.created_at.strftime('%b %d, %Y at %H:%M') if user.created_at else 'Unknown' }}
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <form method="POST" action="{{ url_for('admin.approve_user', id=user.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
+                            Approve
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.reject_user', id=user.id) }}" class="inline"
+                          onsubmit="return confirm('Reject and delete this user?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition">
+                            Reject
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-surface-200">
+        <div class="px-6 py-4 border-b border-surface-200">
+            <h2 class="font-semibold text-gray-900 flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Approved Users ({{ approved|length }})
+            </h2>
+        </div>
+        {% if approved %}
+        <div class="divide-y divide-surface-100">
+            {% for user in approved %}
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                        <span class="text-primary-700 font-medium text-sm">
+                            {{ user.email[0].upper() }}
+                        </span>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900 flex items-center gap-2">
+                            {{ user.email }}
+                            {% if user.is_admin %}
+                            <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">Admin</span>
+                            {% endif %}
+                        </div>
+                        {% if user.name %}
+                        <div class="text-sm text-gray-500">{{ user.name }}</div>
+                        {% endif %}
+                        <div class="text-xs text-gray-400">
+                            Last login: {{ user.last_login_at.strftime('%b %d, %Y') if user.last_login_at else 'Never' }}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    {% if user.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('admin.toggle_admin', id=user.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="px-3 py-1.5 text-sm font-medium rounded-lg border transition
+                                       {% if user.is_admin %}border-purple-300 text-purple-700 hover:bg-purple-50{% else %}border-gray-300 text-gray-700 hover:bg-gray-50{% endif %}">
+                            {{ 'Revoke Admin' if user.is_admin else 'Make Admin' }}
+                        </button>
+                    </form>
+                    {% if not user.is_admin %}
+                    <form method="POST" action="{{ url_for('admin.reject_user', id=user.id) }}" class="inline"
+                          onsubmit="return confirm('Remove this user permanently?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition">
+                            Remove
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-sm text-gray-400 italic">You</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center text-gray-500">
+            No approved users yet.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

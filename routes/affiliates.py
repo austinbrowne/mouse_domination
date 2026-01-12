@@ -1,3 +1,4 @@
+from flask_login import login_required
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -16,6 +17,7 @@ affiliates_bp = Blueprint('affiliates', __name__)
 
 
 @affiliates_bp.route('/')
+@login_required
 def list_revenue():
     """List affiliate revenue with stats and pagination."""
     year = request.args.get('year', type=int)
@@ -73,6 +75,7 @@ def list_revenue():
 
 
 @affiliates_bp.route('/new', methods=['GET', 'POST'])
+@login_required
 def new_revenue():
     """Create a new revenue entry."""
     if request.method == 'POST':
@@ -153,6 +156,7 @@ def new_revenue():
 
 
 @affiliates_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_revenue(id):
     """Edit an existing revenue entry."""
     entry = AffiliateRevenue.query.get_or_404(id)
@@ -192,6 +196,7 @@ def edit_revenue(id):
 
 
 @affiliates_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_revenue(id):
     """Delete a revenue entry."""
     try:
