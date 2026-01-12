@@ -27,6 +27,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.secret_key
 
 # Test/Coverage
 .pytest_cache/
@@ -39,3 +40,4 @@ backups/
 # Spreadsheet (user data, don't commit)
 Mouse_Mastersheet.xlsx
 logs/
+.tunnel_url

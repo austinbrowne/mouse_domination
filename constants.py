@@ -17,9 +17,6 @@ INVENTORY_STATUS_CHOICES = ['in_queue', 'reviewing', 'reviewed', 'keeping', 'lis
 INVENTORY_CONDITION_CHOICES = ['new', 'open_box', 'used']
 MARKETPLACE_CHOICES = ['ebay', 'reddit', 'discord', 'facebook', 'offerup', 'mercari', 'local', 'other']
 
-# Video choices
-VIDEO_TYPE_CHOICES = ['review', 'comparison', 'guide', 'tierlist', 'other']
-
 # Collaboration choices
 COLLAB_TYPE_CHOICES = ['guest_on_their_channel', 'guest_on_mousecast', 'cross_promo', 'collab_video']
 COLLAB_STATUS_CHOICES = ['idea', 'reached_out', 'confirmed', 'completed', 'declined']

@@ -1,4 +1,5 @@
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+from functools import wraps
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, g, abort
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Inventory, Company
@@ -16,7 +17,18 @@ from utils.queries import get_companies_for_dropdown
 inventory_bp = Blueprint('inventory', __name__)
 
 
+def require_login(f):
+    """Decorator to require authenticated user."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not g.current_user:
+            abort(401)
+        return f(*args, **kwargs)
+    return decorated
+
+
 @inventory_bp.route('/')
+@require_login
 def list_inventory():
     """List all inventory with optional filtering and pagination."""
     source_type = request.args.get('source_type')
@@ -26,8 +38,8 @@ def list_inventory():
     search = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
 
-    # Eager load company relationship to avoid N+1
-    query = Inventory.query.options(joinedload(Inventory.company))
+    # Eager load company relationship to avoid N+1, filter by current user
+    query = Inventory.query.options(joinedload(Inventory.company)).filter_by(user_id=g.current_user.id)
 
     if source_type and source_type in INVENTORY_SOURCE_TYPE_CHOICES:
         query = query.filter_by(source_type=source_type)
@@ -65,6 +77,7 @@ def list_inventory():
 
 
 @inventory_bp.route('/new', methods=['GET', 'POST'])
+@require_login
 def new_item():
     """Create a new inventory item."""
     if request.method == 'POST':
@@ -75,6 +88,7 @@ def new_item():
             marketplace = form.choice('marketplace', MARKETPLACE_CHOICES)
 
             item = Inventory(
+                user_id=g.current_user.id,
                 product_name=form.required('product_name'),
                 company_id=form.foreign_key('company_id', Company),
                 category=form.choice('category', INVENTORY_CATEGORY_CHOICES, default='mouse'),
@@ -120,9 +134,13 @@ def new_item():
 
 
 @inventory_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@require_login
 def edit_item(id):
     """Edit an existing inventory item."""
-    item = Inventory.query.options(joinedload(Inventory.company)).get_or_404(id)
+    # Only allow editing own items
+    item = Inventory.query.options(joinedload(Inventory.company)).filter_by(
+        id=id, user_id=g.current_user.id
+    ).first_or_404()
 
     if request.method == 'POST':
         try:
@@ -174,10 +192,12 @@ def edit_item(id):
 
 
 @inventory_bp.route('/<int:id>/delete', methods=['POST'])
+@require_login
 def delete_item(id):
     """Delete an inventory item."""
     try:
-        item = Inventory.query.get_or_404(id)
+        # Only allow deleting own items
+        item = Inventory.query.filter_by(id=id, user_id=g.current_user.id).first_or_404()
         name = item.product_name
         db.session.delete(item)
         db.session.commit()
@@ -190,10 +210,12 @@ def delete_item(id):
 
 
 @inventory_bp.route('/<int:id>/mark-sold', methods=['POST'])
+@require_login
 def mark_sold(id):
     """Quick action to mark an item as sold."""
     try:
-        item = Inventory.query.get_or_404(id)
+        # Only allow marking own items as sold
+        item = Inventory.query.filter_by(id=id, user_id=g.current_user.id).first_or_404()
         item.sold = True
         item.status = 'sold'
         db.session.commit()

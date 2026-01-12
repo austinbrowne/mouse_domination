@@ -92,19 +92,15 @@
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'inventory' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                         Inventory
                     </a>
-                    <a href="{{ url_for('videos.list_videos') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'videos' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
-                        Videos
-                    </a>
                     <a href="{{ url_for('episode_guide.list_guides') }}"
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'episode_guide' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
-                        Guide
+                        MouseCast
                     </a>
 
                     <!-- Business Dropdown -->
                     <div class="relative" x-data="{ open: false }" @click.away="open = false">
                         <button @click="open = !open"
-                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'collabs' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'collabs' in current_endpoint or 'templates' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                             Business
                             <svg class="w-4 h-4" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
@@ -113,6 +109,7 @@
                             <a href="{{ url_for('pipeline.list_deals') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'pipeline' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Pipeline</a>
                             <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Revenue</a>
                             <a href="{{ url_for('collabs.list_collabs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'collabs' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Collabs</a>
+                            <a href="{{ url_for('templates.list_templates') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Templates</a>
                         </div>
                     </div>
 
@@ -130,13 +127,10 @@
                         </div>
                     </div>
 
-                    <!-- Templates (gear icon) -->
+                    {% if g.current_user %}
                     <div class="w-px h-6 bg-surface-200 mx-2"></div>
-                    <a href="{{ url_for('templates.list_templates') }}"
-                       class="p-2 rounded-lg {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-500 hover:bg-surface-100 hover:text-gray-700{% endif %}"
-                       title="Outreach Templates">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </a>
+                    <span class="text-sm text-gray-500">{{ g.current_user.email }}</span>
+                    {% endif %}
                 </div>
 
                 <!-- Mobile menu button -->
@@ -154,19 +148,17 @@
             <div class="px-4 py-3 space-y-1">
                 <a href="{{ url_for('main.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Dashboard</a>
                 <a href="{{ url_for('inventory.list_inventory') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Inventory</a>
-                <a href="{{ url_for('videos.list_videos') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Videos</a>
-                <a href="{{ url_for('episode_guide.list_guides') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Guide</a>
+                <a href="{{ url_for('episode_guide.list_guides') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">MouseCast</a>
                 <hr class="my-2 border-surface-200">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
                 <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
                 <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
                 <a href="{{ url_for('collabs.list_collabs') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Collabs</a>
+                <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
                 <hr class="my-2 border-surface-200">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">CRM</p>
                 <a href="{{ url_for('contacts.list_contacts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Contacts</a>
                 <a href="{{ url_for('companies.list_companies') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Companies</a>
-                <hr class="my-2 border-surface-200">
-                <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
             </div>
         </div>
     </nav>

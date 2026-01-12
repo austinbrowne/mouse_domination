@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from flask import Flask, request, g
 from config import Config, DevelopmentConfig, ProductionConfig
 from extensions import db, csrf
@@ -29,6 +30,35 @@ def create_app(config_class=None):
     @app.before_request
     def add_request_id():
         g.request_id = str(uuid.uuid4())[:8]
+
+    # Load current user from Cloudflare Access header
+    @app.before_request
+    def load_current_user():
+        """Load or create user from Cloudflare Access header."""
+        from models import User
+
+        g.current_user = None
+
+        # Get email from Cloudflare Access
+        email = request.headers.get('Cf-Access-Authenticated-User-Email')
+
+        # Fallback for local development
+        if not email and app.debug:
+            email = os.environ.get('DEV_USER_EMAIL')
+
+        if email:
+            # Get or create user
+            user = User.query.filter_by(email=email).first()
+            if not user:
+                user = User(email=email)
+                db.session.add(user)
+                db.session.commit()
+            else:
+                # Update last login
+                user.last_login_at = datetime.now(timezone.utc)
+                db.session.commit()
+
+            g.current_user = user
 
     # Add security headers
     @app.after_request
@@ -62,8 +92,6 @@ def create_app(config_class=None):
     from routes.contacts import contacts_bp
     from routes.companies import companies_bp
     from routes.inventory import inventory_bp
-    from routes.videos import videos_bp
-    from routes.podcast import podcast_bp
     from routes.affiliates import affiliates_bp
     from routes.collabs import collabs_bp
     from routes.pipeline import pipeline_bp
@@ -74,8 +102,6 @@ def create_app(config_class=None):
     app.register_blueprint(contacts_bp, url_prefix='/contacts')
     app.register_blueprint(companies_bp, url_prefix='/companies')
     app.register_blueprint(inventory_bp, url_prefix='/inventory')
-    app.register_blueprint(videos_bp, url_prefix='/videos')
-    app.register_blueprint(podcast_bp, url_prefix='/podcast')
     app.register_blueprint(affiliates_bp, url_prefix='/affiliates')
     app.register_blueprint(collabs_bp, url_prefix='/collabs')
     app.register_blueprint(pipeline_bp, url_prefix='/pipeline')

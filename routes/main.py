@@ -1,11 +1,22 @@
-from flask import Blueprint, render_template, jsonify
-from models import Contact, Company, Inventory, Video, PodcastEpisode, AffiliateRevenue
+from functools import wraps
+from flask import Blueprint, render_template, jsonify, g, abort
+from models import Contact, Company, Inventory, AffiliateRevenue
 from app import db
 from sqlalchemy import func, case, and_, text
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 
 main_bp = Blueprint('main', __name__)
+
+
+def require_login(f):
+    """Decorator to require authenticated user."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not g.current_user:
+            abort(401)
+        return f(*args, **kwargs)
+    return decorated
 
 
 @main_bp.route('/health')
@@ -29,17 +40,19 @@ def health_check():
 
 
 @main_bp.route('/')
+@require_login
 def dashboard():
     """Main dashboard with overview metrics - optimized with database aggregations."""
 
-    # Quick stats using single query with multiple counts
+    # Quick stats using single query with multiple counts (shared data)
     total_contacts = Contact.query.count()
     total_companies = Company.query.count()
     active_companies_count = Company.query.filter(
         Company.relationship_status.in_(['active', 'affiliate_only'])
     ).count()
 
-    # Inventory stats - all in one query for efficiency
+    # Inventory stats - filtered by current user
+    user_id = g.current_user.id
     inventory_stats = db.session.query(
         func.count(Inventory.id).label('total'),
         func.sum(case((Inventory.status == 'in_queue', 1), else_=0)).label('in_queue'),
@@ -48,9 +61,9 @@ def dashboard():
         func.sum(case((Inventory.sold == True, 1), else_=0)).label('sold_count'),
         func.sum(case((Inventory.source_type == 'review_unit', 1), else_=0)).label('review_units'),
         func.sum(case((Inventory.source_type == 'personal_purchase', 1), else_=0)).label('personal_purchases'),
-    ).first()
+    ).filter(Inventory.user_id == user_id).first()
 
-    # Calculate total P/L using database aggregation instead of Python loop
+    # Calculate total P/L using database aggregation - filtered by user
     total_profit_loss = db.session.query(
         func.sum(
             case(
@@ -62,43 +75,31 @@ def dashboard():
                 else_=0
             )
         )
-    ).scalar() or 0
+    ).filter(Inventory.user_id == user_id).scalar() or 0
 
-    # Upcoming deadlines (next 14 days) - with eager loading
+    # Upcoming deadlines (next 14 days) - filtered by user
     today = datetime.now().date()
     two_weeks = today + timedelta(days=14)
     upcoming_deadlines = Inventory.query.options(
         joinedload(Inventory.company)
     ).filter(
+        Inventory.user_id == user_id,
         Inventory.deadline.isnot(None),
         Inventory.deadline >= today,
         Inventory.deadline <= two_weeks,
         Inventory.status.in_(['in_queue', 'reviewing'])
     ).order_by(Inventory.deadline).limit(5).all()
 
-    # Recent items - with eager loading to avoid N+1
+    # Recent items - filtered by user
     recent_inventory = Inventory.query.options(
         joinedload(Inventory.company)
-    ).order_by(Inventory.created_at.desc()).limit(5).all()
+    ).filter_by(user_id=user_id).order_by(Inventory.created_at.desc()).limit(5).all()
 
     recent_sales = Inventory.query.options(
         joinedload(Inventory.company)
-    ).filter_by(sold=True).order_by(Inventory.updated_at.desc()).limit(5).all()
+    ).filter_by(user_id=user_id, sold=True).order_by(Inventory.updated_at.desc()).limit(5).all()
 
-    # Phase 2: Video stats - combined into single query
-    video_stats = db.session.query(
-        func.count(Video.id).label('total'),
-        func.coalesce(func.sum(Video.views), 0).label('total_views'),
-        func.coalesce(func.sum(case((Video.sponsored == True, Video.sponsor_amount), else_=0)), 0).label('sponsor_revenue')
-    ).first()
-
-    # Phase 2: Podcast stats - combined into single query
-    podcast_stats = db.session.query(
-        func.count(PodcastEpisode.id).label('total'),
-        func.coalesce(func.sum(case((PodcastEpisode.sponsored == True, PodcastEpisode.sponsor_amount), else_=0)), 0).label('sponsor_revenue')
-    ).first()
-
-    # Phase 2: Affiliate revenue stats
+    # Affiliate revenue stats
     current_year = datetime.now().year
 
     # Single query for yearly and total affiliate revenue
@@ -139,9 +140,7 @@ def dashboard():
         monthly_revenue.append({'month': f"{month_name} {year}", 'revenue': revenue})
 
     # Total revenue from all sources
-    video_sponsor_revenue = video_stats.sponsor_revenue or 0
-    podcast_sponsor_revenue = podcast_stats.sponsor_revenue or 0
-    total_revenue = video_sponsor_revenue + podcast_sponsor_revenue + total_affiliate_revenue + total_profit_loss
+    total_revenue = total_affiliate_revenue + total_profit_loss
 
     return render_template('dashboard.html',
         total_contacts=total_contacts,
@@ -158,12 +157,6 @@ def dashboard():
         upcoming_deadlines=upcoming_deadlines,
         recent_inventory=recent_inventory,
         recent_sales=recent_sales,
-        # Phase 2 data
-        total_videos=video_stats.total or 0,
-        total_views=video_stats.total_views or 0,
-        video_sponsor_revenue=video_sponsor_revenue,
-        total_episodes=podcast_stats.total or 0,
-        podcast_sponsor_revenue=podcast_sponsor_revenue,
         yearly_affiliate_revenue=yearly_affiliate_revenue,
         total_affiliate_revenue=total_affiliate_revenue,
         total_revenue=total_revenue,

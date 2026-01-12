@@ -57,21 +57,6 @@ class TestQueryOptimizations:
                 assert companies1 is companies2
                 assert len(companies1) == 3
 
-    def test_association_table_indexes_exist(self, app):
-        """Test that association tables have proper indexes."""
-        with app.app_context():
-            from models import video_inventory, episode_guests
-
-            # Check that index=True was set on the columns
-            for col in video_inventory.columns:
-                if col.name in ('video_id', 'inventory_id'):
-                    assert col.index is True, f"{col.name} should have index=True"
-
-            for col in episode_guests.columns:
-                if col.name in ('episode_id', 'contact_id'):
-                    assert col.index is True, f"{col.name} should have index=True"
-
-
 class TestConnectionPoolingConfig:
     """Test database connection pooling configuration."""
 

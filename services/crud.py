@@ -1,5 +1,5 @@
 """Entity-specific service classes."""
-from models import Company, Contact, Inventory, Video, PodcastEpisode, AffiliateRevenue
+from models import Company, Contact, Inventory, AffiliateRevenue
 from .base import BaseService
 
 
@@ -99,44 +99,6 @@ class InventoryService(BaseService[Inventory]):
             'sold': result.sold or 0,
             'with_deadline': result.with_deadline or 0,
         }
-
-
-class VideoService(BaseService[Video]):
-    """Service for Video operations."""
-    model = Video
-    searchable_fields = ['title', 'description']
-    default_order_by = 'publish_date'
-    eager_load = ['company']
-
-    @classmethod
-    def get_stats(cls) -> dict:
-        """Get video statistics in a single query."""
-        from app import db
-        from sqlalchemy import func, case
-
-        result = db.session.query(
-            func.count(Video.id).label('total'),
-            func.sum(case((Video.sponsored == True, 1), else_=0)).label('sponsored'),
-            func.sum(case((Video.is_short == True, 1), else_=0)).label('shorts'),
-            func.sum(Video.views).label('total_views'),
-            func.sum(Video.sponsor_amount).label('total_sponsor_revenue'),
-        ).first()
-
-        return {
-            'total': result.total or 0,
-            'sponsored': result.sponsored or 0,
-            'shorts': result.shorts or 0,
-            'total_views': result.total_views or 0,
-            'total_sponsor_revenue': result.total_sponsor_revenue or 0,
-        }
-
-
-class PodcastService(BaseService[PodcastEpisode]):
-    """Service for PodcastEpisode operations."""
-    model = PodcastEpisode
-    searchable_fields = ['title', 'topics']
-    default_order_by = 'episode_number'
-    eager_load = ['guests']
 
 
 class AffiliateRevenueService(BaseService[AffiliateRevenue]):
