@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Login - Mouse Domination{% endblock %}
+{% block title %}Login - {{ APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="min-h-[60vh] flex items-center justify-center">
@@ -13,7 +13,7 @@
                     </svg>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900">Sign In</h1>
-                <p class="text-sm text-gray-500 mt-1">Welcome back to Mouse Domination</p>
+                <p class="text-sm text-gray-500 mt-1">Welcome back to {{ APP_NAME }}</p>
             </div>
 
             <form method="POST" action="{{ url_for('auth.login') }}" class="space-y-5">
