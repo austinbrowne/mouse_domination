@@ -279,3 +279,75 @@ class TestGetRequestId:
             result = get_request_id()
             # Should return an 8-char string
             assert len(result) == 8
+
+
+class TestHandleFormErrorsDecorator:
+    """Tests for handle_form_errors decorator."""
+
+    def test_success_passthrough(self, app):
+        """Test successful function passes through."""
+        from utils.routes import handle_form_errors
+
+        @handle_form_errors('main.dashboard')
+        def success_func():
+            return 'success'
+
+        with app.test_request_context():
+            result = success_func()
+            assert result == 'success'
+
+    def test_validation_error_handled(self, app):
+        """Test ValidationError is handled and redirects."""
+        from utils.routes import handle_form_errors
+        from utils.validation import ValidationError
+
+        @handle_form_errors('main.dashboard')
+        def validation_error_func():
+            raise ValidationError('name', 'Required field')
+
+        with app.test_request_context():
+            result = validation_error_func()
+            assert result.status_code == 302
+            assert '/' in result.location
+
+    def test_sqlalchemy_error_handled(self, app):
+        """Test SQLAlchemyError is handled and redirects."""
+        from utils.routes import handle_form_errors
+        from sqlalchemy.exc import SQLAlchemyError
+
+        @handle_form_errors('main.dashboard')
+        def db_error_func():
+            raise SQLAlchemyError('DB error')
+
+        with app.test_request_context():
+            result = db_error_func()
+            assert result.status_code == 302
+
+
+class TestDbOperationDecorator:
+    """Tests for db_operation decorator."""
+
+    def test_success_passthrough(self, app):
+        """Test successful operation passes through."""
+        from utils.routes import db_operation
+
+        @db_operation('Test operation')
+        def success_func():
+            return 'success'
+
+        with app.test_request_context():
+            result = success_func()
+            assert result == 'success'
+
+    def test_sqlalchemy_error_reraised(self, app):
+        """Test SQLAlchemyError is logged and re-raised."""
+        from utils.routes import db_operation
+        from sqlalchemy.exc import SQLAlchemyError
+
+        @db_operation('Test operation')
+        def db_error_func():
+            raise SQLAlchemyError('DB error')
+
+        with app.test_request_context():
+            with pytest.raises(SQLAlchemyError):
+                db_error_func()

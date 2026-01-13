@@ -49,6 +49,12 @@ def create_app(config_class=None):
     def set_current_user():
         g.current_user = current_user if current_user.is_authenticated else None
 
+    # Inject common variables into all templates
+    @app.context_processor
+    def inject_now():
+        from datetime import date
+        return {'now': date.today()}
+
     # Add security headers
     @app.after_request
     def add_security_headers(response):

@@ -213,6 +213,37 @@ def contact(app, company):
 
 
 @pytest.fixture
+def template(app):
+    """Create a test outreach template."""
+    with app.app_context():
+        from models import OutreachTemplate
+        t = OutreachTemplate(
+            name='Test Template',
+            body='Hello {{contact_name}}! From {{company_name}}.',
+            category='outreach',
+            subject='Test Subject {{contact_name}}'
+        )
+        db.session.add(t)
+        db.session.commit()
+        return {'id': t.id, 'name': t.name}
+
+
+@pytest.fixture
+def collab(app, contact):
+    """Create a test collaboration."""
+    with app.app_context():
+        from models import Collaboration
+        c = Collaboration(
+            contact_id=contact['id'],
+            collab_type='collab_video',
+            status='idea'
+        )
+        db.session.add(c)
+        db.session.commit()
+        return {'id': c.id, 'contact_id': contact['id']}
+
+
+@pytest.fixture
 def guide(app):
     """Create a test episode guide."""
     with app.app_context():
