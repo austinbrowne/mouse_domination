@@ -64,7 +64,11 @@ def login():
 
         # Check account lockout
         if user.is_locked():
-            remaining = (user.locked_until - datetime.now(timezone.utc)).total_seconds() // 60
+            # Handle both naive (from SQLite) and aware datetimes
+            locked_until = user.locked_until
+            if locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+            remaining = (locked_until - datetime.now(timezone.utc)).total_seconds() // 60
             flash(f'Account locked. Try again in {int(remaining) + 1} minutes.', 'error')
             return render_template('auth/login.html')
 

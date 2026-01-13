@@ -74,7 +74,11 @@ class User(db.Model):
         """Check if account is locked due to failed attempts."""
         if not self.locked_until:
             return False
-        if datetime.now(timezone.utc) >= self.locked_until:
+        # Handle both naive (from SQLite) and aware datetimes
+        locked_until = self.locked_until
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) >= locked_until:
             self.locked_until = None
             self.failed_login_attempts = 0
             return False

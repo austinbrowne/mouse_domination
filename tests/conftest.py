@@ -174,6 +174,45 @@ def get_csrf_token(client, url='/'):
 
 
 @pytest.fixture
+def unapproved_user(app):
+    """Create an unapproved test user."""
+    with app.app_context():
+        user = User(
+            email='pending@example.com',
+            name='Pending User',
+            is_approved=False,
+            is_admin=False
+        )
+        user.set_password('TestPassword123!')
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+    return {'id': user_id, 'email': 'pending@example.com', 'password': 'TestPassword123!'}
+
+
+@pytest.fixture
+def company(app):
+    """Create a test company."""
+    with app.app_context():
+        from models import Company
+        c = Company(name='Test Company')
+        db.session.add(c)
+        db.session.commit()
+        return {'id': c.id, 'name': c.name}
+
+
+@pytest.fixture
+def contact(app, company):
+    """Create a test contact."""
+    with app.app_context():
+        from models import Contact
+        c = Contact(name='Test Contact', company_id=company['id'])
+        db.session.add(c)
+        db.session.commit()
+        return {'id': c.id, 'name': c.name}
+
+
+@pytest.fixture
 def guide(app):
     """Create a test episode guide."""
     with app.app_context():
