@@ -115,6 +115,16 @@ def list_guides():
     total = EpisodeGuide.query.count()
     drafts = EpisodeGuide.query.filter_by(status='draft').count()
     completed = EpisodeGuide.query.filter_by(status='completed').count()
+    stats = {'total': total, 'drafts': drafts, 'completed': completed}
+
+    # Check if this is an AJAX request for just the table
+    if request.args.get('ajax') == '1':
+        return render_template('episode_guide/_table.html',
+            guides=pagination.items,
+            search=search,
+            matching_items=matching_items,
+            stats=stats,
+        )
 
     return render_template('episode_guide/list.html',
         guides=pagination.items,
@@ -122,7 +132,7 @@ def list_guides():
         current_status=status,
         search=search,
         matching_items=matching_items,
-        stats={'total': total, 'drafts': drafts, 'completed': completed},
+        stats=stats,
     )
 
 

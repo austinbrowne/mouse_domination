@@ -57,6 +57,13 @@ def list_inventory():
     # Calculate totals for current page
     total_profit_loss = sum(item.profit_loss for item in pagination.items if item.sold)
 
+    # Check if this is an AJAX request for just the table
+    if request.args.get('ajax') == '1':
+        return render_template('inventory/_table.html',
+            items=pagination.items,
+            total_profit_loss=total_profit_loss,
+        )
+
     return render_template('inventory/list.html',
         items=pagination.items,
         pagination=pagination,
