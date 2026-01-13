@@ -38,32 +38,80 @@
     {% endif %}
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <form method="get" class="flex flex-wrap gap-3 items-end">
-            <div>
+    <div class="bg-white rounded-xl border border-surface-200 p-4" x-data="affiliateFilters()">
+        <div class="flex flex-wrap gap-3 items-end">
+            <!-- Year Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Year</label>
-                <select name="year" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Years</option>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[120px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="yearLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <button type="button" @click="year = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': year === '' }">All Years</button>
                     {% for y in years %}
-                        <option value="{{ y }}" {% if current_year == y %}selected{% endif %}>{{ y }}</option>
+                    <button type="button" @click="year = '{{ y }}'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': year === '{{ y }}' }">{{ y }}</button>
                     {% endfor %}
-                </select>
+                </div>
             </div>
-            <div>
+
+            <!-- Company Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Company</label>
-                <select name="company_id" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Companies</option>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[160px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="companyLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <button type="button" @click="companyId = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': companyId === '' }">All Companies</button>
                     {% for company in companies %}
-                        <option value="{{ company.id }}" {% if current_company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+                    <button type="button" @click="companyId = '{{ company.id }}'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': companyId === '{{ company.id }}' }">{{ company.name }}</button>
                     {% endfor %}
-                </select>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+
+            <div class="flex items-end">
                 <a href="{{ url_for('affiliates.list_revenue') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        function affiliateFilters() {
+            const companyNames = {
+                '': 'All Companies',
+                {% for company in companies %}'{{ company.id }}': '{{ company.name }}',{% endfor %}
+            };
+            return {
+                year: '{{ current_year or "" }}',
+                companyId: '{{ current_company_id or "" }}',
+
+                get yearLabel() {
+                    return this.year || 'All Years';
+                },
+                get companyLabel() {
+                    return companyNames[this.companyId] || 'All Companies';
+                },
+
+                applyFilters() {
+                    const params = new URLSearchParams();
+                    if (this.year) params.set('year', this.year);
+                    if (this.companyId) params.set('company_id', this.companyId);
+
+                    const url = '{{ url_for("affiliates.list_revenue") }}' + (params.toString() ? '?' + params.toString() : '');
+                    window.location.href = url;
+                }
+            }
+        }
+    </script>
 
     <!-- Revenue Table -->
     <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">

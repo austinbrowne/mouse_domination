@@ -18,31 +18,69 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="bg-white rounded-xl border border-surface-200 p-4" x-data="templateFilters()">
+        <div class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[180px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Template name..."
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" x-model="search" @input.debounce.300ms="applyFilters()" placeholder="Template name..."
+                        class="w-full border border-surface-200 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
             </div>
-            <div>
+
+            <!-- Category Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Category</label>
-                <select name="category" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Categories</option>
-                    <option value="sponsor" {% if current_category == 'sponsor' %}selected{% endif %}>Sponsor</option>
-                    <option value="collab" {% if current_category == 'collab' %}selected{% endif %}>Collab</option>
-                    <option value="follow_up" {% if current_category == 'follow_up' %}selected{% endif %}>Follow Up</option>
-                    <option value="thank_you" {% if current_category == 'thank_you' %}selected{% endif %}>Thank You</option>
-                    <option value="pitch" {% if current_category == 'pitch' %}selected{% endif %}>Pitch</option>
-                    <option value="other" {% if current_category == 'other' %}selected{% endif %}>Other</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="categoryLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="category = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === '' }">All Categories</button>
+                    <button type="button" @click="category = 'sponsor'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'sponsor' }">Sponsor</button>
+                    <button type="button" @click="category = 'collab'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'collab' }">Collab</button>
+                    <button type="button" @click="category = 'follow_up'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'follow_up' }">Follow Up</button>
+                    <button type="button" @click="category = 'thank_you'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'thank_you' }">Thank You</button>
+                    <button type="button" @click="category = 'pitch'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'pitch' }">Pitch</button>
+                    <button type="button" @click="category = 'other'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'other' }">Other</button>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+
+            <div class="flex items-end">
                 <a href="{{ url_for('templates.list_templates') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        function templateFilters() {
+            return {
+                search: '{{ search or "" }}',
+                category: '{{ current_category or "" }}',
+
+                get categoryLabel() {
+                    const labels = { '': 'All Categories', 'sponsor': 'Sponsor', 'collab': 'Collab', 'follow_up': 'Follow Up', 'thank_you': 'Thank You', 'pitch': 'Pitch', 'other': 'Other' };
+                    return labels[this.category] || 'All Categories';
+                },
+
+                applyFilters() {
+                    const params = new URLSearchParams();
+                    if (this.search) params.set('search', this.search);
+                    if (this.category) params.set('category', this.category);
+
+                    const url = '{{ url_for("templates.list_templates") }}' + (params.toString() ? '?' + params.toString() : '');
+                    window.location.href = url;
+                }
+            }
+        }
+    </script>
 
     <!-- Templates Grid -->
     {% if templates %}

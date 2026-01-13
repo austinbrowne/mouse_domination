@@ -40,28 +40,66 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="bg-white rounded-xl border border-surface-200 p-4" x-data="episodeFilters()">
+        <div class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[180px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Search episodes and topics..."
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" x-model="search" @input.debounce.300ms="applyFilters()" placeholder="Search episodes and topics..."
+                        class="w-full border border-surface-200 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
             </div>
-            <div>
+
+            <!-- Status Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
-                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Status</option>
-                    <option value="draft" {% if current_status == 'draft' %}selected{% endif %}>Draft</option>
-                    <option value="recording" {% if current_status == 'recording' %}selected{% endif %}>Recording</option>
-                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[130px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="statusLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="status = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === '' }">All Status</button>
+                    <button type="button" @click="status = 'draft'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'draft' }">Draft</button>
+                    <button type="button" @click="status = 'recording'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'recording' }">Recording</button>
+                    <button type="button" @click="status = 'completed'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'completed' }">Completed</button>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+
+            <div class="flex items-end">
                 <a href="{{ url_for('episode_guide.list_guides') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        function episodeFilters() {
+            return {
+                search: '{{ search or "" }}',
+                status: '{{ current_status or "" }}',
+
+                get statusLabel() {
+                    const labels = { '': 'All Status', 'draft': 'Draft', 'recording': 'Recording', 'completed': 'Completed' };
+                    return labels[this.status] || 'All Status';
+                },
+
+                applyFilters() {
+                    const params = new URLSearchParams();
+                    if (this.search) params.set('search', this.search);
+                    if (this.status) params.set('status', this.status);
+
+                    const url = '{{ url_for("episode_guide.list_guides") }}' + (params.toString() ? '?' + params.toString() : '');
+                    window.location.href = url;
+                }
+            }
+        }
+    </script>
 
     <!-- Guides List -->
     <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
@@ -164,27 +202,3 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.querySelector('input[name="search"]');
-    const form = searchInput.closest('form');
-    let debounceTimer;
-
-    // Auto-search with debounce
-    searchInput.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            form.submit();
-        }, 300);
-    });
-
-    // Restore focus after search if there's a search term
-    if (searchInput.value) {
-        searchInput.focus();
-        // Move cursor to end of input
-        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-    }
-});
-</script>
-{% endblock %}

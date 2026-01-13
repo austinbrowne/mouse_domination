@@ -25,7 +25,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                <input type="url" name="website" value="{{ company.website if company else '' }}" placeholder="https://..."
+                <input type="text" name="website" value="{{ company.website if company else '' }}" placeholder="https://..."
                     class="w-full border rounded-lg px-3 py-2">
             </div>
         </div>
@@ -78,7 +78,7 @@
 
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Affiliate Link</label>
-            <input type="url" name="affiliate_link" value="{{ company.affiliate_link if company else '' }}" placeholder="https://company.com?ref=dazz"
+            <input type="text" name="affiliate_link" value="{{ company.affiliate_link if company else '' }}" placeholder="https://company.com?ref=dazz"
                 class="w-full border rounded-lg px-3 py-2">
         </div>
 

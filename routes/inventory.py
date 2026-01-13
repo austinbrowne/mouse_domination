@@ -237,3 +237,41 @@ def mark_sold(id):
         log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('inventory.list_inventory'))
+
+
+@inventory_bp.route('/<int:id>/update-field', methods=['POST'])
+@login_required
+def update_field(id):
+    """Inline update for a single field (source_type or status)."""
+    from flask import jsonify
+
+    try:
+        # Only allow updating own items
+        item = Inventory.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+
+        field = request.form.get('field')
+        value = request.form.get('value')
+
+        if field == 'source_type':
+            valid_values = [v for v, _ in INVENTORY_SOURCE_TYPE_CHOICES]
+            if value not in valid_values:
+                return jsonify({'success': False, 'error': 'Invalid source type'}), 400
+            item.source_type = value
+        elif field == 'status':
+            valid_statuses = get_valid_values_for_type('inventory_status')
+            if value not in valid_statuses:
+                return jsonify({'success': False, 'error': 'Invalid status'}), 400
+            item.status = value
+            # If marked as sold, also set the sold flag
+            if value == 'sold':
+                item.sold = True
+        else:
+            return jsonify({'success': False, 'error': 'Invalid field'}), 400
+
+        db.session.commit()
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500

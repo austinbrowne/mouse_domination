@@ -18,39 +18,93 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="bg-white rounded-xl border border-surface-200 p-4" x-data="contactFilters()">
+        <div class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[180px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Name..."
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" x-model="search" @input.debounce.300ms="applyFilters()" placeholder="Name..."
+                        class="w-full border border-surface-200 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
             </div>
-            <div>
+
+            <!-- Role Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Role</label>
-                <select name="role" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Roles</option>
-                    <option value="reviewer" {% if current_role == 'reviewer' %}selected{% endif %}>Reviewer</option>
-                    <option value="company_rep" {% if current_role == 'company_rep' %}selected{% endif %}>Company Rep</option>
-                    <option value="podcast_guest" {% if current_role == 'podcast_guest' %}selected{% endif %}>Podcast Guest</option>
-                    <option value="other" {% if current_role == 'other' %}selected{% endif %}>Other</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="roleLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="role = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': role === '' }">All Roles</button>
+                    <button type="button" @click="role = 'reviewer'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': role === 'reviewer' }">Reviewer</button>
+                    <button type="button" @click="role = 'company_rep'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': role === 'company_rep' }">Company Rep</button>
+                    <button type="button" @click="role = 'podcast_guest'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': role === 'podcast_guest' }">Podcast Guest</button>
+                    <button type="button" @click="role = 'other'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': role === 'other' }">Other</button>
+                </div>
             </div>
-            <div>
+
+            <!-- Status Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
-                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Statuses</option>
-                    <option value="cold" {% if current_status == 'cold' %}selected{% endif %}>Cold</option>
-                    <option value="warm" {% if current_status == 'warm' %}selected{% endif %}>Warm</option>
-                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="close" {% if current_status == 'close' %}selected{% endif %}>Close</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                    <span x-text="statusLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="status = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === '' }">All Statuses</button>
+                    <button type="button" @click="status = 'cold'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'cold' }">Cold</button>
+                    <button type="button" @click="status = 'warm'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'warm' }">Warm</button>
+                    <button type="button" @click="status = 'active'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'active' }">Active</button>
+                    <button type="button" @click="status = 'close'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'close' }">Close</button>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+
+            <div class="flex items-end">
                 <a href="{{ url_for('contacts.list_contacts') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        function contactFilters() {
+            return {
+                search: '{{ search or "" }}',
+                role: '{{ current_role or "" }}',
+                status: '{{ current_status or "" }}',
+
+                get roleLabel() {
+                    const labels = { '': 'All Roles', 'reviewer': 'Reviewer', 'company_rep': 'Company Rep', 'podcast_guest': 'Podcast Guest', 'other': 'Other' };
+                    return labels[this.role] || 'All Roles';
+                },
+                get statusLabel() {
+                    const labels = { '': 'All Statuses', 'cold': 'Cold', 'warm': 'Warm', 'active': 'Active', 'close': 'Close' };
+                    return labels[this.status] || 'All Statuses';
+                },
+
+                applyFilters() {
+                    const params = new URLSearchParams();
+                    if (this.search) params.set('search', this.search);
+                    if (this.role) params.set('role', this.role);
+                    if (this.status) params.set('status', this.status);
+
+                    const url = '{{ url_for("contacts.list_contacts") }}' + (params.toString() ? '?' + params.toString() : '');
+                    window.location.href = url;
+                }
+            }
+        }
+    </script>
 
     <!-- Contacts Table -->
     <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">

@@ -17,50 +17,197 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <form method="get" class="flex flex-wrap gap-3 items-end">
-            <div class="flex-1 min-w-[180px]">
+    <div class="bg-white rounded-xl border border-surface-200 p-4" x-data="inventoryFilters()">
+        <div class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[200px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Product name..."
-                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" x-model="search" @input.debounce.300ms="applyFilters()" placeholder="Search products..."
+                        class="w-full border border-surface-200 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
             </div>
-            <div>
+
+            <!-- Type Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
-                <select name="source_type" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Types</option>
-                    <option value="review_unit" {% if current_source_type == 'review_unit' %}selected{% endif %}>Review Unit</option>
-                    <option value="personal_purchase" {% if current_source_type == 'personal_purchase' %}selected{% endif %}>Personal Purchase</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <span x-text="sourceTypeLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="sourceType = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': sourceType === '' }">All Types</button>
+                    <button type="button" @click="sourceType = 'review_unit'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': sourceType === 'review_unit' }">Review Unit</button>
+                    <button type="button" @click="sourceType = 'personal_purchase'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': sourceType === 'personal_purchase' }">Personal Purchase</button>
+                </div>
             </div>
-            <div>
+
+            <!-- Category Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Category</label>
-                <select name="category" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Categories</option>
-                    <option value="mouse" {% if current_category == 'mouse' %}selected{% endif %}>Mouse</option>
-                    <option value="keyboard" {% if current_category == 'keyboard' %}selected{% endif %}>Keyboard</option>
-                    <option value="mousepad" {% if current_category == 'mousepad' %}selected{% endif %}>Mousepad</option>
-                    <option value="iem" {% if current_category == 'iem' %}selected{% endif %}>IEM</option>
-                    <option value="other" {% if current_category == 'other' %}selected{% endif %}>Other</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <span x-text="categoryLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                    <button type="button" @click="category = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === '' }">All Categories</button>
+                    <button type="button" @click="category = 'mouse'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'mouse' }">Mouse</button>
+                    <button type="button" @click="category = 'keyboard'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'keyboard' }">Keyboard</button>
+                    <button type="button" @click="category = 'mousepad'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'mousepad' }">Mousepad</button>
+                    <button type="button" @click="category = 'iem'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'iem' }">IEM</button>
+                    <button type="button" @click="category = 'other'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': category === 'other' }">Other</button>
+                </div>
             </div>
-            <div>
+
+            <!-- Status Dropdown -->
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
-                <select name="status" class="border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                    <option value="">All Statuses</option>
-                    <option value="in_queue" {% if current_status == 'in_queue' %}selected{% endif %}>In Queue</option>
-                    <option value="reviewing" {% if current_status == 'reviewing' %}selected{% endif %}>Reviewing</option>
-                    <option value="reviewed" {% if current_status == 'reviewed' %}selected{% endif %}>Reviewed</option>
-                    <option value="keeping" {% if current_status == 'keeping' %}selected{% endif %}>Keeping</option>
-                    <option value="listed" {% if current_status == 'listed' %}selected{% endif %}>Listed</option>
-                    <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>Sold</option>
-                </select>
+                <button type="button" @click="open = !open"
+                    class="flex items-center justify-between gap-2 min-w-[140px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <span x-text="statusLabel"></span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
+                    <button type="button" @click="status = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === '' }">All Statuses</button>
+                    <button type="button" @click="status = 'in_queue'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'in_queue' }">In Queue</button>
+                    <button type="button" @click="status = 'reviewing'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'reviewing' }">Reviewing</button>
+                    <button type="button" @click="status = 'reviewed'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'reviewed' }">Reviewed</button>
+                    <button type="button" @click="status = 'keeping'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'keeping' }">Keeping</button>
+                    <button type="button" @click="status = 'listed'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'listed' }">Listed</button>
+                    <button type="button" @click="status = 'sold'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'sold' }">Sold</button>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm font-medium">Filter</button>
+
+            <div class="flex items-end">
                 <a href="{{ url_for('inventory.list_inventory') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</a>
             </div>
-        </form>
+        </div>
     </div>
+
+    <script>
+        function inventoryFilters() {
+            return {
+                search: '{{ search or "" }}',
+                sourceType: '{{ current_source_type or "" }}',
+                category: '{{ current_category or "" }}',
+                status: '{{ current_status or "" }}',
+
+                get sourceTypeLabel() {
+                    const labels = { '': 'All Types', 'review_unit': 'Review Unit', 'personal_purchase': 'Personal Purchase' };
+                    return labels[this.sourceType] || 'All Types';
+                },
+                get categoryLabel() {
+                    const labels = { '': 'All Categories', 'mouse': 'Mouse', 'keyboard': 'Keyboard', 'mousepad': 'Mousepad', 'iem': 'IEM', 'other': 'Other' };
+                    return labels[this.category] || 'All Categories';
+                },
+                get statusLabel() {
+                    const labels = { '': 'All Statuses', 'in_queue': 'In Queue', 'reviewing': 'Reviewing', 'reviewed': 'Reviewed', 'keeping': 'Keeping', 'listed': 'Listed', 'sold': 'Sold' };
+                    return labels[this.status] || 'All Statuses';
+                },
+
+                applyFilters() {
+                    const params = new URLSearchParams();
+                    if (this.search) params.set('search', this.search);
+                    if (this.sourceType) params.set('source_type', this.sourceType);
+                    if (this.category) params.set('category', this.category);
+                    if (this.status) params.set('status', this.status);
+
+                    const url = '{{ url_for("inventory.list_inventory") }}' + (params.toString() ? '?' + params.toString() : '');
+                    window.location.href = url;
+                }
+            }
+        }
+
+        const updateFieldUrlBase = '{{ url_for("inventory.update_field", id=0) }}'.replace('/0/', '/{id}/');
+
+        function inlineDropdown(itemId, field, initialValue) {
+            return {
+                open: false,
+                value: initialValue,
+                saving: false,
+                dropdownStyle: '',
+
+                sourceTypeLabels: { 'review_unit': 'Review Unit', 'personal_purchase': 'Personal Purchase' },
+                sourceTypeClasses: {
+                    'review_unit': 'bg-blue-50 text-blue-700',
+                    'personal_purchase': 'bg-violet-50 text-violet-700'
+                },
+
+                statusLabels: {
+                    'in_queue': 'In Queue', 'reviewing': 'Reviewing', 'reviewed': 'Reviewed',
+                    'keeping': 'Keeping', 'listed': 'Listed', 'sold': 'Sold'
+                },
+                statusClasses: {
+                    'in_queue': 'bg-amber-50 text-amber-700',
+                    'reviewing': 'bg-blue-50 text-blue-700',
+                    'reviewed': 'bg-violet-50 text-violet-700',
+                    'keeping': 'bg-gray-100 text-gray-700',
+                    'listed': 'bg-orange-50 text-orange-700',
+                    'sold': 'bg-emerald-50 text-emerald-700'
+                },
+
+                toggleDropdown() {
+                    if (!this.open) {
+                        // Calculate position before opening
+                        const button = this.$refs.button;
+                        const rect = button.getBoundingClientRect();
+                        this.dropdownStyle = `position: fixed; top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
+                    }
+                    this.open = !this.open;
+                },
+
+                async updateField(newValue) {
+                    if (this.value === newValue) {
+                        this.open = false;
+                        return;
+                    }
+
+                    this.saving = true;
+                    const formData = new FormData();
+                    formData.append('field', field);
+                    formData.append('value', newValue);
+                    formData.append('csrf_token', '{{ csrf_token() }}');
+
+                    const url = updateFieldUrlBase.replace('{id}', itemId);
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.value = newValue;
+                            // Update the data-value attribute for sorting
+                            this.$el.closest('td').setAttribute('data-value', newValue);
+                        } else {
+                            alert('Failed to update: ' + (data.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Update failed:', error);
+                        alert('Failed to update. Please try again.');
+                    }
+
+                    this.saving = false;
+                    this.open = false;
+                }
+            }
+        }
+    </script>
 
     <!-- Inventory Table -->
     <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
@@ -91,23 +238,50 @@
                                     {% endif %}
                                 </td>
                                 <td class="px-4 py-3 hidden md:table-cell" data-value="{{ item.source_type }}">
-                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
-                                        {% if item.source_type == 'review_unit' %}bg-blue-50 text-blue-700
-                                        {% else %}bg-violet-50 text-violet-700{% endif %}">
-                                        {{ item.source_type|replace('_', ' ')|title }}
-                                    </span>
+                                    <div x-data="inlineDropdown('{{ item.id }}', 'source_type', '{{ item.source_type }}')">
+                                        <button type="button" x-ref="button" @click="toggleDropdown()"
+                                            class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all"
+                                            :class="sourceTypeClasses[value]">
+                                            <span x-text="sourceTypeLabels[value]"></span>
+                                            <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                        <div x-show="open" @click.away="open = false" x-transition :style="dropdownStyle"
+                                            class="z-50 bg-white border border-surface-200 rounded-lg shadow-lg py-1 min-w-[140px]">
+                                            <button type="button" @click="updateField('review_unit')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'review_unit' }">Review Unit</button>
+                                            <button type="button" @click="updateField('personal_purchase')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'personal_purchase' }">Personal Purchase</button>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3" data-value="{{ item.status }}">
-                                    <span class="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full
-                                        {% if item.status == 'in_queue' %}bg-amber-50 text-amber-700
-                                        {% elif item.status == 'reviewing' %}bg-blue-50 text-blue-700
-                                        {% elif item.status == 'reviewed' %}bg-violet-50 text-violet-700
-                                        {% elif item.status == 'keeping' %}bg-gray-100 text-gray-700
-                                        {% elif item.status == 'listed' %}bg-orange-50 text-orange-700
-                                        {% elif item.status == 'sold' %}bg-emerald-50 text-emerald-700
-                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                        {{ item.status|replace('_', ' ')|title }}
-                                    </span>
+                                    <div x-data="inlineDropdown('{{ item.id }}', 'status', '{{ item.status }}')">
+                                        <button type="button" x-ref="button" @click="toggleDropdown()"
+                                            class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all"
+                                            :class="statusClasses[value]">
+                                            <span x-text="statusLabels[value]"></span>
+                                            <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                        <div x-show="open" @click.away="open = false" x-transition :style="dropdownStyle"
+                                            class="z-50 bg-white border border-surface-200 rounded-lg shadow-lg py-1 min-w-[120px]">
+                                            <button type="button" @click="updateField('in_queue')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'in_queue' }">In Queue</button>
+                                            <button type="button" @click="updateField('reviewing')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'reviewing' }">Reviewing</button>
+                                            <button type="button" @click="updateField('reviewed')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'reviewed' }">Reviewed</button>
+                                            <button type="button" @click="updateField('keeping')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'keeping' }">Keeping</button>
+                                            <button type="button" @click="updateField('listed')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'listed' }">Listed</button>
+                                            <button type="button" @click="updateField('sold')"
+                                                class="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50" :class="{ 'bg-primary-50 font-medium': value === 'sold' }">Sold</button>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 hidden md:table-cell text-sm text-gray-500" data-value="{{ item.date_acquired.isoformat() if item.date_acquired else '' }}">
                                     {{ item.date_acquired.strftime('%b %d, %Y') if item.date_acquired else '-' }}
