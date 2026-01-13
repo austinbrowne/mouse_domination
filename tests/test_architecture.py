@@ -80,16 +80,16 @@ class TestFormData:
         assert result == 'Some notes'
 
     def test_optional_field_missing(self):
-        """Test optional field returns None when missing."""
+        """Test optional field returns empty string when missing."""
         form = FormData({})
         result = form.optional('notes')
-        assert result is None
+        assert result == ''
 
     def test_optional_field_empty(self):
-        """Test optional field returns None when empty."""
+        """Test optional field returns empty string when empty/whitespace."""
         form = FormData({'notes': '   '})
         result = form.optional('notes')
-        assert result is None
+        assert result == ''
 
     def test_email_valid(self):
         """Test email validation with valid email."""
@@ -177,8 +177,8 @@ class TestFormData:
         assert result == {
             'twitter': '@user',
             'discord': 'user#1234',
-            'youtube': None,
-            'missing': None
+            'youtube': '',
+            'missing': ''
         }
 
     def test_date_valid(self):

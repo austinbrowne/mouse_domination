@@ -111,10 +111,9 @@ class FormData:
         return validate_required(value, field, max_length)
 
     def optional(self, field, strip=True):
-        """Get optional field value, returning None if empty."""
-        from utils.validation import or_none
+        """Get optional field value, returning empty string if empty."""
         value = self.form.get(field, '')
-        return or_none(value) if strip else value
+        return value.strip() if strip else value
 
     def email(self, field='email'):
         """Get and validate email field."""

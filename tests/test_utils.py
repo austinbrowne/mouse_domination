@@ -184,11 +184,11 @@ class TestFormData:
             assert result == 'Some notes'
 
     def test_optional_empty(self, app):
-        """Test FormData.optional returns None for empty."""
+        """Test FormData.optional returns empty string for empty."""
         with app.test_request_context():
             form = FormData({'notes': ''})
             result = form.optional('notes')
-            assert result is None
+            assert result == ''
 
     def test_choice_valid(self, app):
         """Test FormData.choice with valid choice."""
@@ -259,7 +259,7 @@ class TestFormData:
         with app.test_request_context():
             form = FormData({'name': 'Test', 'notes': 'Some notes', 'extra': ''})
             result = form.to_dict('name', 'notes', 'extra')
-            assert result == {'name': 'Test', 'notes': 'Some notes', 'extra': None}
+            assert result == {'name': 'Test', 'notes': 'Some notes', 'extra': ''}
 
 
 class TestGetRequestId:
