@@ -16,13 +16,13 @@
                 </thead>
                 <tbody class="divide-y divide-surface-200">
                     {% for item in items %}
-                        <tr class="hover:bg-surface-50 {% if item.deadline and not item.sold %}bg-red-50/50{% endif %}">
+                        <tr class="hover:bg-surface-50 {% if item.deadline and not item.sold and item.status != 'reviewed' %}bg-red-50/50{% endif %}">
                             <td class="px-4 py-3" data-value="{{ item.product_name }}">
                                 <div class="font-medium text-gray-900">{{ item.product_name }}</div>
                                 <div class="text-xs text-gray-500 mt-0.5">
                                     {{ item.company.name if item.company else 'Unknown' }} &middot; {{ item.category|title }}
                                 </div>
-                                {% if item.deadline %}
+                                {% if item.deadline and item.status != 'reviewed' %}
                                     <div class="text-xs text-red-600 font-medium mt-0.5">Deadline: {{ item.deadline.strftime('%b %d') }}</div>
                                 {% endif %}
                             </td>
