@@ -41,3 +41,10 @@ backups/
 Mouse_Mastersheet.xlsx
 logs/
 .tunnel_url
+
+# Uploaded files (ignore images in uploads folder)
+static/uploads/profiles/*.png
+static/uploads/profiles/*.jpg
+static/uploads/profiles/*.jpeg
+static/uploads/profiles/*.gif
+static/uploads/profiles/*.webp

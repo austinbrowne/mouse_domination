@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Preview Media Kit - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Media Kit Preview</h1>
+            <p class="text-gray-600 mt-1">This is how your media kit will look to brands</p>
+        </div>
+        <div class="flex gap-2">
+            <!-- Export Buttons -->
+            <a href="{{ url_for('media_kit.export_html') }}"
+               class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-surface-300 text-gray-700 hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                HTML
+            </a>
+            <a href="{{ url_for('media_kit.export_pdf') }}"
+               class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-surface-300 text-gray-700 hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 mb-6 border-b border-surface-200 pb-2">
+        <a href="{{ url_for('media_kit.edit_profile') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Profile</a>
+        <a href="{{ url_for('media_kit.list_rates') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Rate Card</a>
+        <a href="{{ url_for('media_kit.list_testimonials') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Testimonials</a>
+        <a href="{{ url_for('media_kit.preview') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg bg-primary-100 text-primary-700 border-b-2 border-primary-600">Preview</a>
+    </div>
+
+    <!-- Sharing Controls -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="font-medium text-blue-900">Public Sharing</h3>
+                {% if profile.is_public and profile.public_token %}
+                <p class="text-sm text-blue-700 mt-1">
+                    Your media kit is public:
+                    <a href="{{ url_for('media_kit.public_view', token=profile.public_token) }}"
+                       class="underline break-all" target="_blank">
+                        {{ url_for('media_kit.public_view', token=profile.public_token, _external=True) }}
+                    </a>
+                </p>
+                {% else %}
+                <p class="text-sm text-blue-700 mt-1">Generate a public link to share with brands</p>
+                {% endif %}
+            </div>
+            <div class="flex gap-2">
+                {% if profile.is_public and profile.public_token %}
+                <button onclick="navigator.clipboard.writeText('{{ url_for('media_kit.public_view', token=profile.public_token, _external=True) }}'); alert('Link copied!')"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                    Copy Link
+                </button>
+                <form method="post" action="{{ url_for('media_kit.generate_share_link') }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-100">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        New Link
+                    </button>
+                </form>
+                <form method="post" action="{{ url_for('media_kit.disable_sharing') }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-100">
+                        Disable
+                    </button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('media_kit.generate_share_link') }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        Generate Public Link
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Kit Preview -->
+    <div class="bg-white rounded-xl border border-surface-200 p-8 shadow-sm">
+        {% include 'media_kit/_kit_content.html' %}
+    </div>
+</div>
+{% endblock %}

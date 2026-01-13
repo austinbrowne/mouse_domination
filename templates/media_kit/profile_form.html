@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Media Kit Profile - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Media Kit Profile</h1>
+        <p class="text-gray-600 mt-1">Create your professional media kit for brand sponsorships</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 mb-6 border-b border-surface-200 pb-2">
+        <a href="{{ url_for('media_kit.edit_profile') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg bg-primary-100 text-primary-700 border-b-2 border-primary-600">Profile</a>
+        {% if profile %}
+        <a href="{{ url_for('media_kit.list_rates') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Rate Card</a>
+        <a href="{{ url_for('media_kit.list_testimonials') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Testimonials</a>
+        <a href="{{ url_for('media_kit.preview') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Preview</a>
+        {% endif %}
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Basic Info -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Basic Info</h3>
+
+            <div class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Display Name *</label>
+                        <input type="text" name="display_name" value="{{ profile.display_name or '' if profile else '' }}" required
+                            placeholder="Your creator name"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                        <input type="text" name="location" value="{{ profile.location or '' if profile else '' }}"
+                            placeholder="City, State/Country"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tagline</label>
+                    <input type="text" name="tagline" value="{{ profile.tagline or '' if profile else '' }}"
+                        placeholder="Tech reviewer specializing in gaming peripherals"
+                        maxlength="200"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Bio</label>
+                    <textarea name="bio" rows="3" placeholder="2-3 sentences about you and your content"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">{{ profile.bio or '' if profile else '' }}</textarea>
+                </div>
+
+                <!-- Profile Photo -->
+                <div class="border border-surface-200 rounded-lg p-4 bg-surface-50">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Profile Photo</label>
+                    <div class="flex items-start gap-4">
+                        <!-- Current Photo Preview -->
+                        <div class="flex-shrink-0">
+                            {% if profile and profile.photo_url %}
+                            <img src="{{ profile.photo_url }}" alt="Current profile photo"
+                                class="w-20 h-20 rounded-full object-cover border-2 border-surface-200">
+                            {% else %}
+                            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-2xl font-bold">
+                                {{ (profile.display_name[0] | upper) if profile and profile.display_name else '?' }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Upload Controls -->
+                        <div class="flex-1 space-y-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Upload new photo</label>
+                                <input type="file" name="photo_file" accept="image/png,image/jpeg,image/gif,image/webp"
+                                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                                <p class="text-xs text-gray-400 mt-1">PNG, JPG, GIF or WebP. Max 2MB.</p>
+                            </div>
+
+                            <div class="text-xs text-gray-500">— or use external URL —</div>
+
+                            <div>
+                                <input type="text" name="photo_url" value="{{ profile.photo_url if profile and profile.photo_url and not profile.photo_url.startswith('/static/') else '' }}"
+                                    placeholder="https://example.com/photo.jpg"
+                                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                            </div>
+
+                            {% if profile and profile.photo_url %}
+                            <label class="flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" name="clear_photo" value="yes" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                                Remove current photo
+                            </label>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Content Niches</label>
+                    <input type="text" name="content_niches" value="{{ profile.content_niches | join(', ') if profile and profile.content_niches else '' }}"
+                        placeholder="gaming peripherals, tech reviews (comma-separated)"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Contact Info</h3>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Email</label>
+                    <input type="text" name="contact_email" value="{{ profile.contact_email or '' if profile else '' }}"
+                        placeholder="sponsor@example.com"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Website URL</label>
+                    <input type="text" name="website_url" value="{{ profile.website_url or '' if profile else '' }}"
+                        placeholder="https://yourwebsite.com"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Links -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Social Links</h3>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% set social = profile.social_links if profile and profile.social_links else {} %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">YouTube</label>
+                    <input type="text" name="social_youtube" value="{{ social.youtube or '' }}"
+                        placeholder="@yourhandle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Twitter/X</label>
+                    <input type="text" name="social_twitter" value="{{ social.twitter or '' }}"
+                        placeholder="@yourhandle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Instagram</label>
+                    <input type="text" name="social_instagram" value="{{ social.instagram or '' }}"
+                        placeholder="@yourhandle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">TikTok</label>
+                    <input type="text" name="social_tiktok" value="{{ social.tiktok or '' }}"
+                        placeholder="@yourhandle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Twitch</label>
+                    <input type="text" name="social_twitch" value="{{ social.twitch or '' }}"
+                        placeholder="yourhandle"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Discord</label>
+                    <input type="text" name="social_discord" value="{{ social.discord or '' }}"
+                        placeholder="Server invite link"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">LinkedIn</label>
+                    <input type="text" name="social_linkedin" value="{{ social.linkedin or '' }}"
+                        placeholder="Profile URL"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Platform Stats -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-2">Platform Stats</h3>
+            <p class="text-sm text-gray-500 mb-4">Update these every 3-6 months for accuracy</p>
+
+            {% set stats = profile.platform_stats if profile and profile.platform_stats else {} %}
+
+            <!-- YouTube -->
+            <div class="mb-6 pb-4 border-b border-surface-100">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">YouTube</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Subscribers</label>
+                        <input type="number" name="stats_youtube_subscribers" value="{{ stats.get('youtube', {}).get('subscribers', '') or '' }}"
+                            placeholder="4500"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Avg Views/Video</label>
+                        <input type="number" name="stats_youtube_avg_views" value="{{ stats.get('youtube', {}).get('avg_views', '') or '' }}"
+                            placeholder="2000"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Engagement Rate %</label>
+                        <input type="text" name="stats_youtube_engagement" value="{{ stats.get('youtube', {}).get('engagement_rate', '') or '' }}"
+                            placeholder="8.2"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Twitter -->
+            <div class="mb-6 pb-4 border-b border-surface-100">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Twitter/X</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Followers</label>
+                        <input type="number" name="stats_twitter_subscribers" value="{{ stats.get('twitter', {}).get('subscribers', '') or '' }}"
+                            placeholder="2100"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Avg Impressions</label>
+                        <input type="number" name="stats_twitter_avg_views" value="{{ stats.get('twitter', {}).get('avg_views', '') or '' }}"
+                            placeholder="5000"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Engagement Rate %</label>
+                        <input type="text" name="stats_twitter_engagement" value="{{ stats.get('twitter', {}).get('engagement_rate', '') or '' }}"
+                            placeholder="3.5"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instagram -->
+            <div class="mb-6 pb-4 border-b border-surface-100">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Instagram</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Followers</label>
+                        <input type="number" name="stats_instagram_subscribers" value="{{ stats.get('instagram', {}).get('subscribers', '') or '' }}"
+                            placeholder="800"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Avg Reach</label>
+                        <input type="number" name="stats_instagram_avg_views" value="{{ stats.get('instagram', {}).get('avg_views', '') or '' }}"
+                            placeholder="1500"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Engagement Rate %</label>
+                        <input type="text" name="stats_instagram_engagement" value="{{ stats.get('instagram', {}).get('engagement_rate', '') or '' }}"
+                            placeholder="5.0"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TikTok -->
+            <div class="mb-6 pb-4 border-b border-surface-100">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">TikTok</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Followers</label>
+                        <input type="number" name="stats_tiktok_subscribers" value="{{ stats.get('tiktok', {}).get('subscribers', '') or '' }}"
+                            placeholder="1200"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Avg Views</label>
+                        <input type="number" name="stats_tiktok_avg_views" value="{{ stats.get('tiktok', {}).get('avg_views', '') or '' }}"
+                            placeholder="3000"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Engagement Rate %</label>
+                        <input type="text" name="stats_tiktok_engagement" value="{{ stats.get('tiktok', {}).get('engagement_rate', '') or '' }}"
+                            placeholder="12.0"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Twitch -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Twitch</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Followers</label>
+                        <input type="number" name="stats_twitch_subscribers" value="{{ stats.get('twitch', {}).get('subscribers', '') or '' }}"
+                            placeholder="500"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Avg Viewers</label>
+                        <input type="number" name="stats_twitch_avg_views" value="{{ stats.get('twitch', {}).get('avg_views', '') or '' }}"
+                            placeholder="25"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Engagement Rate %</label>
+                        <input type="text" name="stats_twitch_engagement" value="{{ stats.get('twitch', {}).get('engagement_rate', '') or '' }}"
+                            placeholder="15.0"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audience Demographics -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-2">Audience Demographics</h3>
+            <p class="text-sm text-gray-500 mb-4">All percentages should roughly add up to 100%</p>
+
+            {% set demo = profile.audience_demographics if profile and profile.audience_demographics else {} %}
+            {% set ages = demo.age if demo.age else {} %}
+            {% set gender = demo.gender if demo.gender else {} %}
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Age Distribution -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Age Distribution (%)</h4>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">13-17</label>
+                            <input type="number" name="age_13_17" value="{{ ages['13-17'] or '' }}" min="0" max="100"
+                                placeholder="0"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">18-24</label>
+                            <input type="number" name="age_18_24" value="{{ ages['18-24'] or '' }}" min="0" max="100"
+                                placeholder="35"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">25-34</label>
+                            <input type="number" name="age_25_34" value="{{ ages['25-34'] or '' }}" min="0" max="100"
+                                placeholder="45"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">35-44</label>
+                            <input type="number" name="age_35_44" value="{{ ages['35-44'] or '' }}" min="0" max="100"
+                                placeholder="15"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">45-54</label>
+                            <input type="number" name="age_45_54" value="{{ ages['45-54'] or '' }}" min="0" max="100"
+                                placeholder="4"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="w-16 text-xs text-gray-500">55+</label>
+                            <input type="number" name="age_55plus" value="{{ ages['55+'] or '' }}" min="0" max="100"
+                                placeholder="1"
+                                class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                            <span class="text-xs text-gray-400">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gender & Location -->
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Gender Distribution (%)</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <label class="w-16 text-xs text-gray-500">Male</label>
+                                <input type="number" name="gender_male" value="{{ gender.male or '' }}" min="0" max="100"
+                                    placeholder="72"
+                                    class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                                <span class="text-xs text-gray-400">%</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="w-16 text-xs text-gray-500">Female</label>
+                                <input type="number" name="gender_female" value="{{ gender.female or '' }}" min="0" max="100"
+                                    placeholder="26"
+                                    class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                                <span class="text-xs text-gray-400">%</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="w-16 text-xs text-gray-500">Other</label>
+                                <input type="number" name="gender_other" value="{{ gender.other or '' }}" min="0" max="100"
+                                    placeholder="2"
+                                    class="flex-1 border border-surface-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500">
+                                <span class="text-xs text-gray-400">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Top Locations</h4>
+                        <input type="text" name="top_locations" value="{{ demo.top_locations | join(', ') if demo.top_locations else '' }}"
+                            placeholder="US, UK, Canada, Germany (comma-separated)"
+                            class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">
+                {% if profile %}
+                Last updated: {{ profile.updated_at.strftime('%B %d, %Y') if profile.updated_at else 'Never' }}
+                {% endif %}
+            </span>
+            <button type="submit" class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {{ 'Save Changes' if profile else 'Create Profile' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ profile.display_name }} - Media Kit</title>
+    <style>
+        /* Reset and base styles for PDF */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #1f2937;
+            padding: 40px;
+        }
+
+        /* Colors */
+        .text-primary { color: #0891b2; }
+        .bg-primary { background-color: #0891b2; }
+        .bg-primary-light { background-color: #ecfeff; }
+        .text-gray { color: #6b7280; }
+        .text-gray-dark { color: #374151; }
+        .bg-gray-light { background-color: #f3f4f6; }
+        .border-gray { border-color: #e5e7eb; }
+
+        /* Layout */
+        .text-center { text-align: center; }
+        .mb-1 { margin-bottom: 4px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+        .mt-2 { margin-top: 8px; }
+        .mt-4 { margin-top: 16px; }
+        .p-3 { padding: 12px; }
+        .p-4 { padding: 16px; }
+        .px-2 { padding-left: 8px; padding-right: 8px; }
+        .py-1 { padding-top: 4px; padding-bottom: 4px; }
+
+        /* Typography */
+        h1 { font-size: 24pt; font-weight: bold; }
+        h2 { font-size: 14pt; font-weight: 600; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px; }
+        h3 { font-size: 11pt; font-weight: 600; }
+
+        /* Grid */
+        .grid-2 { display: flex; gap: 16px; }
+        .grid-2 > div { flex: 1; }
+        .grid-4 { display: flex; gap: 12px; flex-wrap: wrap; }
+        .grid-4 > div { flex: 1; min-width: 120px; }
+
+        /* Components */
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            object-fit: cover;
+        }
+
+        .avatar-placeholder {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, #06b6d4, #0e7490);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 36pt;
+            font-weight: bold;
+        }
+
+        .tag {
+            display: inline-block;
+            background-color: #ecfeff;
+            color: #0e7490;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 9pt;
+            margin: 2px;
+        }
+
+        .stat-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #0891b2;
+        }
+
+        .stat-label {
+            font-size: 9pt;
+            color: #6b7280;
+        }
+
+        .rate-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+        }
+
+        .rate-price {
+            font-size: 14pt;
+            font-weight: 600;
+            color: #0891b2;
+        }
+
+        .testimonial {
+            background-color: #f9fafb;
+            border-left: 4px solid #0891b2;
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 12px;
+        }
+
+        .testimonial-quote {
+            font-style: italic;
+            color: #374151;
+        }
+
+        .testimonial-author {
+            font-size: 9pt;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+
+        .sponsor-tag {
+            display: inline-block;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 10pt;
+            margin: 4px;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, #06b6d4, #0e7490);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .cta-box h2 { color: white; border-bottom: none; }
+        .cta-box a { color: white; text-decoration: none; }
+
+        /* Progress bar */
+        .progress-bar {
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            height: 8px;
+            flex: 1;
+        }
+
+        .progress-fill {
+            background-color: #0891b2;
+            border-radius: 4px;
+            height: 8px;
+        }
+
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .progress-label { width: 50px; font-size: 9pt; color: #6b7280; }
+        .progress-value { width: 30px; font-size: 9pt; color: #6b7280; text-align: right; }
+
+        /* Page breaks */
+        @page { margin: 0.5in; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="text-center mb-6">
+        {% if profile.photo_url %}
+        <img src="{{ profile.photo_url }}" alt="{{ profile.display_name }}" class="avatar">
+        {% else %}
+        <div class="avatar-placeholder">{{ profile.display_name[0] | upper }}</div>
+        {% endif %}
+
+        <h1>{{ profile.display_name }}</h1>
+        {% if profile.tagline %}
+        <p class="text-gray mt-2">{{ profile.tagline }}</p>
+        {% endif %}
+
+        <p class="text-gray mt-2" style="font-size: 10pt;">
+            {% if profile.location %}{{ profile.location }}{% endif %}
+            {% if profile.location and profile.contact_email %} • {% endif %}
+            {% if profile.contact_email %}{{ profile.contact_email }}{% endif %}
+        </p>
+    </div>
+
+    <!-- About -->
+    {% if profile.bio %}
+    <div class="mb-6">
+        <h2>About Me</h2>
+        <p>{{ profile.bio }}</p>
+
+        {% if profile.content_niches %}
+        <div class="mt-4">
+            {% for niche in profile.content_niches %}
+            <span class="tag">{{ niche }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Platform Stats -->
+    {% if profile.platform_stats %}
+    <div class="mb-6">
+        <h2>Platforms & Reach</h2>
+        <div class="grid-4">
+            {% for platform, stats in profile.platform_stats.items() %}
+            {% if stats %}
+            <div class="stat-box">
+                <div class="stat-number">
+                    {% if stats.subscribers %}{{ "{:,}".format(stats.subscribers) }}{% elif stats.followers %}{{ "{:,}".format(stats.followers) }}{% else %}-{% endif %}
+                </div>
+                <div class="stat-label">{{ platform | capitalize }}</div>
+                {% if stats.engagement_rate %}
+                <div class="stat-label">{{ stats.engagement_rate }}% eng.</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {% set total = profile.get_total_followers() %}
+        {% set avg_engagement = profile.get_avg_engagement_rate() %}
+        {% if total or avg_engagement %}
+        <div class="grid-2 mt-4" style="justify-content: center; gap: 40px;">
+            {% if total %}
+            <div class="text-center">
+                <div class="stat-number">{{ "{:,}".format(total) }}</div>
+                <div class="stat-label">Total Followers</div>
+            </div>
+            {% endif %}
+            {% if avg_engagement %}
+            <div class="text-center">
+                <div class="stat-number">{{ "%.1f"|format(avg_engagement) }}%</div>
+                <div class="stat-label">Avg Engagement</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Demographics -->
+    {% if profile.audience_demographics %}
+    <div class="mb-6">
+        <h2>Audience Demographics</h2>
+        {% set demo = profile.audience_demographics %}
+
+        <div class="grid-2">
+            {% if demo.age %}
+            <div>
+                <h3 class="mb-2">Age Distribution</h3>
+                {% for age_range, pct in demo.age.items() %}
+                <div class="progress-row">
+                    <span class="progress-label">{{ age_range }}</span>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ pct }}%"></div></div>
+                    <span class="progress-value">{{ pct }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div>
+                {% if demo.gender %}
+                <h3 class="mb-2">Gender</h3>
+                {% for gender, pct in demo.gender.items() %}
+                <div class="progress-row">
+                    <span class="progress-label">{{ gender | capitalize }}</span>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ pct }}%"></div></div>
+                    <span class="progress-value">{{ pct }}%</span>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if demo.top_locations %}
+                <h3 class="mb-2 mt-4">Top Locations</h3>
+                <p class="text-gray">{{ demo.top_locations | join(', ') }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Past Collaborations -->
+    {% if past_sponsors %}
+    <div class="mb-6">
+        <h2>Past Collaborations</h2>
+        <div>
+            {% for company in past_sponsors %}
+            <span class="sponsor-tag">{{ company.name }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Rate Card -->
+    {% if rates %}
+    <div class="mb-6">
+        <h2>Services & Rates</h2>
+        {% for rate in rates %}
+        <div class="rate-row">
+            <div>
+                <strong>{{ rate.service_name }}</strong>
+                {% if rate.description %}
+                <br><span class="text-gray" style="font-size: 9pt;">{{ rate.description }}</span>
+                {% endif %}
+            </div>
+            <div class="rate-price">{{ rate.price_display }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Testimonials -->
+    {% if testimonials %}
+    <div class="mb-6">
+        <h2>What Brands Say</h2>
+        {% for testimonial in testimonials %}
+        <div class="testimonial">
+            <p class="testimonial-quote">"{{ testimonial.quote }}"</p>
+            <p class="testimonial-author">
+                {% if testimonial.contact_name %}— {{ testimonial.contact_name }}{% if testimonial.contact_title %}, {{ testimonial.contact_title }}{% endif %} at {% endif %}
+                <strong>{{ testimonial.display_company_name }}</strong>
+            </p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Contact CTA -->
+    <div class="cta-box">
+        <h2>Let's Work Together</h2>
+        <p style="margin-bottom: 12px; opacity: 0.9;">Interested in a collaboration? Get in touch!</p>
+        {% if profile.contact_email %}
+        <p><strong>{{ profile.contact_email }}</strong></p>
+        {% endif %}
+        {% if profile.website_url %}
+        <p style="font-size: 10pt; opacity: 0.8; margin-top: 8px;">{{ profile.website_url }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>

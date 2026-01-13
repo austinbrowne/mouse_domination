@@ -94,6 +94,7 @@ def create_app(config_class=None):
     from routes.pipeline import pipeline_bp
     from routes.templates import templates_bp
     from routes.episode_guide import episode_guide_bp
+    from routes.media_kit import media_kit_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -106,6 +107,7 @@ def create_app(config_class=None):
     app.register_blueprint(pipeline_bp, url_prefix='/pipeline')
     app.register_blueprint(templates_bp, url_prefix='/templates')
     app.register_blueprint(episode_guide_bp, url_prefix='/guide')
+    app.register_blueprint(media_kit_bp, url_prefix='/media-kit')
 
     # Create database tables
     with app.app_context():

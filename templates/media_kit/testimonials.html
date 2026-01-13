@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Testimonials - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Testimonials</h1>
+        <p class="text-gray-600 mt-1">Add quotes from brands you've worked with</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 mb-6 border-b border-surface-200 pb-2">
+        <a href="{{ url_for('media_kit.edit_profile') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Profile</a>
+        <a href="{{ url_for('media_kit.list_rates') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Rate Card</a>
+        <a href="{{ url_for('media_kit.list_testimonials') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg bg-primary-100 text-primary-700 border-b-2 border-primary-600">Testimonials</a>
+        <a href="{{ url_for('media_kit.preview') }}" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 hover:bg-gray-100">Preview</a>
+    </div>
+
+    <!-- Add New Testimonial Form -->
+    <div class="bg-white rounded-xl border border-surface-200 p-6 mb-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Add Testimonial</h3>
+
+        <form method="post" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Quote *</label>
+                <textarea name="quote" rows="3" required
+                    placeholder="Working with [creator] was a fantastic experience. Their content quality and professionalism exceeded our expectations..."
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Company (from your contacts)</label>
+                    <select name="company_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <option value="">Select a company or enter manually below</option>
+                        {% for company in companies %}
+                        <option value="{{ company.id }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Or Enter Company Name</label>
+                    <input type="text" name="company_name"
+                        placeholder="Acme Corp"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Name</label>
+                    <input type="text" name="contact_name"
+                        placeholder="Jane Smith"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Title</label>
+                    <input type="text" name="contact_title"
+                        placeholder="Marketing Manager"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Add Testimonial
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Current Testimonials List -->
+    <div class="bg-white rounded-xl border border-surface-200 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Your Testimonials</h3>
+
+        {% if testimonials %}
+        <div class="space-y-4">
+            {% for testimonial in testimonials %}
+            <div class="p-4 bg-surface-50 rounded-lg border border-surface-100">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <blockquote class="text-gray-700 italic mb-3">"{{ testimonial.quote }}"</blockquote>
+                        <div class="text-sm">
+                            {% if testimonial.contact_name %}
+                            <span class="font-medium text-gray-900">{{ testimonial.contact_name }}</span>
+                            {% if testimonial.contact_title %}
+                            <span class="text-gray-500">, {{ testimonial.contact_title }}</span>
+                            {% endif %}
+                            <span class="text-gray-500"> at </span>
+                            {% endif %}
+                            <span class="font-medium text-primary-600">{{ testimonial.display_company_name }}</span>
+                        </div>
+                    </div>
+                    <form method="post" action="{{ url_for('media_kit.delete_testimonial', id=testimonial.id) }}" class="ml-4"
+                          onsubmit="return confirm('Delete this testimonial?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="text-red-500 hover:text-red-700 p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <p>No testimonials yet</p>
+            <p class="text-sm mt-1">Add your first brand testimonial above</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tips Section -->
+    <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 class="font-medium text-green-900 mb-2">Tips for Great Testimonials</h4>
+        <ul class="text-sm text-green-800 space-y-1">
+            <li>- Ask brands for feedback after successful campaigns</li>
+            <li>- Include specific results when possible (e.g., "drove 500+ clicks")</li>
+            <li>- Get permission before using quotes in your media kit</li>
+            <li>- Focus on testimonials that highlight professionalism and results</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
