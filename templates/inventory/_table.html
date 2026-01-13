@@ -77,13 +77,13 @@
                             </td>
                             <td class="px-4 py-3 hidden lg:table-cell">
                                 <div class="flex gap-2">
-                                    {% if item.short_url %}
+                                    {% if item.short_url and item.short_url.strip() %}
                                         <a href="{{ item.short_url }}" target="_blank" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Short</a>
                                     {% endif %}
-                                    {% if item.video_url %}
+                                    {% if item.video_url and item.video_url.strip() %}
                                         <a href="{{ item.video_url }}" target="_blank" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Video</a>
                                     {% endif %}
-                                    {% if not item.short_url and not item.video_url %}
+                                    {% if (not item.short_url or not item.short_url.strip()) and (not item.video_url or not item.video_url.strip()) %}
                                         <span class="text-gray-400 text-sm">-</span>
                                     {% endif %}
                                 </div>
