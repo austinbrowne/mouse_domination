@@ -434,6 +434,79 @@ class TestInventoryRoutes:
         assert response.status_code == 200
         assert b'Sold Item' in response.data
 
+    def test_ajax_search_returns_partial(self, auth_client, app, test_user):
+        """Test AJAX search returns partial HTML without base template."""
+        with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
+            db.session.add(Inventory(product_name='AJAX Test Mouse', user_id=user.id))
+            db.session.commit()
+
+        response = auth_client.get('/inventory/?ajax=1')
+        assert response.status_code == 200
+        # Should contain table content
+        assert b'AJAX Test Mouse' in response.data
+        # Should NOT contain full page elements (no extends base.html)
+        assert b'<!DOCTYPE html>' not in response.data
+        assert b'<html' not in response.data
+        # Should contain stats div for JS updates
+        assert b'id="inventory-stats"' in response.data
+
+    def test_ajax_search_with_query(self, auth_client, app, test_user):
+        """Test AJAX search filters results correctly."""
+        with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
+            db.session.add(Inventory(product_name='Pulsar X2', user_id=user.id))
+            db.session.add(Inventory(product_name='Logitech GPX', user_id=user.id))
+            db.session.commit()
+
+        response = auth_client.get('/inventory/?search=Pulsar&ajax=1')
+        assert response.status_code == 200
+        assert b'Pulsar X2' in response.data
+        assert b'Logitech GPX' not in response.data
+
+    def test_ajax_search_with_filters(self, auth_client, app, test_user):
+        """Test AJAX search works with multiple filters."""
+        with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
+            db.session.add(Inventory(
+                product_name='Review Mouse',
+                source_type='review_unit',
+                status='reviewing',
+                user_id=user.id
+            ))
+            db.session.add(Inventory(
+                product_name='Purchased Mouse',
+                source_type='personal_purchase',
+                status='keeping',
+                user_id=user.id
+            ))
+            db.session.commit()
+
+        response = auth_client.get('/inventory/?source_type=review_unit&status=reviewing&ajax=1')
+        assert response.status_code == 200
+        assert b'Review Mouse' in response.data
+        assert b'Purchased Mouse' not in response.data
+
+    def test_ajax_stats_data_attributes(self, auth_client, app, test_user):
+        """Test AJAX response includes correct stats in data attributes."""
+        with app.app_context():
+            user = User.query.filter_by(email='test@example.com').first()
+            # Add items with profit/loss
+            item = Inventory(
+                product_name='Sold Mouse',
+                sold=True,
+                sale_price=100.0,
+                cost=50.0,
+                user_id=user.id
+            )
+            db.session.add(item)
+            db.session.commit()
+
+        response = auth_client.get('/inventory/?ajax=1')
+        assert response.status_code == 200
+        assert b'data-count="1"' in response.data
+        assert b'data-profit-loss=' in response.data
+
 
 class TestAffiliateRoutes:
     """Tests for affiliate revenue routes."""

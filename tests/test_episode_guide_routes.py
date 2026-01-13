@@ -87,6 +87,80 @@ class TestEpisodeGuideList:
         assert response.status_code == 200
         assert b'Episode With Links' in response.data
 
+    def test_ajax_search_returns_partial(self, auth_client, app):
+        """Test AJAX search returns partial HTML without base template."""
+        with app.app_context():
+            guide = EpisodeGuide(title='AJAX Test Guide')
+            db.session.add(guide)
+            db.session.commit()
+
+        response = auth_client.get('/guide/?ajax=1')
+        assert response.status_code == 200
+        # Should contain guide content
+        assert b'AJAX Test Guide' in response.data
+        # Should NOT contain full page elements (no extends base.html)
+        assert b'<!DOCTYPE html>' not in response.data
+        assert b'<html' not in response.data
+        # Should contain stats div for JS updates
+        assert b'id="episode-stats"' in response.data
+
+    def test_ajax_search_with_query(self, auth_client, app):
+        """Test AJAX search filters results correctly."""
+        with app.app_context():
+            db.session.add(EpisodeGuide(title='Mouse Roundup Episode'))
+            db.session.add(EpisodeGuide(title='Keyboard Review Episode'))
+            db.session.commit()
+
+        response = auth_client.get('/guide/?search=Mouse&ajax=1')
+        assert response.status_code == 200
+        assert b'Mouse Roundup Episode' in response.data
+        assert b'Keyboard Review Episode' not in response.data
+
+    def test_ajax_search_with_status_filter(self, auth_client, app):
+        """Test AJAX search works with status filter."""
+        with app.app_context():
+            db.session.add(EpisodeGuide(title='Draft Episode', status='draft'))
+            db.session.add(EpisodeGuide(title='Completed Episode', status='completed'))
+            db.session.commit()
+
+        response = auth_client.get('/guide/?status=draft&ajax=1')
+        assert response.status_code == 200
+        assert b'Draft Episode' in response.data
+        assert b'Completed Episode' not in response.data
+
+    def test_ajax_stats_data_attributes(self, auth_client, app):
+        """Test AJAX response includes correct stats in data attributes."""
+        with app.app_context():
+            db.session.add(EpisodeGuide(title='Draft 1', status='draft'))
+            db.session.add(EpisodeGuide(title='Draft 2', status='draft'))
+            db.session.add(EpisodeGuide(title='Completed 1', status='completed'))
+            db.session.commit()
+
+        response = auth_client.get('/guide/?ajax=1')
+        assert response.status_code == 200
+        assert b'data-total="3"' in response.data
+        assert b'data-drafts="2"' in response.data
+        assert b'data-completed="1"' in response.data
+
+    def test_ajax_search_finds_items(self, auth_client, app):
+        """Test AJAX search finds guides by item title."""
+        with app.app_context():
+            guide = EpisodeGuide(title='Episode About Mice')
+            db.session.add(guide)
+            db.session.commit()
+
+            item = EpisodeGuideItem(
+                guide_id=guide.id,
+                section='introduction',
+                title='Pulsar X2 Mini Review'
+            )
+            db.session.add(item)
+            db.session.commit()
+
+        response = auth_client.get('/guide/?search=Pulsar&ajax=1')
+        assert response.status_code == 200
+        assert b'Episode About Mice' in response.data
+
 
 class TestEpisodeGuideCreate:
     """Tests for episode guide creation."""
