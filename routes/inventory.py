@@ -107,6 +107,7 @@ def new_item():
                 on_amazon=form.boolean('on_amazon'),
                 date_acquired=form.date('date_acquired'),
                 deadline=form.date('deadline'),
+                return_by_date=form.date('return_by_date'),
                 status=form.choice('status', valid_statuses, default='in_queue'),
                 condition=form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new'),
                 notes=form.optional('notes'),
@@ -182,6 +183,7 @@ def edit_item(id):
             item.on_amazon = form.boolean('on_amazon')
             item.date_acquired = form.date('date_acquired')
             item.deadline = form.date('deadline')
+            item.return_by_date = form.date('return_by_date')
             item.status = form.choice('status', valid_statuses, default='in_queue')
             item.condition = form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new')
             item.notes = form.optional('notes')

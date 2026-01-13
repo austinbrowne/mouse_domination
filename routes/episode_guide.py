@@ -172,6 +172,7 @@ def new_guide():
             guide = EpisodeGuide(
                 title=form.required('title'),
                 episode_number=episode_number,
+                scheduled_date=form.date('scheduled_date'),
                 notes=form.optional('notes'),
                 previous_poll=previous_poll,
                 previous_poll_link=previous_poll_link,
@@ -275,6 +276,7 @@ def edit_guide(id):
 
             guide.title = form.required('title')
             guide.episode_number = form.integer('episode_number')
+            guide.scheduled_date = form.date('scheduled_date')
             guide.notes = form.optional('notes')
 
             db.session.commit()

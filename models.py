@@ -208,6 +208,7 @@ class Inventory(db.Model):
     cost = db.Column(db.Float, default=0.0)  # $0 for review units
     on_amazon = db.Column(db.Boolean, default=False)
     deadline = db.Column(db.Date, nullable=True, index=True)  # Index for deadline queries
+    return_by_date = db.Column(db.Date, nullable=True, index=True)  # When loaner must be returned
     status = db.Column(db.String(20), default='in_queue', index=True)  # Index for filtering
     condition = db.Column(db.String(20), default='new')  # new, open_box, used
     notes = db.Column(db.Text, nullable=True)
@@ -260,6 +261,7 @@ class Inventory(db.Model):
             'cost': self.cost,
             'on_amazon': self.on_amazon,
             'deadline': self.deadline.isoformat() if self.deadline else None,
+            'return_by_date': self.return_by_date.isoformat() if self.return_by_date else None,
             'status': self.status,
             'condition': self.condition,
             'notes': self.notes,
@@ -387,6 +389,7 @@ class SalesPipeline(db.Model):
     rate_agreed = db.Column(db.Float, nullable=True)
     deliverables = db.Column(db.Text, nullable=True)
     deadline = db.Column(db.Date, nullable=True, index=True)
+    deliverable_date = db.Column(db.Date, nullable=True, index=True)  # When deliverables are due
     payment_status = db.Column(db.String(20), default='pending', index=True)
     # Payment: pending, invoiced, paid
     payment_date = db.Column(db.Date, nullable=True)
@@ -413,6 +416,7 @@ class SalesPipeline(db.Model):
             'rate_agreed': self.rate_agreed,
             'deliverables': self.deliverables,
             'deadline': self.deadline.isoformat() if self.deadline else None,
+            'deliverable_date': self.deliverable_date.isoformat() if self.deliverable_date else None,
             'payment_status': self.payment_status,
             'payment_date': self.payment_date.isoformat() if self.payment_date else None,
             'notes': self.notes,
@@ -538,6 +542,7 @@ class EpisodeGuide(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False, index=True)
     episode_number = db.Column(db.Integer, nullable=True, index=True)
+    scheduled_date = db.Column(db.Date, nullable=True, index=True)  # Episode recording/publish date
 
     # Template reference (optional - guides can be created without template)
     template_id = db.Column(db.Integer, db.ForeignKey('episode_guide_templates.id'), nullable=True, index=True)
@@ -619,6 +624,7 @@ class EpisodeGuide(db.Model):
             'id': self.id,
             'title': self.title,
             'episode_number': self.episode_number,
+            'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'template_id': self.template_id,
             'template_name': self.template.name if self.template else None,
             'status': self.status,

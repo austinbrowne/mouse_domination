@@ -111,6 +111,7 @@ def new_deal():
                 rate_agreed=form.decimal('rate_agreed'),
                 deliverables=form.optional('deliverables'),
                 deadline=form.date('deadline'),
+                deliverable_date=form.date('deliverable_date'),
                 payment_status=form.choice('payment_status', PAYMENT_STATUS_CHOICES, default='pending'),
                 payment_date=form.date('payment_date'),
                 notes=form.optional('notes'),
@@ -174,6 +175,7 @@ def edit_deal(id):
             deal.rate_agreed = form.decimal('rate_agreed')
             deal.deliverables = form.optional('deliverables')
             deal.deadline = form.date('deadline')
+            deal.deliverable_date = form.date('deliverable_date')
             deal.payment_status = form.choice('payment_status', PAYMENT_STATUS_CHOICES, default='pending')
             deal.payment_date = form.date('payment_date')
             deal.notes = form.optional('notes')

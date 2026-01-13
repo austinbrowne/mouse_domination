@@ -226,7 +226,7 @@ Extend existing Templates module:
 
 ## 5. Implementation Plan
 
-### Phase 4: Media Kit Generator — 6-8 hours
+### Phase 4: Media Kit Generator — ~~6-8 hours~~ DONE
 
 **Deliverables:**
 - CreatorProfile model and form
@@ -235,16 +235,16 @@ Extend existing Templates module:
 - Public shareable link with token
 
 **Acceptance Criteria:**
-- [ ] User can enter channel name, bio, social links, rate card
-- [ ] Preview shows aggregated stats (subscriber count manual entry initially)
-- [ ] Past sponsors pulled from Companies with `is_sponsor=True`
-- [ ] PDF downloads with professional formatting
-- [ ] Public link works without authentication
-- [ ] Tests cover profile CRUD and PDF generation
+- [x] User can enter channel name, bio, social links, rate card
+- [x] Preview shows aggregated stats (subscriber count manual entry initially)
+- [x] Past sponsors pulled from Companies with `is_sponsor=True`
+- [x] PDF downloads with professional formatting
+- [x] Public link works without authentication
+- [x] Tests cover profile CRUD and PDF generation
 
 ---
 
-### Phase 5: Calendar View — 4-6 hours
+### Phase 5: Calendar View — ~~4-6 hours~~ DONE
 
 **Deliverables:**
 - Calendar page with month/week view
@@ -253,12 +253,12 @@ Extend existing Templates module:
 - Color coding by event type
 
 **Acceptance Criteria:**
-- [ ] Calendar displays events from all sources
-- [ ] Events link to their source records
-- [ ] Month navigation works
-- [ ] New date fields added to relevant models
-- [ ] Migration script for new columns
-- [ ] Tests cover event aggregation API
+- [x] Calendar displays events from all sources
+- [x] Events link to their source records
+- [x] Month navigation works
+- [x] New date fields added to relevant models
+- [x] Migration script for new columns
+- [x] Tests cover event aggregation API
 
 ---
 
@@ -404,9 +404,9 @@ Extend existing Templates module:
 | ~~1~~ | ~~Config-driven branding~~ | ~~Done~~ | - |
 | ~~2~~ | ~~Custom Options~~ | ~~Done~~ | - |
 | ~~3~~ | ~~Episode Guide Templates~~ | ~~Done~~ | - |
-| **4** | **Media Kit Generator** | 6-8 hrs | None |
-| **5** | **Calendar View** | 4-6 hrs | None |
+| ~~4~~ | ~~Media Kit Generator~~ | ~~Done~~ | - |
+| ~~5~~ | ~~Calendar View~~ | ~~Done~~ | - |
 | **6** | **Financial Tracking** | 4-5 hrs | None |
 | **7** | **Contracts & Email** | 4-5 hrs | None |
 
-Phases 4-7 are independent and can be implemented in any order based on priority.
+Phases 6-7 are independent and can be implemented in any order based on priority.
