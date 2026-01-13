@@ -507,6 +507,90 @@ class TestInventoryRoutes:
         assert b'data-count="1"' in response.data
         assert b'data-profit-loss=' in response.data
 
+    def test_quick_add_company_success(self, auth_client, app):
+        """Test quick-adding a new company from inventory form."""
+        response = auth_client.post('/inventory/quick-add-company', data={
+            'name': 'New Quick Company',
+            'category': 'mice',
+        })
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['company']['name'] == 'New Quick Company'
+        assert 'id' in data['company']
+
+        with app.app_context():
+            company = Company.query.filter_by(name='New Quick Company').first()
+            assert company is not None
+            assert company.category == 'mice'
+
+    def test_quick_add_company_duplicate_fails(self, auth_client, app):
+        """Test quick-adding a duplicate company returns error."""
+        with app.app_context():
+            db.session.add(Company(name='Existing Company'))
+            db.session.commit()
+
+        response = auth_client.post('/inventory/quick-add-company', data={
+            'name': 'Existing Company',
+            'category': 'mice',
+        })
+        assert response.status_code == 409
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'already exists' in data['error']
+
+    def test_quick_add_company_empty_name_fails(self, auth_client):
+        """Test quick-adding a company with empty name returns error."""
+        response = auth_client.post('/inventory/quick-add-company', data={
+            'name': '',
+            'category': 'mice',
+        })
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'required' in data['error'].lower()
+
+    def test_quick_add_category_success(self, auth_client, app, test_user):
+        """Test quick-adding a new inventory category."""
+        response = auth_client.post('/inventory/quick-add-category', data={
+            'label': 'Webcam',
+        })
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['category']['label'] == 'Webcam'
+        assert data['category']['value'] == 'webcam'
+
+        with app.app_context():
+            from models import CustomOption
+            option = CustomOption.query.filter_by(
+                option_type='inventory_category',
+                value='webcam'
+            ).first()
+            assert option is not None
+            assert option.label == 'Webcam'
+
+    def test_quick_add_category_duplicate_fails(self, auth_client, app, test_user):
+        """Test quick-adding a duplicate category returns error."""
+        # 'mouse' is a built-in category
+        response = auth_client.post('/inventory/quick-add-category', data={
+            'label': 'Mouse',
+        })
+        assert response.status_code == 409
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'already exists' in data['error']
+
+    def test_quick_add_category_empty_label_fails(self, auth_client):
+        """Test quick-adding a category with empty label returns error."""
+        response = auth_client.post('/inventory/quick-add-category', data={
+            'label': '',
+        })
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'required' in data['error'].lower()
+
 
 class TestAffiliateRoutes:
     """Tests for affiliate revenue routes."""

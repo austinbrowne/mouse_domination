@@ -3,7 +3,7 @@
 {% block title %}{{ 'Edit' if item else 'New' }} Item - {{ APP_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div class="max-w-3xl mx-auto" x-data="inventoryForm()">
     <!-- Header -->
     <div class="mb-6">
         <a href="{{ url_for('inventory.list_inventory') }}" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 mb-2">
@@ -29,22 +29,32 @@
                 <div class="grid md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Company</label>
-                        <select name="company_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                            <option value="">None</option>
-                            {% for company in companies %}
-                                <option value="{{ company.id }}" {% if item and item.company_id == company.id %}selected{% endif %}>
-                                    {{ company.name }}
-                                </option>
-                            {% endfor %}
-                        </select>
+                        <div class="flex gap-2">
+                            <select name="company_id" x-ref="companySelect" class="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                <option value="">None</option>
+                                {% for company in companies %}
+                                    <option value="{{ company.id }}" {% if item and item.company_id == company.id %}selected{% endif %}>
+                                        {{ company.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" @click="showCompanyModal = true" class="inline-flex items-center px-2.5 py-2 border border-surface-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Add new company">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-                        <select name="category" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                            {% for value, label in category_choices %}
-                            <option value="{{ value }}" {% if item and item.category == value %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="flex gap-2">
+                            <select name="category" x-ref="categorySelect" class="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                {% for value, label in category_choices %}
+                                <option value="{{ value }}" {% if item and item.category == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" @click="showCategoryModal = true" class="inline-flex items-center px-2.5 py-2 border border-surface-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Add new category">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Source Type</label>
@@ -223,5 +233,181 @@
             </button>
         </div>
     </form>
+
+    <!-- Add Company Modal -->
+    <div x-show="showCompanyModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showCompanyModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showCompanyModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div x-show="showCompanyModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form @submit.prevent="addCompany()">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Add New Company</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Company Name *</label>
+                                <input type="text" x-model="newCompany.name" required
+                                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    placeholder="e.g., Pulsar">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+                                <select x-model="newCompany.category" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                    {% for value, label in company_category_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div x-show="companyError" x-text="companyError" class="mt-3 text-sm text-red-600"></div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                        <button type="submit" :disabled="companyLoading"
+                            class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:w-auto sm:text-sm disabled:opacity-50">
+                            <span x-show="!companyLoading">Add Company</span>
+                            <span x-show="companyLoading">Adding...</span>
+                        </button>
+                        <button type="button" @click="showCompanyModal = false; companyError = ''"
+                            class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:w-auto sm:text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Category Modal -->
+    <div x-show="showCategoryModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showCategoryModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showCategoryModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div x-show="showCategoryModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form @submit.prevent="addCategory()">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Add New Category</h3>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Category Name *</label>
+                            <input type="text" x-model="newCategoryLabel" required
+                                class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                placeholder="e.g., Webcam">
+                        </div>
+                        <div x-show="categoryError" x-text="categoryError" class="mt-3 text-sm text-red-600"></div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                        <button type="submit" :disabled="categoryLoading"
+                            class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:w-auto sm:text-sm disabled:opacity-50">
+                            <span x-show="!categoryLoading">Add Category</span>
+                            <span x-show="categoryLoading">Adding...</span>
+                        </button>
+                        <button type="button" @click="showCategoryModal = false; categoryError = ''"
+                            class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:w-auto sm:text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function inventoryForm() {
+    return {
+        showCompanyModal: false,
+        showCategoryModal: false,
+        newCompany: { name: '', category: 'mice' },
+        newCategoryLabel: '',
+        companyLoading: false,
+        categoryLoading: false,
+        companyError: '',
+        categoryError: '',
+
+        async addCompany() {
+            this.companyLoading = true;
+            this.companyError = '';
+
+            const formData = new FormData();
+            formData.append('name', this.newCompany.name);
+            formData.append('category', this.newCompany.category);
+            formData.append('csrf_token', '{{ csrf_token() }}');
+
+            try {
+                const response = await fetch('{{ url_for("inventory.quick_add_company") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Add new option to select and select it
+                    const select = this.$refs.companySelect;
+                    const option = document.createElement('option');
+                    option.value = data.company.id;
+                    option.text = data.company.name;
+                    option.selected = true;
+                    select.add(option);
+
+                    // Reset and close modal
+                    this.newCompany = { name: '', category: 'mice' };
+                    this.showCompanyModal = false;
+                } else {
+                    this.companyError = data.error || 'Failed to add company';
+                }
+            } catch (error) {
+                this.companyError = 'Network error. Please try again.';
+            }
+
+            this.companyLoading = false;
+        },
+
+        async addCategory() {
+            this.categoryLoading = true;
+            this.categoryError = '';
+
+            const formData = new FormData();
+            formData.append('label', this.newCategoryLabel);
+            formData.append('csrf_token', '{{ csrf_token() }}');
+
+            try {
+                const response = await fetch('{{ url_for("inventory.quick_add_category") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Add new option to select and select it
+                    const select = this.$refs.categorySelect;
+                    const option = document.createElement('option');
+                    option.value = data.category.value;
+                    option.text = data.category.label;
+                    option.selected = true;
+                    select.add(option);
+
+                    // Reset and close modal
+                    this.newCategoryLabel = '';
+                    this.showCategoryModal = false;
+                } else {
+                    this.categoryError = data.error || 'Failed to add category';
+                }
+            } catch (error) {
+                this.categoryError = 'Network error. Please try again.';
+            }
+
+            this.categoryLoading = false;
+        }
+    };
+}
+</script>
 {% endblock %}

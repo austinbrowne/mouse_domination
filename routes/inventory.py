@@ -1,8 +1,8 @@
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import SQLAlchemyError
-from models import Inventory, Company
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from models import Inventory, Company, CustomOption
 from app import db
 from constants import (
     INVENTORY_SOURCE_TYPE_CHOICES, INVENTORY_CONDITION_CHOICES,
@@ -128,19 +128,25 @@ def new_item():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
+            company_category_choices = get_choices_for_type('company_category')
             return render_template('inventory/form.html', item=None, companies=companies,
-                                   category_choices=category_choices, status_choices=status_choices)
+                                   category_choices=category_choices, status_choices=status_choices,
+                                   company_category_choices=company_category_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
+            company_category_choices = get_choices_for_type('company_category')
             return render_template('inventory/form.html', item=None, companies=companies,
-                                   category_choices=category_choices, status_choices=status_choices)
+                                   category_choices=category_choices, status_choices=status_choices,
+                                   company_category_choices=company_category_choices)
 
     companies = get_companies_for_dropdown()
+    company_category_choices = get_choices_for_type('company_category')
     return render_template('inventory/form.html', item=None, companies=companies,
-                           category_choices=category_choices, status_choices=status_choices)
+                           category_choices=category_choices, status_choices=status_choices,
+                           company_category_choices=company_category_choices)
 
 
 @inventory_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -195,19 +201,25 @@ def edit_item(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
+            company_category_choices = get_choices_for_type('company_category')
             return render_template('inventory/form.html', item=item, companies=companies,
-                                   category_choices=category_choices, status_choices=status_choices)
+                                   category_choices=category_choices, status_choices=status_choices,
+                                   company_category_choices=company_category_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
+            company_category_choices = get_choices_for_type('company_category')
             return render_template('inventory/form.html', item=item, companies=companies,
-                                   category_choices=category_choices, status_choices=status_choices)
+                                   category_choices=category_choices, status_choices=status_choices,
+                                   company_category_choices=company_category_choices)
 
     companies = get_companies_for_dropdown()
+    company_category_choices = get_choices_for_type('company_category')
     return render_template('inventory/form.html', item=item, companies=companies,
-                           category_choices=category_choices, status_choices=status_choices)
+                           category_choices=category_choices, status_choices=status_choices,
+                           company_category_choices=company_category_choices)
 
 
 @inventory_bp.route('/<int:id>/delete', methods=['POST'])
@@ -282,3 +294,108 @@ def update_field(id):
         db.session.rollback()
         log_exception(current_app.logger, 'Database operation', e)
         return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@inventory_bp.route('/quick-add-company', methods=['POST'])
+@login_required
+def quick_add_company():
+    """AJAX endpoint to quickly add a new company from the inventory form."""
+    try:
+        name = request.form.get('name', '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'Company name is required'}), 400
+
+        # Check for duplicate
+        existing = Company.query.filter_by(name=name).first()
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Company "{name}" already exists',
+                'existing_id': existing.id
+            }), 409
+
+        # Get category from form, default to 'mice'
+        category = request.form.get('category', 'mice')
+        valid_categories = get_valid_values_for_type('company_category')
+        if category not in valid_categories:
+            category = 'mice'
+
+        company = Company(
+            name=name,
+            category=category,
+            relationship_status='no_contact',
+            affiliate_status='no',
+            priority='low',
+        )
+
+        db.session.add(company)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'company': {
+                'id': company.id,
+                'name': company.name,
+                'category': company.category
+            }
+        })
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Company name already exists'}), 409
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error occurred'}), 500
+
+
+@inventory_bp.route('/quick-add-category', methods=['POST'])
+@login_required
+def quick_add_category():
+    """AJAX endpoint to quickly add a new inventory category."""
+    try:
+        label = request.form.get('label', '').strip()
+        if not label:
+            return jsonify({'success': False, 'error': 'Category name is required'}), 400
+
+        # Generate value from label (lowercase, underscores)
+        value = label.lower().replace(' ', '_').replace('-', '_')
+        # Remove any non-alphanumeric characters except underscores
+        value = ''.join(c for c in value if c.isalnum() or c == '_')
+
+        if not value:
+            return jsonify({'success': False, 'error': 'Invalid category name'}), 400
+
+        # Check if already exists (built-in or custom)
+        existing_values = get_valid_values_for_type('inventory_category')
+        if value in existing_values:
+            return jsonify({
+                'success': False,
+                'error': f'Category "{label}" already exists'
+            }), 409
+
+        custom_option = CustomOption(
+            option_type='inventory_category',
+            value=value,
+            label=label,
+            created_by=current_user.id
+        )
+
+        db.session.add(custom_option)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'category': {
+                'value': custom_option.value,
+                'label': custom_option.label
+            }
+        })
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Category already exists'}), 409
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error occurred'}), 500
