@@ -129,6 +129,12 @@ def list_guides():
 @login_required
 def new_guide():
     """Create a new episode guide."""
+    # Get available templates for the form
+    templates = EpisodeGuideTemplate.query.order_by(
+        EpisodeGuideTemplate.is_default.desc(),
+        EpisodeGuideTemplate.name
+    ).all()
+
     if request.method == 'POST':
         try:
             form = FormData(request.form)
@@ -146,6 +152,12 @@ def new_guide():
                     previous_poll = prev_guide.new_poll
                     previous_poll_link = prev_guide.new_poll_link
 
+            # Check if a template was selected
+            template_id = form.integer('template_id')
+            template = None
+            if template_id:
+                template = EpisodeGuideTemplate.query.get(template_id)
+
             guide = EpisodeGuide(
                 title=form.required('title'),
                 episode_number=episode_number,
@@ -153,7 +165,19 @@ def new_guide():
                 previous_poll=previous_poll,
                 previous_poll_link=previous_poll_link,
                 status='draft',
+                template_id=template_id if template else None,
             )
+
+            # Apply template defaults if selected
+            if template:
+                guide.intro_static_content = template.intro_static_content
+                guide.outro_static_content = template.outro_static_content
+                guide.custom_sections = template.default_sections
+                # Apply default poll questions
+                if template.default_poll_1:
+                    guide.new_poll = template.default_poll_1
+                if template.default_poll_2:
+                    guide.new_poll_2 = template.default_poll_2
 
             db.session.add(guide)
             db.session.commit()
@@ -162,14 +186,14 @@ def new_guide():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            return render_template('episode_guide/form.html', guide=None)
+            return render_template('episode_guide/form.html', guide=None, templates=templates)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            return render_template('episode_guide/form.html', guide=None)
+            return render_template('episode_guide/form.html', guide=None, templates=templates)
 
-    return render_template('episode_guide/form.html', guide=None)
+    return render_template('episode_guide/form.html', guide=None, templates=templates)
 
 
 @episode_guide_bp.route('/new-from/<int:source_id>', methods=['POST'])
