@@ -3,11 +3,11 @@ from flask_login import login_required
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Contact, Company
-from app import db
+from extensions import db
 from constants import CONTACT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
-from utils.routes import FormData
+from utils.routes import FormData, make_delete_view
 from utils.logging import log_exception
 from utils.queries import get_companies_for_dropdown
 
@@ -52,13 +52,26 @@ def list_contacts():
     )
 
 
+def _get_form_context(contact=None):
+    """Get common context for contact forms."""
+    return {
+        'contact': contact,
+        'companies': get_companies_for_dropdown(),
+        'role_choices': get_choices_for_type('contact_role'),
+    }
+
+
+def _get_valid_roles():
+    """Get valid role values for form validation."""
+    return [v for v, _ in get_choices_for_type('contact_role')]
+
+
 @contacts_bp.route('/new', methods=['GET', 'POST'])
 @login_required
 def new_contact():
     """Create a new contact."""
-    # Get dynamic choices for form
-    role_choices = get_choices_for_type('contact_role')
-    valid_roles = [v for v, _ in role_choices]
+    context = _get_form_context()
+    valid_roles = _get_valid_roles()
 
     if request.method == 'POST':
         try:
@@ -85,20 +98,12 @@ def new_contact():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = get_companies_for_dropdown()
-            return render_template('contacts/form.html', contact=None, companies=companies,
-                                   role_choices=role_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Create contact', e)
             flash('Database error occurred. Please try again.', 'error')
-            companies = get_companies_for_dropdown()
-            return render_template('contacts/form.html', contact=None, companies=companies,
-                                   role_choices=role_choices)
 
-    companies = get_companies_for_dropdown()
-    return render_template('contacts/form.html', contact=None, companies=companies,
-                           role_choices=role_choices)
+    return render_template('contacts/form.html', **context)
 
 
 @contacts_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -106,10 +111,8 @@ def new_contact():
 def edit_contact(id):
     """Edit an existing contact."""
     contact = Contact.query.options(joinedload(Contact.company)).get_or_404(id)
-
-    # Get dynamic choices for form
-    role_choices = get_choices_for_type('contact_role')
-    valid_roles = [v for v, _ in role_choices]
+    context = _get_form_context(contact)
+    valid_roles = _get_valid_roles()
 
     if request.method == 'POST':
         try:
@@ -133,34 +136,18 @@ def edit_contact(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            companies = get_companies_for_dropdown()
-            return render_template('contacts/form.html', contact=contact, companies=companies,
-                                   role_choices=role_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Update contact', e, contact_id=id)
             flash('Database error occurred. Please try again.', 'error')
-            companies = get_companies_for_dropdown()
-            return render_template('contacts/form.html', contact=contact, companies=companies,
-                                   role_choices=role_choices)
 
-    companies = get_companies_for_dropdown()
-    return render_template('contacts/form.html', contact=contact, companies=companies,
-                           role_choices=role_choices)
+    return render_template('contacts/form.html', **context)
 
 
-@contacts_bp.route('/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_contact(id):
-    """Delete a contact."""
-    try:
-        contact = Contact.query.get_or_404(id)
-        name = contact.name
-        db.session.delete(contact)
-        db.session.commit()
-        flash(f'Contact "{name}" deleted.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Delete contact', e, contact_id=id)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('contacts.list_contacts'))
+# Use generic delete view factory
+contacts_bp.add_url_rule(
+    '/<int:id>/delete',
+    'delete_contact',
+    make_delete_view(Contact, 'name', 'contacts.list_contacts'),
+    methods=['POST']
+)

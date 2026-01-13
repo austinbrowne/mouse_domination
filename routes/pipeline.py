@@ -8,7 +8,7 @@ from extensions import db
 from constants import DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
-from utils.routes import FormData
+from utils.routes import FormData, make_delete_view, quick_action
 from utils.logging import log_exception
 from utils.queries import get_companies_for_dropdown, get_contacts_for_dropdown
 
@@ -205,50 +205,27 @@ def edit_deal(id):
                            deal_type_choices=deal_type_choices)
 
 
-@pipeline_bp.route('/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_deal(id):
-    """Delete a deal."""
-    try:
-        deal = SalesPipeline.query.get_or_404(id)
-        db.session.delete(deal)
-        db.session.commit()
-        flash('Deal deleted.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('pipeline.list_deals'))
+# Use generic delete view factory
+pipeline_bp.add_url_rule(
+    '/<int:id>/delete',
+    'delete_deal',
+    make_delete_view(SalesPipeline, 'description', 'pipeline.list_deals', 'Deal'),
+    methods=['POST']
+)
 
 
 @pipeline_bp.route('/<int:id>/mark-complete', methods=['POST'])
-@login_required
-def mark_complete(id):
+@quick_action(SalesPipeline, 'pipeline.list_deals')
+def mark_complete(deal):
     """Quick action to mark a deal as completed."""
-    try:
-        deal = SalesPipeline.query.get_or_404(id)
-        deal.status = 'completed'
-        db.session.commit()
-        flash('Deal marked as completed.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('pipeline.list_deals'))
+    deal.status = 'completed'
+    return 'Deal marked as completed.'
 
 
 @pipeline_bp.route('/<int:id>/mark-paid', methods=['POST'])
-@login_required
-def mark_paid(id):
+@quick_action(SalesPipeline, 'pipeline.list_deals')
+def mark_paid(deal):
     """Quick action to mark a deal as paid."""
-    try:
-        deal = SalesPipeline.query.get_or_404(id)
-        deal.payment_status = 'paid'
-        deal.payment_date = db.func.current_date()
-        db.session.commit()
-        flash('Deal marked as paid.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('pipeline.list_deals'))
+    deal.payment_status = 'paid'
+    deal.payment_date = db.func.current_date()
+    return 'Deal marked as paid.'

@@ -8,7 +8,7 @@ from app import db
 from constants import COLLAB_STATUS_CHOICES, PLATFORM_CHOICES, DEFAULT_PAGE_SIZE
 from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
-from utils.routes import FormData
+from utils.routes import FormData, make_delete_view, quick_action
 from utils.logging import log_exception
 from utils.queries import get_contacts_for_dropdown
 
@@ -201,51 +201,28 @@ def edit_collab(id):
                            collab_type_choices=collab_type_choices)
 
 
-@collabs_bp.route('/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_collab(id):
-    """Delete a collaboration."""
-    try:
-        collab = Collaboration.query.get_or_404(id)
-        db.session.delete(collab)
-        db.session.commit()
-        flash('Collaboration deleted.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('collabs.list_collabs'))
+# Use generic delete view factory
+collabs_bp.add_url_rule(
+    '/<int:id>/delete',
+    'delete_collab',
+    make_delete_view(Collaboration, 'contact', 'collabs.list_collabs', 'Collaboration'),
+    methods=['POST']
+)
 
 
 @collabs_bp.route('/<int:id>/complete', methods=['POST'])
-@login_required
-def complete_collab(id):
+@quick_action(Collaboration, 'collabs.list_collabs')
+def complete_collab(collab):
     """Quick action to mark a collaboration as completed."""
-    try:
-        collab = Collaboration.query.get_or_404(id)
-        collab.status = 'completed'
-        collab.completed_date = db.func.current_date()
-        db.session.commit()
-        flash('Collaboration marked as completed.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('collabs.list_collabs'))
+    collab.status = 'completed'
+    collab.completed_date = db.func.current_date()
+    return 'Collaboration marked as completed.'
 
 
 @collabs_bp.route('/<int:id>/clear-followup', methods=['POST'])
-@login_required
-def clear_followup(id):
+@quick_action(Collaboration, 'collabs.list_collabs')
+def clear_followup(collab):
     """Clear follow-up flag."""
-    try:
-        collab = Collaboration.query.get_or_404(id)
-        collab.follow_up_needed = False
-        collab.follow_up_date = None
-        db.session.commit()
-        flash('Follow-up cleared.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('collabs.list_collabs'))
+    collab.follow_up_needed = False
+    collab.follow_up_date = None
+    return 'Follow-up cleared.'

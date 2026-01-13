@@ -6,7 +6,7 @@ from models import OutreachTemplate, Contact, Company
 from app import db
 from constants import TEMPLATE_CATEGORY_CHOICES, DEFAULT_PAGE_SIZE
 from utils.validation import ValidationError
-from utils.routes import FormData
+from utils.routes import FormData, make_delete_view
 from utils.logging import log_exception
 from utils.queries import get_companies_for_dropdown, get_contacts_for_dropdown
 
@@ -106,21 +106,13 @@ def edit_template(id):
     return render_template('outreach/form.html', template=template)
 
 
-@templates_bp.route('/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_template(id):
-    """Delete a template."""
-    try:
-        template = OutreachTemplate.query.get_or_404(id)
-        name = template.name
-        db.session.delete(template)
-        db.session.commit()
-        flash(f'Template "{name}" deleted.', 'success')
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        log_exception(current_app.logger, 'Database operation', e)
-        flash('Database error occurred. Please try again.', 'error')
-    return redirect(url_for('templates.list_templates'))
+# Use generic delete view factory
+templates_bp.add_url_rule(
+    '/<int:id>/delete',
+    'delete_template',
+    make_delete_view(OutreachTemplate, 'name', 'templates.list_templates', 'Template'),
+    methods=['POST']
+)
 
 
 @templates_bp.route('/<int:id>/preview')

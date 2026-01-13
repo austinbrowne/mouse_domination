@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from sqlalchemy import or_, exists
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 from models import EpisodeGuide, EpisodeGuideItem, EpisodeGuideTemplate
 from extensions import db
 from constants import (
@@ -201,7 +202,7 @@ def new_guide():
 def copy_guide(source_id):
     """Create new guide by copying items from previous episode."""
     try:
-        source = EpisodeGuide.query.get_or_404(source_id)
+        source = EpisodeGuide.query.options(joinedload(EpisodeGuide.items)).get_or_404(source_id)
 
         # Create new guide
         guide = EpisodeGuide(
@@ -241,7 +242,7 @@ def copy_guide(source_id):
 @login_required
 def view_guide(id):
     """View a completed episode guide with timestamps."""
-    guide = EpisodeGuide.query.get_or_404(id)
+    guide = EpisodeGuide.query.options(joinedload(EpisodeGuide.items)).get_or_404(id)
     sections = get_sections_with_items(guide)
 
     return render_template('episode_guide/view.html',
@@ -256,7 +257,7 @@ def view_guide(id):
 @login_required
 def edit_guide(id):
     """Edit episode guide metadata and items."""
-    guide = EpisodeGuide.query.get_or_404(id)
+    guide = EpisodeGuide.query.options(joinedload(EpisodeGuide.items)).get_or_404(id)
 
     if request.method == 'POST':
         try:
@@ -575,7 +576,7 @@ def move_item(id):
 @login_required
 def live_mode(id):
     """Live recording interface with timer and timestamp buttons."""
-    guide = EpisodeGuide.query.get_or_404(id)
+    guide = EpisodeGuide.query.options(joinedload(EpisodeGuide.items)).get_or_404(id)
     sections = get_sections_with_items(guide)
 
     return render_template('episode_guide/live.html',

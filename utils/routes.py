@@ -161,3 +161,96 @@ class FormData:
     def to_dict(self, *fields):
         """Extract multiple optional fields as a dictionary."""
         return {field: self.optional(field) for field in fields}
+
+
+def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None):
+    """Factory function to create a standard delete view for a model.
+
+    Args:
+        model_class: The SQLAlchemy model class
+        name_attr: The attribute to use for the name in flash message (e.g., 'name', 'title')
+        redirect_endpoint: The endpoint to redirect to after delete (e.g., 'contacts.list_contacts')
+        entity_name: Human-readable name for flash message (defaults to model class name)
+
+    Returns:
+        A view function that handles DELETE for the model
+
+    Usage:
+        # In routes file:
+        contacts_bp.add_url_rule(
+            '/<int:id>/delete',
+            'delete_contact',
+            make_delete_view(Contact, 'name', 'contacts.list_contacts'),
+            methods=['POST']
+        )
+    """
+    from flask_login import login_required
+
+    display_name = entity_name or model_class.__name__
+
+    @login_required
+    def delete_view(id):
+        try:
+            entity = model_class.query.get_or_404(id)
+            name = getattr(entity, name_attr, str(id))
+            db.session.delete(entity)
+            db.session.commit()
+            flash(f'{display_name} "{name}" deleted.', 'success')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            request_id = get_request_id()
+            log_exception(
+                current_app.logger,
+                f'Delete {display_name} [req:{request_id}]',
+                e,
+                entity_id=id
+            )
+            flash('Database error occurred. Please try again.', 'error')
+        return redirect(url_for(redirect_endpoint))
+
+    # Set function name for Flask's endpoint naming
+    delete_view.__name__ = f'delete_{model_class.__name__.lower()}'
+    return delete_view
+
+
+def quick_action(model_class, redirect_endpoint, operation_name=None):
+    """Decorator for quick action routes that update a model and redirect.
+
+    Args:
+        model_class: The SQLAlchemy model class
+        redirect_endpoint: The endpoint to redirect to after action
+        operation_name: Human-readable name for logging (defaults to function name)
+
+    Usage:
+        @collabs_bp.route('/<int:id>/complete', methods=['POST'])
+        @quick_action(Collaboration, 'collabs.list_collabs')
+        def complete_collab(entity):
+            entity.status = 'completed'
+            entity.completed_date = db.func.current_date()
+            return 'Collaboration marked as completed.'
+    """
+    from flask_login import login_required
+
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def wrapper(id):
+            op_name = operation_name or f.__name__
+            try:
+                entity = model_class.query.get_or_404(id)
+                message = f(entity)
+                db.session.commit()
+                flash(message, 'success')
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                request_id = get_request_id()
+                log_exception(
+                    current_app.logger,
+                    f'{op_name} [req:{request_id}]',
+                    e,
+                    entity_id=id
+                )
+                flash('Database error occurred. Please try again.', 'error')
+            return redirect(url_for(redirect_endpoint))
+        return wrapper
+    return decorator

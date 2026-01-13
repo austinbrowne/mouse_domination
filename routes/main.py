@@ -21,10 +21,11 @@ def health_check():
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
     except Exception as e:
+        current_app.logger.error(f'Health check failed: {e}')
         return jsonify({
             'status': 'unhealthy',
             'database': 'disconnected',
-            'error': str(e),
+            'error': 'Database connection failed',
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }), 500
 

@@ -156,10 +156,10 @@ class Company(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    category = db.Column(db.String(20), default='mice')  # mice, keyboards, mousepads, iems, other
+    category = db.Column(db.String(20), default='mice', index=True)  # mice, keyboards, mousepads, iems, other
     website = db.Column(db.String(200), nullable=True)
-    relationship_status = db.Column(db.String(20), default='no_contact')  # no_contact, reached_out, active, affiliate_only, past
-    affiliate_status = db.Column(db.String(20), default='no')  # yes, no, pending
+    relationship_status = db.Column(db.String(20), default='no_contact', index=True)  # no_contact, reached_out, active, affiliate_only, past
+    affiliate_status = db.Column(db.String(20), default='no', index=True)  # yes, no, pending
     affiliate_code = db.Column(db.String(50), nullable=True)
     affiliate_link = db.Column(db.String(300), nullable=True)
     commission_rate = db.Column(db.Float, nullable=True)  # percentage
