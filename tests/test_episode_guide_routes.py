@@ -1,6 +1,6 @@
 """Tests for Episode Guide routes."""
 import pytest
-from models import EpisodeGuide, EpisodeGuideItem
+from models import EpisodeGuide, EpisodeGuideItem, EpisodeGuideTemplate
 from extensions import db
 
 
@@ -562,6 +562,76 @@ class TestEpisodeGuideTemplates:
         with app.app_context():
             template = db.session.get(EpisodeGuideTemplate, template_id)
             assert template is not None
+
+    def test_new_guide_shows_template_selector(self, auth_client, app):
+        """Test that new guide form shows template selector."""
+        # Create a template first
+        with app.app_context():
+            template = EpisodeGuideTemplate(name='My Template', is_default=True)
+            db.session.add(template)
+            db.session.commit()
+
+        response = auth_client.get('/guide/new')
+        assert response.status_code == 200
+        assert b'Start from Template' in response.data
+        assert b'My Template' in response.data
+        assert b'(Default)' in response.data
+
+    def test_new_guide_shows_create_template_link_when_none(self, auth_client):
+        """Test that new guide form shows link to create template when none exist."""
+        response = auth_client.get('/guide/new')
+        assert response.status_code == 200
+        assert b'Start from Template' in response.data
+        assert b'No templates yet' in response.data
+        assert b'Create one' in response.data
+
+    def test_create_guide_with_template_applies_defaults(self, auth_client, app):
+        """Test that creating guide with template applies intro/outro/sections."""
+        # Create a template with content
+        with app.app_context():
+            template = EpisodeGuideTemplate(
+                name='Full Template',
+                intro_static_content=['Welcome!', 'Subscribe'],
+                outro_static_content=['Thanks for watching'],
+                default_sections=[{'key': 'custom_1', 'name': 'Special Segment'}],
+                default_poll_1='Best mouse?',
+                is_default=False
+            )
+            db.session.add(template)
+            db.session.commit()
+            template_id = template.id
+
+        response = auth_client.post('/guide/new', data={
+            'title': 'Guide With Template',
+            'template_id': template_id,
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+
+        with app.app_context():
+            guide = EpisodeGuide.query.filter_by(title='Guide With Template').first()
+            assert guide is not None
+            assert guide.template_id == template_id
+            assert guide.intro_static_content == ['Welcome!', 'Subscribe']
+            assert guide.outro_static_content == ['Thanks for watching']
+            assert guide.custom_sections == [{'key': 'custom_1', 'name': 'Special Segment'}]
+            assert guide.new_poll == 'Best mouse?'
+
+    def test_create_guide_without_template_has_no_defaults(self, auth_client, app):
+        """Test that creating guide without template has no pre-filled content."""
+        response = auth_client.post('/guide/new', data={
+            'title': 'Blank Guide',
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+
+        with app.app_context():
+            guide = EpisodeGuide.query.filter_by(title='Blank Guide').first()
+            assert guide is not None
+            assert guide.template_id is None
+            assert guide.intro_static_content is None
+            assert guide.outro_static_content is None
+            assert guide.custom_sections is None
 
 
 class TestCustomSections:
