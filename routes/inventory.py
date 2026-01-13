@@ -48,8 +48,11 @@ def list_inventory():
     if search:
         query = query.filter(Inventory.product_name.ilike(f"%{search}%"))
 
-    # Paginated query
-    pagination = query.order_by(Inventory.date_acquired.desc()).paginate(
+    # Paginated query - prioritize items with deadlines (nearest first), then by date acquired
+    pagination = query.order_by(
+        Inventory.deadline.asc().nulls_last(),
+        Inventory.date_acquired.desc()
+    ).paginate(
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
     companies = get_companies_for_dropdown()
