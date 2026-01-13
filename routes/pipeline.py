@@ -5,9 +5,8 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import SalesPipeline, Company, Contact
 from extensions import db
-from constants import (
-    DEAL_TYPE_CHOICES, DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
-)
+from constants import DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
+from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
 from utils.routes import FormData
 from utils.logging import log_exception
@@ -26,13 +25,16 @@ def list_deals():
     follow_up = request.args.get('follow_up')
     page = request.args.get('page', 1, type=int)
 
+    # Get valid values for filtering (includes custom options)
+    valid_deal_types = get_valid_values_for_type('deal_type')
+
     # Eager load relationships to avoid N+1
     query = SalesPipeline.query.options(
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact)
     )
 
-    if deal_type and deal_type in DEAL_TYPE_CHOICES:
+    if deal_type and deal_type in valid_deal_types:
         query = query.filter_by(deal_type=deal_type)
     if status and status in DEAL_STATUS_CHOICES:
         query = query.filter_by(status=status)
@@ -87,6 +89,10 @@ def list_deals():
 @login_required
 def new_deal():
     """Create a new deal."""
+    # Get dynamic choices for form
+    deal_type_choices = get_choices_for_type('deal_type')
+    valid_deal_types = [v for v, _ in deal_type_choices]
+
     if request.method == 'POST':
         try:
             form = FormData(request.form)
@@ -99,7 +105,7 @@ def new_deal():
             deal = SalesPipeline(
                 company_id=company_id,
                 contact_id=form.foreign_key('contact_id', Contact),
-                deal_type=form.choice('deal_type', DEAL_TYPE_CHOICES, default='paid_review'),
+                deal_type=form.choice('deal_type', valid_deal_types, default='paid_review'),
                 status=form.choice('status', DEAL_STATUS_CHOICES, default='lead'),
                 rate_quoted=form.decimal('rate_quoted'),
                 rate_agreed=form.decimal('rate_agreed'),
@@ -121,18 +127,21 @@ def new_deal():
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
             contacts = get_contacts_for_dropdown()
-            return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
+            return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts,
+                                   deal_type_choices=deal_type_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
             contacts = get_contacts_for_dropdown()
-            return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
+            return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts,
+                                   deal_type_choices=deal_type_choices)
 
     companies = get_companies_for_dropdown()
     contacts = get_contacts_for_dropdown()
-    return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts)
+    return render_template('pipeline/form.html', deal=None, companies=companies, contacts=contacts,
+                           deal_type_choices=deal_type_choices)
 
 
 @pipeline_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -143,6 +152,10 @@ def edit_deal(id):
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact)
     ).get_or_404(id)
+
+    # Get dynamic choices for form
+    deal_type_choices = get_choices_for_type('deal_type')
+    valid_deal_types = [v for v, _ in deal_type_choices]
 
     if request.method == 'POST':
         try:
@@ -155,7 +168,7 @@ def edit_deal(id):
 
             deal.company_id = company_id
             deal.contact_id = form.foreign_key('contact_id', Contact)
-            deal.deal_type = form.choice('deal_type', DEAL_TYPE_CHOICES, default='paid_review')
+            deal.deal_type = form.choice('deal_type', valid_deal_types, default='paid_review')
             deal.status = form.choice('status', DEAL_STATUS_CHOICES, default='lead')
             deal.rate_quoted = form.decimal('rate_quoted')
             deal.rate_agreed = form.decimal('rate_agreed')
@@ -175,18 +188,21 @@ def edit_deal(id):
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
             contacts = get_contacts_for_dropdown()
-            return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
+            return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts,
+                                   deal_type_choices=deal_type_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
             contacts = get_contacts_for_dropdown()
-            return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
+            return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts,
+                                   deal_type_choices=deal_type_choices)
 
     companies = get_companies_for_dropdown()
     contacts = get_contacts_for_dropdown()
-    return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts)
+    return render_template('pipeline/form.html', deal=deal, companies=companies, contacts=contacts,
+                           deal_type_choices=deal_type_choices)
 
 
 @pipeline_bp.route('/<int:id>/delete', methods=['POST'])

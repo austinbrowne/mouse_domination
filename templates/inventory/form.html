@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Edit' if item else 'New' }} Item - Mouse Domination{% endblock %}
+{% block title %}{{ 'Edit' if item else 'New' }} Item - {{ APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
@@ -41,11 +41,9 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
                         <select name="category" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                            <option value="mouse" {% if item and item.category == 'mouse' %}selected{% endif %}>Mouse</option>
-                            <option value="keyboard" {% if item and item.category == 'keyboard' %}selected{% endif %}>Keyboard</option>
-                            <option value="mousepad" {% if item and item.category == 'mousepad' %}selected{% endif %}>Mousepad</option>
-                            <option value="iem" {% if item and item.category == 'iem' %}selected{% endif %}>IEM</option>
-                            <option value="other" {% if item and item.category == 'other' %}selected{% endif %}>Other</option>
+                            {% for value, label in category_choices %}
+                            <option value="{{ value }}" {% if item and item.category == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div>
@@ -71,12 +69,9 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
                         <select name="status" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
-                            <option value="in_queue" {% if item and item.status == 'in_queue' %}selected{% endif %}>In Queue</option>
-                            <option value="reviewing" {% if item and item.status == 'reviewing' %}selected{% endif %}>Reviewing</option>
-                            <option value="reviewed" {% if item and item.status == 'reviewed' %}selected{% endif %}>Reviewed</option>
-                            <option value="keeping" {% if item and item.status == 'keeping' %}selected{% endif %}>Keeping</option>
-                            <option value="listed" {% if item and item.status == 'listed' %}selected{% endif %}>Listed</option>
-                            <option value="sold" {% if item and item.status == 'sold' %}selected{% endif %}>Sold</option>
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if item and item.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div>

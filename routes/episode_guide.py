@@ -1,14 +1,15 @@
 from datetime import datetime, timezone
-from flask_login import login_required
+from flask_login import login_required, current_user
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from sqlalchemy import or_, exists
 from sqlalchemy.exc import SQLAlchemyError
-from models import EpisodeGuide, EpisodeGuideItem
+from models import EpisodeGuide, EpisodeGuideItem, EpisodeGuideTemplate
 from extensions import db
 from constants import (
     EPISODE_GUIDE_SECTIONS, EPISODE_GUIDE_SECTION_CHOICES,
     EPISODE_GUIDE_SECTION_NAMES, EPISODE_GUIDE_SECTION_PARENTS,
-    EPISODE_GUIDE_STATUS_CHOICES, DEFAULT_PAGE_SIZE
+    EPISODE_GUIDE_STATUS_CHOICES, DEFAULT_PAGE_SIZE,
+    INTRO_STATIC_CONTENT, OUTRO_STATIC_CONTENT
 )
 from utils.validation import ValidationError
 from utils.routes import FormData
@@ -20,7 +21,14 @@ episode_guide_bp = Blueprint('episode_guide', __name__)
 def get_sections_with_items(guide):
     """Organize guide items by section for template rendering."""
     sections = {}
-    for key, name, parent in EPISODE_GUIDE_SECTIONS:
+
+    # Use guide's sections if available (includes custom sections), otherwise use builtin
+    if guide:
+        all_sections = guide.get_all_sections()
+    else:
+        all_sections = EPISODE_GUIDE_SECTIONS
+
+    for key, name, parent in all_sections:
         sections[key] = {
             'key': key,
             'name': name,
@@ -34,6 +42,13 @@ def get_sections_with_items(guide):
                 sections[item.section]['items'].append(item)
 
     return sections
+
+
+def get_valid_sections_for_guide(guide):
+    """Get list of valid section keys for a guide (builtin + custom)."""
+    if guide:
+        return [s[0] for s in guide.get_all_sections()]
+    return EPISODE_GUIDE_SECTION_CHOICES
 
 
 @episode_guide_bp.route('/')
@@ -332,7 +347,8 @@ def add_item(id):
         data = request.get_json()
 
         section = data.get('section')
-        if section not in EPISODE_GUIDE_SECTION_CHOICES:
+        valid_sections = get_valid_sections_for_guide(guide)
+        if section not in valid_sections:
             return jsonify({'success': False, 'error': 'Invalid section'}), 400
 
         title = data.get('title', '').strip()
@@ -425,11 +441,13 @@ def update_or_delete_item(id, item_id):
 def reorder_items(id):
     """Reorder items within a section (AJAX)."""
     try:
+        guide = EpisodeGuide.query.get_or_404(id)
         data = request.get_json()
         section = data.get('section')
         item_ids = data.get('item_ids', [])
 
-        if section not in EPISODE_GUIDE_SECTION_CHOICES:
+        valid_sections = get_valid_sections_for_guide(guide)
+        if section not in valid_sections:
             return jsonify({'success': False, 'error': 'Invalid section'}), 400
 
         # Update positions
@@ -452,6 +470,7 @@ def reorder_items(id):
 def move_item(id):
     """Move an item to a different section and/or position (AJAX)."""
     try:
+        guide = EpisodeGuide.query.get_or_404(id)
         data = request.get_json()
         item_id = data.get('item_id')
         target_section = data.get('target_section')
@@ -459,7 +478,8 @@ def move_item(id):
 
         if not item_id:
             return jsonify({'success': False, 'error': 'item_id is required'}), 400
-        if target_section not in EPISODE_GUIDE_SECTION_CHOICES:
+        valid_sections = get_valid_sections_for_guide(guide)
+        if target_section not in valid_sections:
             return jsonify({'success': False, 'error': 'Invalid target section'}), 400
         if not isinstance(new_position, int) or new_position < 0:
             return jsonify({'success': False, 'error': 'Invalid position'}), 400
@@ -633,6 +653,291 @@ def capture_timestamp(id, item_id):
             'success': True,
             'timestamp_seconds': item.timestamp_seconds,
             'timestamp_formatted': item.formatted_timestamp,
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+# ---- Template Management ----
+
+@episode_guide_bp.route('/templates')
+@login_required
+def list_templates():
+    """List all episode guide templates."""
+    templates = EpisodeGuideTemplate.query.order_by(
+        EpisodeGuideTemplate.is_default.desc(),
+        EpisodeGuideTemplate.name
+    ).all()
+
+    return render_template('episode_guide/templates_list.html',
+        templates=templates,
+    )
+
+
+@episode_guide_bp.route('/templates/new', methods=['GET', 'POST'])
+@login_required
+def new_template():
+    """Create a new episode guide template."""
+    if request.method == 'POST':
+        try:
+            form = FormData(request.form)
+
+            # Parse static content from textarea (one line per item)
+            intro_lines = [line.strip() for line in form.optional('intro_static_content', '').split('\n') if line.strip()]
+            outro_lines = [line.strip() for line in form.optional('outro_static_content', '').split('\n') if line.strip()]
+
+            # Parse default sections from checkboxes
+            selected_sections = request.form.getlist('default_sections')
+            default_sections = []
+            for key, name, parent in EPISODE_GUIDE_SECTIONS:
+                if key in selected_sections:
+                    default_sections.append({'key': key, 'name': name, 'parent': parent})
+
+            template = EpisodeGuideTemplate(
+                name=form.required('name'),
+                description=form.optional('description'),
+                intro_static_content=intro_lines if intro_lines else None,
+                outro_static_content=outro_lines if outro_lines else None,
+                default_sections=default_sections if default_sections else None,
+                default_poll_1=form.optional('default_poll_1'),
+                default_poll_2=form.optional('default_poll_2'),
+                created_by=current_user.id,
+                is_default=form.optional('is_default') == 'on',
+            )
+
+            # If this is set as default, clear other defaults
+            if template.is_default:
+                EpisodeGuideTemplate.query.filter(
+                    EpisodeGuideTemplate.id != template.id
+                ).update({'is_default': False})
+
+            db.session.add(template)
+            db.session.commit()
+            flash(f'Template "{template.name}" created.', 'success')
+            return redirect(url_for('episode_guide.list_templates'))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            flash('Database error occurred. Please try again.', 'error')
+
+    return render_template('episode_guide/template_form.html',
+        template=None,
+        all_sections=EPISODE_GUIDE_SECTIONS,
+        default_intro=INTRO_STATIC_CONTENT,
+        default_outro=OUTRO_STATIC_CONTENT,
+    )
+
+
+@episode_guide_bp.route('/templates/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_template(id):
+    """Edit an existing episode guide template."""
+    template = EpisodeGuideTemplate.query.get_or_404(id)
+
+    if request.method == 'POST':
+        try:
+            form = FormData(request.form)
+
+            # Parse static content from textarea
+            intro_lines = [line.strip() for line in form.optional('intro_static_content', '').split('\n') if line.strip()]
+            outro_lines = [line.strip() for line in form.optional('outro_static_content', '').split('\n') if line.strip()]
+
+            # Parse default sections from checkboxes
+            selected_sections = request.form.getlist('default_sections')
+            default_sections = []
+            for key, name, parent in EPISODE_GUIDE_SECTIONS:
+                if key in selected_sections:
+                    default_sections.append({'key': key, 'name': name, 'parent': parent})
+
+            template.name = form.required('name')
+            template.description = form.optional('description')
+            template.intro_static_content = intro_lines if intro_lines else None
+            template.outro_static_content = outro_lines if outro_lines else None
+            template.default_sections = default_sections if default_sections else None
+            template.default_poll_1 = form.optional('default_poll_1')
+            template.default_poll_2 = form.optional('default_poll_2')
+            template.is_default = form.optional('is_default') == 'on'
+
+            # If this is set as default, clear other defaults
+            if template.is_default:
+                EpisodeGuideTemplate.query.filter(
+                    EpisodeGuideTemplate.id != template.id
+                ).update({'is_default': False})
+
+            db.session.commit()
+            flash(f'Template "{template.name}" updated.', 'success')
+            return redirect(url_for('episode_guide.list_templates'))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            flash('Database error occurred. Please try again.', 'error')
+
+    return render_template('episode_guide/template_form.html',
+        template=template,
+        all_sections=EPISODE_GUIDE_SECTIONS,
+        default_intro=INTRO_STATIC_CONTENT,
+        default_outro=OUTRO_STATIC_CONTENT,
+    )
+
+
+@episode_guide_bp.route('/templates/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_template(id):
+    """Delete an episode guide template."""
+    try:
+        template = EpisodeGuideTemplate.query.get_or_404(id)
+
+        # Check if any guides are using this template
+        guide_count = template.guides.count()
+        if guide_count > 0:
+            flash(f'Cannot delete template - it is used by {guide_count} guide(s).', 'error')
+            return redirect(url_for('episode_guide.list_templates'))
+
+        name = template.name
+        db.session.delete(template)
+        db.session.commit()
+        flash(f'Template "{name}" deleted.', 'success')
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        flash('Database error occurred. Please try again.', 'error')
+
+    return redirect(url_for('episode_guide.list_templates'))
+
+
+# ---- Custom Sections ----
+
+@episode_guide_bp.route('/<int:id>/sections', methods=['POST'])
+@login_required
+def add_custom_section(id):
+    """Add a custom section to an episode guide (AJAX)."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+        data = request.get_json()
+
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'Section name is required'}), 400
+
+        # Generate a key from the name
+        key = name.lower().replace(' ', '_').replace('-', '_')
+        # Remove any non-alphanumeric characters except underscore
+        key = ''.join(c for c in key if c.isalnum() or c == '_')
+        # Ensure key is unique by adding a suffix if needed
+        base_key = key
+        counter = 1
+        existing_keys = get_valid_sections_for_guide(guide)
+        while key in existing_keys:
+            key = f"{base_key}_{counter}"
+            counter += 1
+
+        # Get optional parent and color
+        parent = data.get('parent') or None
+        color = data.get('color') or 'gray'
+
+        # Add to custom_sections
+        custom_sections = guide.custom_sections or []
+        new_section = {
+            'key': key,
+            'name': name,
+            'parent': parent,
+            'color': color,
+        }
+        custom_sections.append(new_section)
+        guide.custom_sections = custom_sections
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'section': new_section,
+            'all_sections': [{'key': s[0], 'name': s[1], 'parent': s[2]} for s in guide.get_all_sections()],
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@episode_guide_bp.route('/<int:id>/sections/<section_key>', methods=['DELETE'])
+@login_required
+def delete_custom_section(id, section_key):
+    """Delete a custom section from an episode guide (AJAX)."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+
+        # Can only delete custom sections, not builtin ones
+        if section_key in EPISODE_GUIDE_SECTION_CHOICES:
+            return jsonify({'success': False, 'error': 'Cannot delete built-in sections'}), 400
+
+        # Check if section has items
+        item_count = EpisodeGuideItem.query.filter_by(guide_id=id, section=section_key).count()
+        if item_count > 0:
+            return jsonify({'success': False, 'error': f'Section has {item_count} items. Move or delete them first.'}), 400
+
+        # Remove from custom_sections
+        if guide.custom_sections:
+            guide.custom_sections = [s for s in guide.custom_sections if s['key'] != section_key]
+            if not guide.custom_sections:
+                guide.custom_sections = None
+
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+# ---- Static Content Management ----
+
+@episode_guide_bp.route('/<int:id>/static-content', methods=['PUT'])
+@login_required
+def update_static_content(id):
+    """Update intro/outro static content for a guide (AJAX)."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+        data = request.get_json()
+
+        if 'intro_static_content' in data:
+            content = data['intro_static_content']
+            if isinstance(content, list):
+                guide.intro_static_content = [line.strip() for line in content if line and line.strip()] or None
+            elif isinstance(content, str):
+                lines = [line.strip() for line in content.split('\n') if line.strip()]
+                guide.intro_static_content = lines if lines else None
+            else:
+                guide.intro_static_content = None
+
+        if 'outro_static_content' in data:
+            content = data['outro_static_content']
+            if isinstance(content, list):
+                guide.outro_static_content = [line.strip() for line in content if line and line.strip()] or None
+            elif isinstance(content, str):
+                lines = [line.strip() for line in content.split('\n') if line.strip()]
+                guide.outro_static_content = lines if lines else None
+            else:
+                guide.outro_static_content = None
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'intro_static_content': guide.get_intro_content(),
+            'outro_static_content': guide.get_outro_content(),
         })
 
     except SQLAlchemyError as e:

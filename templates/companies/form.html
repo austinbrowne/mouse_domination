@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Edit' if company else 'New' }} Company - Mouse Domination{% endblock %}
+{% block title %}{{ 'Edit' if company else 'New' }} Company - {{ APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
@@ -18,11 +18,9 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <select name="category" class="w-full border rounded-lg px-3 py-2">
-                    <option value="mice" {% if company and company.category == 'mice' %}selected{% endif %}>Mice</option>
-                    <option value="keyboards" {% if company and company.category == 'keyboards' %}selected{% endif %}>Keyboards</option>
-                    <option value="mousepads" {% if company and company.category == 'mousepads' %}selected{% endif %}>Mousepads</option>
-                    <option value="iems" {% if company and company.category == 'iems' %}selected{% endif %}>IEMs</option>
-                    <option value="other" {% if company and company.category == 'other' %}selected{% endif %}>Other</option>
+                    {% for value, label in category_choices %}
+                    <option value="{{ value }}" {% if company and company.category == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div>

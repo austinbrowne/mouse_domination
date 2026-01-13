@@ -5,10 +5,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import Inventory, Company
 from app import db
 from constants import (
-    INVENTORY_CATEGORY_CHOICES, INVENTORY_SOURCE_TYPE_CHOICES,
-    INVENTORY_STATUS_CHOICES, INVENTORY_CONDITION_CHOICES,
+    INVENTORY_SOURCE_TYPE_CHOICES, INVENTORY_CONDITION_CHOICES,
     MARKETPLACE_CHOICES, DEFAULT_PAGE_SIZE
 )
+from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
 from utils.routes import FormData
 from utils.logging import log_exception
@@ -28,14 +28,18 @@ def list_inventory():
     search = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
 
+    # Get valid values for filtering (includes custom options)
+    valid_categories = get_valid_values_for_type('inventory_category')
+    valid_statuses = get_valid_values_for_type('inventory_status')
+
     # Eager load company relationship to avoid N+1, filter by current user
     query = Inventory.query.options(joinedload(Inventory.company)).filter_by(user_id=current_user.id)
 
     if source_type and source_type in INVENTORY_SOURCE_TYPE_CHOICES:
         query = query.filter_by(source_type=source_type)
-    if category and category in INVENTORY_CATEGORY_CHOICES:
+    if category and category in valid_categories:
         query = query.filter_by(category=category)
-    if status and status in INVENTORY_STATUS_CHOICES:
+    if status and status in valid_statuses:
         query = query.filter_by(status=status)
     if sold == 'yes':
         query = query.filter_by(sold=True)
@@ -70,6 +74,12 @@ def list_inventory():
 @login_required
 def new_item():
     """Create a new inventory item."""
+    # Get dynamic choices for form
+    category_choices = get_choices_for_type('inventory_category')
+    status_choices = get_choices_for_type('inventory_status')
+    valid_categories = [v for v, _ in category_choices]
+    valid_statuses = [v for v, _ in status_choices]
+
     if request.method == 'POST':
         try:
             form = FormData(request.form)
@@ -81,13 +91,13 @@ def new_item():
                 user_id=current_user.id,
                 product_name=form.required('product_name'),
                 company_id=form.foreign_key('company_id', Company),
-                category=form.choice('category', INVENTORY_CATEGORY_CHOICES, default='mouse'),
+                category=form.choice('category', valid_categories, default='mouse'),
                 source_type=form.choice('source_type', INVENTORY_SOURCE_TYPE_CHOICES, default='review_unit'),
                 cost=form.decimal('cost', allow_negative=False) or 0.0,
                 on_amazon=form.boolean('on_amazon'),
                 date_acquired=form.date('date_acquired'),
                 deadline=form.date('deadline'),
-                status=form.choice('status', INVENTORY_STATUS_CHOICES, default='in_queue'),
+                status=form.choice('status', valid_statuses, default='in_queue'),
                 condition=form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new'),
                 notes=form.optional('notes'),
                 short_url=form.optional('short_url'),
@@ -111,16 +121,19 @@ def new_item():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
-            return render_template('inventory/form.html', item=None, companies=companies)
+            return render_template('inventory/form.html', item=None, companies=companies,
+                                   category_choices=category_choices, status_choices=status_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
-            return render_template('inventory/form.html', item=None, companies=companies)
+            return render_template('inventory/form.html', item=None, companies=companies,
+                                   category_choices=category_choices, status_choices=status_choices)
 
     companies = get_companies_for_dropdown()
-    return render_template('inventory/form.html', item=None, companies=companies)
+    return render_template('inventory/form.html', item=None, companies=companies,
+                           category_choices=category_choices, status_choices=status_choices)
 
 
 @inventory_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -132,6 +145,12 @@ def edit_item(id):
         id=id, user_id=current_user.id
     ).first_or_404()
 
+    # Get dynamic choices for form
+    category_choices = get_choices_for_type('inventory_category')
+    status_choices = get_choices_for_type('inventory_status')
+    valid_categories = [v for v, _ in category_choices]
+    valid_statuses = [v for v, _ in status_choices]
+
     if request.method == 'POST':
         try:
             form = FormData(request.form)
@@ -141,13 +160,13 @@ def edit_item(id):
 
             item.product_name = form.required('product_name')
             item.company_id = form.foreign_key('company_id', Company)
-            item.category = form.choice('category', INVENTORY_CATEGORY_CHOICES, default='mouse')
+            item.category = form.choice('category', valid_categories, default='mouse')
             item.source_type = form.choice('source_type', INVENTORY_SOURCE_TYPE_CHOICES, default='review_unit')
             item.cost = form.decimal('cost', allow_negative=False) or 0.0
             item.on_amazon = form.boolean('on_amazon')
             item.date_acquired = form.date('date_acquired')
             item.deadline = form.date('deadline')
-            item.status = form.choice('status', INVENTORY_STATUS_CHOICES, default='in_queue')
+            item.status = form.choice('status', valid_statuses, default='in_queue')
             item.condition = form.choice('condition', INVENTORY_CONDITION_CHOICES, default='new')
             item.notes = form.optional('notes')
             item.short_url = form.optional('short_url')
@@ -169,16 +188,19 @@ def edit_item(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             companies = get_companies_for_dropdown()
-            return render_template('inventory/form.html', item=item, companies=companies)
+            return render_template('inventory/form.html', item=item, companies=companies,
+                                   category_choices=category_choices, status_choices=status_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             companies = get_companies_for_dropdown()
-            return render_template('inventory/form.html', item=item, companies=companies)
+            return render_template('inventory/form.html', item=item, companies=companies,
+                                   category_choices=category_choices, status_choices=status_choices)
 
     companies = get_companies_for_dropdown()
-    return render_template('inventory/form.html', item=item, companies=companies)
+    return render_template('inventory/form.html', item=item, companies=companies,
+                           category_choices=category_choices, status_choices=status_choices)
 
 
 @inventory_bp.route('/<int:id>/delete', methods=['POST'])

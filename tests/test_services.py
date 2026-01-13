@@ -439,3 +439,162 @@ class TestDbTransactionDecorator:
             # Instead, test with a NotFoundError scenario
             with pytest.raises(NotFoundError):
                 CompanyService.delete(99999)
+
+
+class TestOptionsService:
+    """Tests for services/options.py helper functions."""
+
+    def test_get_choices_for_type_builtin_only(self, app):
+        """Test get_choices_for_type returns builtin options."""
+        from services.options import get_choices_for_type
+
+        with app.app_context():
+            choices = get_choices_for_type('inventory_category')
+            assert len(choices) >= 5  # mouse, keyboard, mousepad, iem, other
+            values = [v for v, _ in choices]
+            assert 'mouse' in values
+            assert 'keyboard' in values
+
+    def test_get_choices_for_type_with_custom(self, app, admin_user):
+        """Test get_choices_for_type includes custom options."""
+        from services.options import get_choices_for_type
+        from models import CustomOption
+
+        with app.app_context():
+            # Add custom option
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+
+            choices = get_choices_for_type('inventory_category')
+            values = [v for v, _ in choices]
+            assert 'flashlight' in values
+            assert 'mouse' in values  # builtin still there
+
+    def test_get_choices_for_type_unknown_type(self, app):
+        """Test get_choices_for_type returns empty for unknown type."""
+        from services.options import get_choices_for_type
+
+        with app.app_context():
+            choices = get_choices_for_type('nonexistent_type')
+            assert choices == []
+
+    def test_get_valid_values_for_type(self, app):
+        """Test get_valid_values_for_type returns list of values."""
+        from services.options import get_valid_values_for_type
+
+        with app.app_context():
+            values = get_valid_values_for_type('inventory_category')
+            assert isinstance(values, list)
+            assert 'mouse' in values
+            assert 'keyboard' in values
+
+    def test_get_all_custom_options(self, app, admin_user):
+        """Test get_all_custom_options returns grouped options."""
+        from services.options import get_all_custom_options
+        from models import CustomOption
+
+        with app.app_context():
+            # Add custom options
+            opt1 = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            opt2 = CustomOption(
+                option_type='company_category',
+                value='audio',
+                label='Audio',
+                created_by=admin_user['id']
+            )
+            db.session.add_all([opt1, opt2])
+            db.session.commit()
+
+            grouped = get_all_custom_options()
+            assert 'inventory_category' in grouped
+            assert 'company_category' in grouped
+            assert len(grouped['inventory_category']) == 1
+            assert grouped['inventory_category'][0].value == 'flashlight'
+
+    def test_get_option_types(self, app):
+        """Test get_option_types returns list of type tuples."""
+        from services.options import get_option_types
+
+        with app.app_context():
+            types = get_option_types()
+            assert isinstance(types, list)
+            values = [v for v, _ in types]
+            assert 'inventory_category' in values
+            assert 'company_category' in values
+
+    def test_get_label_for_value_builtin(self, app):
+        """Test get_label_for_value returns builtin label."""
+        from services.options import get_label_for_value
+
+        with app.app_context():
+            label = get_label_for_value('inventory_category', 'mouse')
+            assert label == 'Mouse'
+
+    def test_get_label_for_value_custom(self, app, admin_user):
+        """Test get_label_for_value returns custom label."""
+        from services.options import get_label_for_value
+        from models import CustomOption
+
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+
+            label = get_label_for_value('inventory_category', 'flashlight')
+            assert label == 'Flashlight'
+
+    def test_get_label_for_value_fallback(self, app):
+        """Test get_label_for_value falls back to titlecased value."""
+        from services.options import get_label_for_value
+
+        with app.app_context():
+            label = get_label_for_value('inventory_category', 'unknown_value')
+            assert label == 'Unknown Value'
+
+    def test_is_valid_option_builtin(self, app):
+        """Test is_valid_option returns True for builtin."""
+        from services.options import is_valid_option
+
+        with app.app_context():
+            assert is_valid_option('inventory_category', 'mouse') is True
+            assert is_valid_option('inventory_category', 'keyboard') is True
+
+    def test_is_valid_option_custom(self, app, admin_user):
+        """Test is_valid_option returns True for custom."""
+        from services.options import is_valid_option
+        from models import CustomOption
+
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+
+            assert is_valid_option('inventory_category', 'flashlight') is True
+
+    def test_is_valid_option_invalid(self, app):
+        """Test is_valid_option returns False for invalid."""
+        from services.options import is_valid_option
+
+        with app.app_context():
+            assert is_valid_option('inventory_category', 'nonexistent') is False

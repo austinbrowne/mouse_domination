@@ -5,9 +5,8 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from models import Collaboration, Contact
 from app import db
-from constants import (
-    COLLAB_TYPE_CHOICES, COLLAB_STATUS_CHOICES, PLATFORM_CHOICES, DEFAULT_PAGE_SIZE
-)
+from constants import COLLAB_STATUS_CHOICES, PLATFORM_CHOICES, DEFAULT_PAGE_SIZE
+from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import ValidationError
 from utils.routes import FormData
 from utils.logging import log_exception
@@ -26,10 +25,13 @@ def list_collabs():
     search = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
 
+    # Get valid values for filtering (includes custom options)
+    valid_collab_types = get_valid_values_for_type('collab_type')
+
     # Eager load contact to avoid N+1
     query = Collaboration.query.options(joinedload(Collaboration.contact))
 
-    if collab_type and collab_type in COLLAB_TYPE_CHOICES:
+    if collab_type and collab_type in valid_collab_types:
         query = query.filter_by(collab_type=collab_type)
     if status and status in COLLAB_STATUS_CHOICES:
         query = query.filter_by(status=status)
@@ -80,6 +82,10 @@ def list_collabs():
 @login_required
 def new_collab():
     """Create a new collaboration."""
+    # Get dynamic choices for form
+    collab_type_choices = get_choices_for_type('collab_type')
+    valid_collab_types = [v for v, _ in collab_type_choices]
+
     if request.method == 'POST':
         try:
             form = FormData(request.form)
@@ -96,7 +102,7 @@ def new_collab():
 
             collab = Collaboration(
                 contact_id=contact_id,
-                collab_type=form.choice('collab_type', COLLAB_TYPE_CHOICES, default='collab_video'),
+                collab_type=form.choice('collab_type', valid_collab_types, default='collab_video'),
                 status=form.choice('status', COLLAB_STATUS_CHOICES, default='idea'),
                 scheduled_date=form.date('scheduled_date'),
                 completed_date=form.date('completed_date'),
@@ -119,16 +125,19 @@ def new_collab():
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             contacts = get_contacts_for_dropdown()
-            return render_template('collabs/form.html', collab=None, contacts=contacts)
+            return render_template('collabs/form.html', collab=None, contacts=contacts,
+                                   collab_type_choices=collab_type_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = get_contacts_for_dropdown()
-            return render_template('collabs/form.html', collab=None, contacts=contacts)
+            return render_template('collabs/form.html', collab=None, contacts=contacts,
+                                   collab_type_choices=collab_type_choices)
 
     contacts = get_contacts_for_dropdown()
-    return render_template('collabs/form.html', collab=None, contacts=contacts)
+    return render_template('collabs/form.html', collab=None, contacts=contacts,
+                           collab_type_choices=collab_type_choices)
 
 
 @collabs_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -136,6 +145,10 @@ def new_collab():
 def edit_collab(id):
     """Edit an existing collaboration."""
     collab = Collaboration.query.options(joinedload(Collaboration.contact)).get_or_404(id)
+
+    # Get dynamic choices for form
+    collab_type_choices = get_choices_for_type('collab_type')
+    valid_collab_types = [v for v, _ in collab_type_choices]
 
     if request.method == 'POST':
         try:
@@ -152,7 +165,7 @@ def edit_collab(id):
                 platform = 'other'
 
             collab.contact_id = contact_id
-            collab.collab_type = form.choice('collab_type', COLLAB_TYPE_CHOICES, default='collab_video')
+            collab.collab_type = form.choice('collab_type', valid_collab_types, default='collab_video')
             collab.status = form.choice('status', COLLAB_STATUS_CHOICES, default='idea')
             collab.scheduled_date = form.date('scheduled_date')
             collab.completed_date = form.date('completed_date')
@@ -173,16 +186,19 @@ def edit_collab(id):
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
             contacts = get_contacts_for_dropdown()
-            return render_template('collabs/form.html', collab=collab, contacts=contacts)
+            return render_template('collabs/form.html', collab=collab, contacts=contacts,
+                                   collab_type_choices=collab_type_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
             contacts = get_contacts_for_dropdown()
-            return render_template('collabs/form.html', collab=collab, contacts=contacts)
+            return render_template('collabs/form.html', collab=collab, contacts=contacts,
+                                   collab_type_choices=collab_type_choices)
 
     contacts = get_contacts_for_dropdown()
-    return render_template('collabs/form.html', collab=collab, contacts=contacts)
+    return render_template('collabs/form.html', collab=collab, contacts=contacts,
+                           collab_type_choices=collab_type_choices)
 
 
 @collabs_bp.route('/<int:id>/delete', methods=['POST'])

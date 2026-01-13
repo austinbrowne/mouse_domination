@@ -1,7 +1,41 @@
 """Tests for admin routes."""
 import pytest
-from models import User
+from models import User, CustomOption
 from extensions import db
+
+
+class TestAdminIndex:
+    """Tests for admin index/landing page."""
+
+    def test_admin_index_requires_login(self, client):
+        """Test admin index redirects to login when not authenticated."""
+        response = client.get('/admin/')
+        assert response.status_code == 302
+        assert '/auth/login' in response.location
+
+    def test_admin_index_requires_admin(self, auth_client):
+        """Test non-admin user gets 403."""
+        response = auth_client.get('/admin/')
+        assert response.status_code == 403
+
+    def test_admin_index_success(self, admin_client):
+        """Test admin can access admin index."""
+        response = admin_client.get('/admin/')
+        assert response.status_code == 200
+        assert b'Admin Dashboard' in response.data
+
+    def test_admin_index_shows_links(self, admin_client):
+        """Test admin index shows links to sub-pages."""
+        response = admin_client.get('/admin/')
+        assert response.status_code == 200
+        assert b'User Management' in response.data
+        assert b'Custom Options' in response.data
+
+    def test_admin_index_shows_pending_count(self, admin_client, app, unapproved_user):
+        """Test admin index shows pending user count."""
+        response = admin_client.get('/admin/')
+        assert response.status_code == 200
+        assert b'pending approval' in response.data
 
 
 class TestAdminRequired:
@@ -257,3 +291,259 @@ class TestToggleAdmin:
         )
         assert response.status_code == 302
         assert '/admin/users' in response.location
+
+
+class TestListOptions:
+    """Tests for custom options list route."""
+
+    def test_list_options_requires_login(self, client):
+        """Test list options redirects to login when not authenticated."""
+        response = client.get('/admin/options')
+        assert response.status_code == 302
+        assert '/auth/login' in response.location
+
+    def test_list_options_requires_admin(self, auth_client):
+        """Test non-admin user gets 403."""
+        response = auth_client.get('/admin/options')
+        assert response.status_code == 403
+
+    def test_list_options_success(self, admin_client):
+        """Test admin can access options list."""
+        response = admin_client.get('/admin/options')
+        assert response.status_code == 200
+        assert b'Custom Options' in response.data
+
+    def test_list_options_shows_builtin(self, admin_client):
+        """Test builtin options are displayed."""
+        response = admin_client.get('/admin/options')
+        assert response.status_code == 200
+        # Should show builtin inventory categories
+        assert b'Mouse' in response.data
+        assert b'Keyboard' in response.data
+
+    def test_list_options_shows_custom(self, admin_client, app, admin_user):
+        """Test custom options are displayed."""
+        # Create a custom option
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+
+        response = admin_client.get('/admin/options')
+        assert response.status_code == 200
+        assert b'Flashlight' in response.data
+
+
+class TestCreateOption:
+    """Tests for creating custom options."""
+
+    def test_create_option_requires_login(self, client):
+        """Test create option redirects to login when not authenticated."""
+        response = client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'test',
+            'label': 'Test'
+        })
+        assert response.status_code == 302
+        assert '/auth/login' in response.location
+
+    def test_create_option_requires_admin(self, auth_client):
+        """Test non-admin user gets 403."""
+        response = auth_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'test',
+            'label': 'Test'
+        })
+        assert response.status_code == 403
+
+    def test_create_option_success(self, admin_client, app):
+        """Test admin can create custom option."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'flashlight',
+            'label': 'Flashlight'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'added successfully' in response.data
+
+        # Verify option was created
+        with app.app_context():
+            option = CustomOption.query.filter_by(value='flashlight').first()
+            assert option is not None
+            assert option.label == 'Flashlight'
+            assert option.option_type == 'inventory_category'
+
+    def test_create_option_normalizes_value(self, admin_client, app):
+        """Test value is normalized to lowercase with underscores."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'My Custom Type',
+            'label': 'My Custom Type'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+
+        with app.app_context():
+            option = CustomOption.query.filter_by(value='my_custom_type').first()
+            assert option is not None
+
+    def test_create_option_invalid_type(self, admin_client):
+        """Test invalid option type is rejected."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'invalid_type',
+            'value': 'test',
+            'label': 'Test'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'Invalid option type' in response.data
+
+    def test_create_option_empty_value(self, admin_client):
+        """Test empty value is rejected."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': '',
+            'label': 'Test'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'required' in response.data
+
+    def test_create_option_empty_label(self, admin_client):
+        """Test empty label is rejected."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'test',
+            'label': ''
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'required' in response.data
+
+    def test_create_option_builtin_conflict(self, admin_client):
+        """Test cannot create option with value matching builtin."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'mouse',
+            'label': 'Mouse'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'already a built-in' in response.data
+
+    def test_create_option_duplicate(self, admin_client, app, admin_user):
+        """Test cannot create duplicate option."""
+        # Create first option
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+
+        # Try to create duplicate
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'flashlight',
+            'label': 'Another Flashlight'
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b'already exists' in response.data
+
+    def test_create_option_redirects(self, admin_client):
+        """Test create redirects to options list."""
+        response = admin_client.post('/admin/options/new', data={
+            'option_type': 'inventory_category',
+            'value': 'test',
+            'label': 'Test'
+        })
+        assert response.status_code == 302
+        assert '/admin/options' in response.location
+
+
+class TestDeleteOption:
+    """Tests for deleting custom options."""
+
+    def test_delete_option_requires_login(self, client, app, admin_user):
+        """Test delete option redirects to login when not authenticated."""
+        # Create option to delete
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+            option_id = option.id
+
+        response = client.post(f'/admin/options/{option_id}/delete')
+        assert response.status_code == 302
+        assert '/auth/login' in response.location
+
+    def test_delete_option_requires_admin(self, auth_client, app, admin_user):
+        """Test non-admin user gets 403."""
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+            option_id = option.id
+
+        response = auth_client.post(f'/admin/options/{option_id}/delete')
+        assert response.status_code == 403
+
+    def test_delete_option_success(self, admin_client, app, admin_user):
+        """Test admin can delete custom option."""
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+            option_id = option.id
+
+        response = admin_client.post(
+            f'/admin/options/{option_id}/delete',
+            follow_redirects=True
+        )
+        assert response.status_code == 200
+        assert b'deleted' in response.data
+
+        # Verify option was deleted
+        with app.app_context():
+            option = db.session.get(CustomOption, option_id)
+            assert option is None
+
+    def test_delete_option_nonexistent_404(self, admin_client):
+        """Test deleting non-existent option returns 404."""
+        response = admin_client.post('/admin/options/99999/delete')
+        assert response.status_code == 404
+
+    def test_delete_option_redirects(self, admin_client, app, admin_user):
+        """Test delete redirects to options list."""
+        with app.app_context():
+            option = CustomOption(
+                option_type='inventory_category',
+                value='flashlight',
+                label='Flashlight',
+                created_by=admin_user['id']
+            )
+            db.session.add(option)
+            db.session.commit()
+            option_id = option.id
+
+        response = admin_client.post(f'/admin/options/{option_id}/delete')
+        assert response.status_code == 302
+        assert '/admin/options' in response.location

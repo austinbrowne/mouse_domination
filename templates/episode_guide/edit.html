@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit: {{ guide.title }} - Mouse Domination{% endblock %}
+{% block title %}Edit: {{ guide.title }} - {{ APP_NAME }}{% endblock %}
 
 {% macro render_section_content(section_key, show_header=true) %}
 <!-- Add Item Form -->
@@ -126,7 +126,7 @@
 {% endmacro %}
 
 {% block content %}
-<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}')">
+<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}', {{ guide.custom_sections | default([], true) | tojson }})">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -294,6 +294,129 @@
                 {{ render_section_content('outro') }}
             </div>
         </div>
+
+        <!-- Custom Sections -->
+        <template x-for="customSection in customSections" :key="customSection.key">
+            <div>
+                <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-t-xl px-4 py-2">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-bold text-white uppercase tracking-wide" x-text="customSection.name"></h2>
+                        <div class="flex items-center gap-2">
+                            <span class="text-white/70 text-sm" x-text="'(' + (items[customSection.key]?.length || 0) + ' topics)'"></span>
+                            <button type="button" @click="deleteCustomSection(customSection.key)"
+                                    class="text-white/70 hover:text-white p-1" title="Delete section">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-b-xl border border-t-0 border-surface-200 overflow-hidden" x-data="{ adding: false }">
+                    <!-- Add Item Form -->
+                    <div x-show="adding" class="p-4 bg-primary-50 border-b border-primary-100" x-data="{ newLinks: [''], newNotes: '' }">
+                        <div class="space-y-3">
+                            <input type="text" :x-ref="'newTitle' + customSection.key" placeholder="Topic title..."
+                                class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                                @keydown.enter.prevent="addItem(customSection.key, $event.target.value, newLinks, newNotes); $event.target.value = ''; newLinks = ['']; newNotes = ''">
+                            <div class="space-y-2">
+                                <template x-for="(link, idx) in newLinks" :key="idx">
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="newLinks[idx]" placeholder="Link (optional)..."
+                                            class="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                        <button type="button" @click="newLinks.splice(idx, 1)" x-show="newLinks.length > 1"
+                                            class="text-red-500 hover:text-red-700 px-2 text-lg font-bold">-</button>
+                                    </div>
+                                </template>
+                                <button type="button" @click="newLinks.push('')" class="text-primary-600 hover:text-primary-700 text-sm font-medium">+ Add Link</button>
+                            </div>
+                            <textarea x-model="newNotes" placeholder="Notes (optional)..." rows="2"
+                                class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"></textarea>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" @click="adding = false; newLinks = ['']; newNotes = ''" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                                <button type="button" @click="addItem(customSection.key, $el.closest('.space-y-3').querySelector('input[placeholder=\\'Topic title...\\']').value, newLinks, newNotes); $el.closest('.space-y-3').querySelector('input[placeholder=\\'Topic title...\\']').value = ''; newLinks = ['']; newNotes = ''; adding = false"
+                                    class="bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 text-sm font-medium">Add Item</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Topics Header with Add Button -->
+                    <div class="p-3 bg-surface-50 border-b border-surface-200 flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Topics</span>
+                        <button type="button" @click="adding = true" class="text-primary-600 hover:text-primary-700 text-sm font-medium">+ Add</button>
+                    </div>
+                    <!-- Items List -->
+                    <div class="divide-y divide-surface-200 sortable-list" :id="'sortable-' + customSection.key" :data-section="customSection.key">
+                        <template x-for="(item, idx) in items[customSection.key] || []" :key="item.id">
+                            <div :id="'item-' + item.id" class="py-1.5 px-3 hover:bg-surface-50 group sortable-item scroll-mt-24" :data-id="item.id">
+                                <div class="flex items-start gap-2">
+                                    <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                            <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                                            <circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/>
+                                            <circle cx="9" cy="15" r="1.5"/><circle cx="15" cy="15" r="1.5"/>
+                                            <circle cx="9" cy="20" r="1.5"/><circle cx="15" cy="20" r="1.5"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
+                                        <template x-if="item.links && item.links.length">
+                                            <div class="space-y-0.5">
+                                                <template x-for="link in item.links" :key="link">
+                                                    <a :href="link.startsWith('http') ? link : 'https://' + link" target="_blank" class="text-xs text-primary-600 hover:underline truncate block" x-text="link"></a>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="item.notes">
+                                            <div class="text-xs text-gray-500 mt-1" x-text="item.notes"></div>
+                                        </template>
+                                    </div>
+                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                                        <button type="button" @click="deleteItem(customSection.key, item.id)"
+                                            class="text-gray-400 hover:text-red-600 p-1" title="Delete">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="!items[customSection.key] || items[customSection.key].length === 0" class="p-4 text-center text-gray-400 text-xs empty-placeholder">
+                            No topics yet. Click "+ Add" to add one.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Add Custom Section Button -->
+        <div class="flex justify-center" x-data="{ showForm: false, sectionName: '' }">
+            <template x-if="!showForm">
+                <button type="button" @click="showForm = true"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-primary-400 hover:text-primary-600 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Custom Section
+                </button>
+            </template>
+            <template x-if="showForm">
+                <div class="bg-white rounded-xl border border-surface-200 p-4 w-full max-w-md">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Section Name</label>
+                            <input type="text" x-model="sectionName" placeholder="e.g., Q&A, Hot Takes, Gear Corner"
+                                   class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"
+                                   @keydown.enter.prevent="addCustomSection(sectionName); sectionName = ''; showForm = false">
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" @click="showForm = false; sectionName = ''" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                            <button type="button" @click="addCustomSection(sectionName); sectionName = ''; showForm = false"
+                                    class="bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 text-sm font-medium">Add Section</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -327,7 +450,7 @@
 </style>
 
 <script>
-function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink) {
+function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink, initialCustomSections) {
     return {
         guideId: guideId,
         guideTitle: initialTitle,
@@ -340,6 +463,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         editingEpisodeNum: false,
         editingItemId: null,
         editingItem: { title: '', links: [''], notes: '' },
+        customSections: initialCustomSections || [],
         items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
             if (!acc[item.section]) acc[item.section] = [];
             acc[item.section].push(item);
@@ -359,10 +483,14 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             this.sortableInstances.forEach(s => s.destroy());
             this.sortableInstances = [];
 
+            // Built-in sections
             const sections = [
                 'introduction', 'news_mice', 'news_other', 'news_pads',
                 'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'
             ];
+
+            // Add custom sections
+            this.customSections.forEach(cs => sections.push(cs.key));
 
             sections.forEach(section => {
                 const el = document.getElementById(`sortable-${section}`);
@@ -382,6 +510,57 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
 
                 this.sortableInstances.push(sortable);
             });
+        },
+
+        async addCustomSection(name) {
+            if (!name || !name.trim()) return;
+
+            try {
+                const response = await fetch(`/guide/${this.guideId}/sections`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ name: name.trim() })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.customSections.push(data.section);
+                    // Reinitialize sortables after Alpine renders the new section
+                    this.$nextTick(() => this.initSortables());
+                } else {
+                    alert('Failed to add section: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to add custom section:', error);
+                alert('Failed to add section. Please try again.');
+            }
+        },
+
+        async deleteCustomSection(sectionKey) {
+            if (!confirm('Delete this section? Any items in it must be moved or deleted first.')) return;
+
+            try {
+                const response = await fetch(`/guide/${this.guideId}/sections/${sectionKey}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.customSections = this.customSections.filter(s => s.key !== sectionKey);
+                    delete this.items[sectionKey];
+                } else {
+                    alert('Failed to delete section: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to delete custom section:', error);
+                alert('Failed to delete section. Please try again.');
+            }
         },
 
         async handleDragEnd(evt) {

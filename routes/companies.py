@@ -4,10 +4,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import Company
 from app import db
 from constants import (
-    COMPANY_CATEGORY_CHOICES, COMPANY_STATUS_CHOICES,
-    COMPANY_PRIORITY_CHOICES, AFFILIATE_STATUS_CHOICES, DEFAULT_PAGE_SIZE
+    COMPANY_STATUS_CHOICES, COMPANY_PRIORITY_CHOICES, AFFILIATE_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 )
 from services.crud import CompanyService
+from services.options import get_choices_for_type, get_valid_values_for_type
 from utils.validation import (
     parse_float, validate_required, validate_url, validate_range,
     or_none, ValidationError
@@ -27,9 +27,12 @@ def list_companies():
     search = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
 
+    # Get valid values for filtering (includes custom options)
+    valid_categories = get_valid_values_for_type('company_category')
+
     # Build filters dict
     filters = {}
-    if category and category in COMPANY_CATEGORY_CHOICES:
+    if category and category in valid_categories:
         filters['category'] = category
     if status and status in COMPANY_STATUS_CHOICES:
         filters['relationship_status'] = status
@@ -58,6 +61,10 @@ def list_companies():
 @login_required
 def new_company():
     """Create a new company."""
+    # Get dynamic choices for form
+    category_choices = get_choices_for_type('company_category')
+    valid_categories = [v for v, _ in category_choices]
+
     if request.method == 'POST':
         try:
             # Validate required fields
@@ -67,11 +74,12 @@ def new_company():
             existing = Company.query.filter_by(name=name).first()
             if existing:
                 flash(f'Company "{name}" already exists.', 'error')
-                return render_template('companies/form.html', company=None)
+                return render_template('companies/form.html', company=None,
+                                       category_choices=category_choices)
 
-            # Validate choices using constants
+            # Validate choices using dynamic values
             category = request.form.get('category', 'mice')
-            if category not in COMPANY_CATEGORY_CHOICES:
+            if category not in valid_categories:
                 category = 'mice'
 
             status = request.form.get('relationship_status', 'no_contact')
@@ -115,14 +123,17 @@ def new_company():
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            return render_template('companies/form.html', company=None)
+            return render_template('companies/form.html', company=None,
+                                   category_choices=category_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            return render_template('companies/form.html', company=None)
+            return render_template('companies/form.html', company=None,
+                                   category_choices=category_choices)
 
-    return render_template('companies/form.html', company=None)
+    return render_template('companies/form.html', company=None,
+                           category_choices=category_choices)
 
 
 @companies_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -130,6 +141,10 @@ def new_company():
 def edit_company(id):
     """Edit an existing company."""
     company = Company.query.get_or_404(id)
+
+    # Get dynamic choices for form
+    category_choices = get_choices_for_type('company_category')
+    valid_categories = [v for v, _ in category_choices]
 
     if request.method == 'POST':
         try:
@@ -143,11 +158,12 @@ def edit_company(id):
             ).first()
             if existing:
                 flash(f'Company "{name}" already exists.', 'error')
-                return render_template('companies/form.html', company=company)
+                return render_template('companies/form.html', company=company,
+                                       category_choices=category_choices)
 
-            # Validate choices using constants
+            # Validate choices using dynamic values
             category = request.form.get('category', 'mice')
-            if category not in COMPANY_CATEGORY_CHOICES:
+            if category not in valid_categories:
                 category = 'mice'
 
             status = request.form.get('relationship_status', 'no_contact')
@@ -188,14 +204,17 @@ def edit_company(id):
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
-            return render_template('companies/form.html', company=company)
+            return render_template('companies/form.html', company=company,
+                                   category_choices=category_choices)
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(current_app.logger, 'Database operation', e)
             flash('Database error occurred. Please try again.', 'error')
-            return render_template('companies/form.html', company=company)
+            return render_template('companies/form.html', company=company,
+                                   category_choices=category_choices)
 
-    return render_template('companies/form.html', company=company)
+    return render_template('companies/form.html', company=company,
+                           category_choices=category_choices)
 
 
 @companies_bp.route('/<int:id>/delete', methods=['POST'])

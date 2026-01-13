@@ -450,6 +450,86 @@ class OutreachTemplate(db.Model):
         }
 
 
+class CustomOption(db.Model):
+    """User-defined custom options for dropdowns (supplements built-in defaults)."""
+    __tablename__ = 'custom_options'
+
+    id = db.Column(db.Integer, primary_key=True)
+    option_type = db.Column(db.String(50), nullable=False, index=True)
+    # Types: inventory_category, inventory_status, company_category, collab_type, deal_type, contact_role
+    value = db.Column(db.String(100), nullable=False)  # e.g., 'flashlight'
+    label = db.Column(db.String(100), nullable=False)  # e.g., 'Flashlight'
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Unique constraint: one value per option_type
+    __table_args__ = (
+        db.UniqueConstraint('option_type', 'value', name='unique_option_type_value'),
+    )
+
+    # Relationship
+    creator = db.relationship('User', backref='custom_options')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'option_type': self.option_type,
+            'value': self.value,
+            'label': self.label,
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class EpisodeGuideTemplate(db.Model):
+    """Reusable template for episode guides with default sections and static content."""
+    __tablename__ = 'episode_guide_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, index=True)
+    description = db.Column(db.Text, nullable=True)
+
+    # Default static content (JSON arrays of strings)
+    intro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
+    outro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
+
+    # Default sections to include (JSON array of section definitions)
+    # Format: [{"key": "news_mice", "name": "Mice", "parent": "news", "color": "red"}, ...]
+    default_sections = db.Column(db.JSON, nullable=True)
+
+    # Default poll questions
+    default_poll_1 = db.Column(db.String(200), nullable=True)
+    default_poll_2 = db.Column(db.String(200), nullable=True)
+
+    # Metadata
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    is_default = db.Column(db.Boolean, default=False)  # Auto-select for new guides
+
+    # Relationships
+    creator = db.relationship('User', backref='episode_guide_templates')
+    guides = db.relationship('EpisodeGuide', back_populates='template', lazy='dynamic')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'intro_static_content': self.intro_static_content,
+            'outro_static_content': self.outro_static_content,
+            'default_sections': self.default_sections,
+            'default_poll_1': self.default_poll_1,
+            'default_poll_2': self.default_poll_2,
+            'created_by': self.created_by,
+            'creator_name': self.creator.name if self.creator else None,
+            'is_default': self.is_default,
+            'guide_count': self.guides.count() if self.guides else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class EpisodeGuide(db.Model):
     """Episode guide for live podcast recording with timestamp tracking."""
     __tablename__ = 'episode_guides'
@@ -457,6 +537,9 @@ class EpisodeGuide(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False, index=True)
     episode_number = db.Column(db.Integer, nullable=True, index=True)
+
+    # Template reference (optional - guides can be created without template)
+    template_id = db.Column(db.Integer, db.ForeignKey('episode_guide_templates.id'), nullable=True, index=True)
 
     # Recording state
     status = db.Column(db.String(20), default='draft', index=True)  # draft, recording, completed
@@ -472,12 +555,51 @@ class EpisodeGuide(db.Model):
     new_poll = db.Column(db.String(500), nullable=True)  # Title
     new_poll_link = db.Column(db.String(500), nullable=True)
 
+    # Static content for this guide (overrides template if set)
+    intro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
+    outro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
+
+    # Custom sections added on-the-fly (supplements builtin + template sections)
+    # Format: [{"key": "my_section", "name": "My Section", "parent": null, "color": "blue"}, ...]
+    custom_sections = db.Column(db.JSON, nullable=True)
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    template = db.relationship('EpisodeGuideTemplate', back_populates='guides')
     items = db.relationship('EpisodeGuideItem', back_populates='guide', cascade='all, delete-orphan',
                            order_by='EpisodeGuideItem.section, EpisodeGuideItem.position', lazy='select')
+
+    def get_intro_content(self):
+        """Get intro static content (from guide, or fallback to template)."""
+        if self.intro_static_content:
+            return self.intro_static_content
+        if self.template and self.template.intro_static_content:
+            return self.template.intro_static_content
+        return []
+
+    def get_outro_content(self):
+        """Get outro static content (from guide, or fallback to template)."""
+        if self.outro_static_content:
+            return self.outro_static_content
+        if self.template and self.template.outro_static_content:
+            return self.template.outro_static_content
+        return []
+
+    def get_all_sections(self):
+        """Get all sections for this guide (builtin + template defaults + custom)."""
+        from constants import EPISODE_GUIDE_SECTIONS
+
+        # Start with builtin sections
+        sections = list(EPISODE_GUIDE_SECTIONS)
+
+        # Add custom sections from this guide
+        if self.custom_sections:
+            for cs in self.custom_sections:
+                sections.append((cs['key'], cs['name'], cs.get('parent')))
+
+        return sections
 
     @property
     def formatted_duration(self):
@@ -496,6 +618,8 @@ class EpisodeGuide(db.Model):
             'id': self.id,
             'title': self.title,
             'episode_number': self.episode_number,
+            'template_id': self.template_id,
+            'template_name': self.template.name if self.template else None,
             'status': self.status,
             'recording_started_at': self.recording_started_at.isoformat() if self.recording_started_at else None,
             'recording_ended_at': self.recording_ended_at.isoformat() if self.recording_ended_at else None,
@@ -506,6 +630,9 @@ class EpisodeGuide(db.Model):
             'previous_poll_link': self.previous_poll_link,
             'new_poll': self.new_poll,
             'new_poll_link': self.new_poll_link,
+            'intro_static_content': self.get_intro_content(),
+            'outro_static_content': self.get_outro_content(),
+            'custom_sections': self.custom_sections,
             'item_count': len(self.items) if self.items else 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

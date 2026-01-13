@@ -34,6 +34,61 @@ TEMPLATE_CATEGORY_CHOICES = ['sponsor', 'collab', 'follow_up', 'thank_you', 'pit
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
+# Built-in choices lookup for dynamic options system
+# Maps option_type to list of (value, label) tuples
+BUILTIN_CHOICES = {
+    'inventory_category': [
+        ('mouse', 'Mouse'),
+        ('keyboard', 'Keyboard'),
+        ('mousepad', 'Mousepad'),
+        ('iem', 'IEM'),
+        ('other', 'Other'),
+    ],
+    'inventory_status': [
+        ('in_queue', 'In Queue'),
+        ('reviewing', 'Reviewing'),
+        ('reviewed', 'Reviewed'),
+        ('keeping', 'Keeping'),
+        ('listed', 'Listed'),
+        ('sold', 'Sold'),
+    ],
+    'company_category': [
+        ('mice', 'Mice'),
+        ('keyboards', 'Keyboards'),
+        ('mousepads', 'Mousepads'),
+        ('iems', 'IEMs'),
+        ('other', 'Other'),
+    ],
+    'collab_type': [
+        ('guest_on_their_channel', 'Guest on Their Channel'),
+        ('guest_on_mousecast', 'Guest on MouseCast'),
+        ('cross_promo', 'Cross Promo'),
+        ('collab_video', 'Collab Video'),
+    ],
+    'deal_type': [
+        ('paid_review', 'Paid Review'),
+        ('podcast_ad', 'Podcast Ad'),
+        ('sponsored_segment', 'Sponsored Segment'),
+        ('other', 'Other'),
+    ],
+    'contact_role': [
+        ('reviewer', 'Reviewer'),
+        ('company_rep', 'Company Rep'),
+        ('podcast_guest', 'Podcast Guest'),
+        ('other', 'Other'),
+    ],
+}
+
+# Option type display names for admin UI
+OPTION_TYPE_LABELS = {
+    'inventory_category': 'Inventory Category',
+    'inventory_status': 'Inventory Status',
+    'company_category': 'Company Category',
+    'collab_type': 'Collaboration Type',
+    'deal_type': 'Deal Type',
+    'contact_role': 'Contact Role',
+}
+
 # Episode Guide sections (key, display_name, parent_section)
 # parent_section is used for grouping subsections under a main section
 EPISODE_GUIDE_SECTIONS = [

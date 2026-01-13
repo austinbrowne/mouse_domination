@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}LIVE: {{ guide.title }} - Mouse Domination{% endblock %}
+{% block title %}LIVE: {{ guide.title }} - {{ APP_NAME }}{% endblock %}
 
 {% macro render_item(item, idx) %}
 <div class="py-1.5 px-3 flex items-center gap-2 hover:bg-surface-50">
@@ -111,12 +111,14 @@
                 <h2 class="text-base font-bold text-white uppercase tracking-wide">INTRO</h2>
             </div>
             <div class="bg-white rounded-b-xl border border-t-0 border-surface-200 overflow-hidden">
+                {% set intro_content = guide.get_intro_content() %}
+                {% if intro_content or guide.previous_poll or guide.new_poll %}
                 <div class="bg-blue-50 border-b border-blue-100 p-3">
                     <ul class="text-xs text-blue-800 space-y-0.5">
-                        <li>"Hello everyone! I'm Phalanges. (and I'm dazztrazak) Welcome to MouseCast"</li>
-                        <li>Subscribe</li>
-                        <li>Discord - https://discord.gg/xPFzjD8r</li>
-                        <li>What mice do you have inbound? & What's on your desk right now?</li>
+                        {% for line in intro_content %}
+                        <li>{{ line }}</li>
+                        {% endfor %}
+                        {% if guide.previous_poll or guide.new_poll %}
                         <li class="font-semibold">
                             Previous Poll: {{ guide.previous_poll or '[Not set]' }}
                             {% if guide.previous_poll_link %}
@@ -129,8 +131,10 @@
                             <a href="{{ guide.new_poll_link if guide.new_poll_link.startswith('http') else 'https://' + guide.new_poll_link }}" target="_blank" class="text-blue-600 hover:underline ml-1">[Link]</a>
                             {% endif %}
                         </li>
+                        {% endif %}
                     </ul>
                 </div>
+                {% endif %}
                 {% set intro_items = sections.get('introduction', {}).get('items', []) %}
                 {% if intro_items %}
                 <div class="divide-y divide-surface-200">
@@ -209,15 +213,16 @@
                 <h2 class="text-base font-bold text-white uppercase tracking-wide">OUTRO</h2>
             </div>
             <div class="bg-white rounded-b-xl border border-t-0 border-surface-200 overflow-hidden">
+                {% set outro_content = guide.get_outro_content() %}
+                {% if outro_content %}
                 <div class="bg-blue-50 border-b border-blue-100 p-3">
                     <ul class="text-xs text-blue-800 space-y-0.5">
-                        <li>"Thank you all for listening."</li>
-                        <li>MouseCast next week - [UPDATE DATE/TIME]</li>
-                        <li>Like & share the video, it helps the algorithm.</li>
-                        <li>If you have a question or want to submit a discussion topic, leave it in the comments!</li>
-                        <li>We'll be back next Friday with another episode.</li>
+                        {% for line in outro_content %}
+                        <li>{{ line }}</li>
+                        {% endfor %}
                     </ul>
                 </div>
+                {% endif %}
                 {% set outro_items = sections.get('outro', {}).get('items', []) %}
                 {% if outro_items %}
                 <div class="divide-y divide-surface-200">
@@ -228,6 +233,29 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Custom Sections -->
+        {% if guide.custom_sections %}
+            {% for custom_section in guide.custom_sections %}
+            <div>
+                <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-t-xl px-4 py-2">
+                    <h2 class="text-base font-bold text-white uppercase tracking-wide">{{ custom_section.name }}</h2>
+                </div>
+                <div class="bg-white rounded-b-xl border border-t-0 border-surface-200 overflow-hidden">
+                    {% set custom_items = sections.get(custom_section.key, {}).get('items', []) %}
+                    {% if custom_items %}
+                    <div class="divide-y divide-surface-200">
+                        {% for item in custom_items %}
+                            {{ render_item(item, loop.index) }}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-gray-400 text-xs">No topics</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
     </div>
 </div>
 {% endblock %}

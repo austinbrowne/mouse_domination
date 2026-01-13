@@ -461,3 +461,285 @@ class TestEpisodeGuideDelete:
         """Test deleting non-existent guide returns 404."""
         response = auth_client.post('/guide/99999/delete')
         assert response.status_code == 404
+
+
+class TestEpisodeGuideTemplates:
+    """Tests for episode guide template management."""
+
+    def test_list_templates_requires_auth(self, client):
+        """Test list templates requires authentication."""
+        response = client.get('/guide/templates')
+        assert response.status_code == 302  # Redirect to login
+
+    def test_list_templates_empty(self, auth_client):
+        """Test list with no templates."""
+        response = auth_client.get('/guide/templates')
+        assert response.status_code == 200
+        assert b'No templates yet' in response.data
+
+    def test_new_template_form(self, auth_client):
+        """Test new template form renders."""
+        response = auth_client.get('/guide/templates/new')
+        assert response.status_code == 200
+        assert b'New Episode Guide Template' in response.data
+
+    def test_create_template_success(self, auth_client, app):
+        """Test creating a template."""
+        response = auth_client.post('/guide/templates/new', data={
+            'name': 'Test Template',
+            'description': 'A test template',
+            'default_sections': ['introduction', 'outro'],
+            'intro_static_content': 'Welcome\nSubscribe',
+            'outro_static_content': 'Thanks for listening',
+            'default_poll_1': 'What mouse do you use?',
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+
+        from models import EpisodeGuideTemplate
+        with app.app_context():
+            template = EpisodeGuideTemplate.query.filter_by(name='Test Template').first()
+            assert template is not None
+            assert template.description == 'A test template'
+            assert template.intro_static_content == ['Welcome', 'Subscribe']
+            assert template.outro_static_content == ['Thanks for listening']
+            assert template.default_poll_1 == 'What mouse do you use?'
+
+    def test_edit_template_success(self, auth_client, app):
+        """Test editing a template."""
+        from models import EpisodeGuideTemplate
+        with app.app_context():
+            template = EpisodeGuideTemplate(name='Original Name')
+            db.session.add(template)
+            db.session.commit()
+            template_id = template.id
+
+        response = auth_client.post(f'/guide/templates/{template_id}/edit', data={
+            'name': 'Updated Name',
+            'description': 'Updated description',
+        }, follow_redirects=True)
+
+        assert response.status_code == 200
+
+        with app.app_context():
+            template = db.session.get(EpisodeGuideTemplate, template_id)
+            assert template.name == 'Updated Name'
+            assert template.description == 'Updated description'
+
+    def test_delete_template_success(self, auth_client, app):
+        """Test deleting a template without guides."""
+        from models import EpisodeGuideTemplate
+        with app.app_context():
+            template = EpisodeGuideTemplate(name='To Delete')
+            db.session.add(template)
+            db.session.commit()
+            template_id = template.id
+
+        response = auth_client.post(f'/guide/templates/{template_id}/delete', follow_redirects=True)
+        assert response.status_code == 200
+
+        with app.app_context():
+            template = db.session.get(EpisodeGuideTemplate, template_id)
+            assert template is None
+
+    def test_delete_template_with_guides_blocked(self, auth_client, app):
+        """Test cannot delete template used by guides."""
+        from models import EpisodeGuideTemplate
+        with app.app_context():
+            template = EpisodeGuideTemplate(name='In Use')
+            db.session.add(template)
+            db.session.commit()
+
+            guide = EpisodeGuide(title='Uses Template', template_id=template.id)
+            db.session.add(guide)
+            db.session.commit()
+            template_id = template.id
+
+        response = auth_client.post(f'/guide/templates/{template_id}/delete', follow_redirects=True)
+        assert response.status_code == 200
+        assert b'Cannot delete template' in response.data
+
+        with app.app_context():
+            template = db.session.get(EpisodeGuideTemplate, template_id)
+            assert template is not None
+
+
+class TestCustomSections:
+    """Tests for on-the-fly custom sections."""
+
+    def test_add_custom_section(self, auth_client, app, guide):
+        """Test adding a custom section to a guide."""
+        response = auth_client.post(
+            f'/guide/{guide["id"]}/sections',
+            json={'name': 'Q&A Session'},
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['section']['name'] == 'Q&A Session'
+        assert data['section']['key'] == 'qa_session'
+
+        with app.app_context():
+            g = db.session.get(EpisodeGuide, guide['id'])
+            assert g.custom_sections is not None
+            assert len(g.custom_sections) == 1
+            assert g.custom_sections[0]['name'] == 'Q&A Session'
+
+    def test_add_custom_section_empty_name(self, auth_client, guide):
+        """Test adding custom section with empty name fails."""
+        response = auth_client.post(
+            f'/guide/{guide["id"]}/sections',
+            json={'name': ''},
+            content_type='application/json'
+        )
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+
+    def test_add_item_to_custom_section(self, auth_client, app, guide):
+        """Test adding items to a custom section."""
+        # First add the custom section
+        auth_client.post(
+            f'/guide/{guide["id"]}/sections',
+            json={'name': 'Hot Takes'},
+            content_type='application/json'
+        )
+
+        # Then add an item to it
+        response = auth_client.post(
+            f'/guide/{guide["id"]}/items',
+            json={
+                'section': 'hot_takes',
+                'title': 'Mice are overrated'
+            },
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['item']['section'] == 'hot_takes'
+
+    def test_delete_custom_section_empty(self, auth_client, app, guide):
+        """Test deleting an empty custom section."""
+        # Add then delete
+        auth_client.post(
+            f'/guide/{guide["id"]}/sections',
+            json={'name': 'To Delete'},
+            content_type='application/json'
+        )
+
+        response = auth_client.delete(
+            f'/guide/{guide["id"]}/sections/to_delete'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+
+        with app.app_context():
+            g = db.session.get(EpisodeGuide, guide['id'])
+            assert g.custom_sections is None or len(g.custom_sections) == 0
+
+    def test_delete_builtin_section_blocked(self, auth_client, guide):
+        """Test cannot delete built-in sections."""
+        response = auth_client.delete(
+            f'/guide/{guide["id"]}/sections/introduction'
+        )
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'built-in' in data['error'].lower()
+
+    def test_delete_section_with_items_blocked(self, auth_client, app, guide):
+        """Test cannot delete custom section with items."""
+        # Add custom section
+        auth_client.post(
+            f'/guide/{guide["id"]}/sections',
+            json={'name': 'With Items'},
+            content_type='application/json'
+        )
+
+        # Add an item
+        auth_client.post(
+            f'/guide/{guide["id"]}/items',
+            json={'section': 'with_items', 'title': 'Test Item'},
+            content_type='application/json'
+        )
+
+        # Try to delete
+        response = auth_client.delete(
+            f'/guide/{guide["id"]}/sections/with_items'
+        )
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'items' in data['error'].lower()
+
+
+class TestStaticContent:
+    """Tests for dynamic static content."""
+
+    def test_update_static_content(self, auth_client, app, guide):
+        """Test updating intro/outro static content."""
+        response = auth_client.put(
+            f'/guide/{guide["id"]}/static-content',
+            json={
+                'intro_static_content': ['Hello', 'Welcome'],
+                'outro_static_content': ['Goodbye', 'Subscribe']
+            },
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['intro_static_content'] == ['Hello', 'Welcome']
+        assert data['outro_static_content'] == ['Goodbye', 'Subscribe']
+
+        with app.app_context():
+            g = db.session.get(EpisodeGuide, guide['id'])
+            assert g.intro_static_content == ['Hello', 'Welcome']
+            assert g.outro_static_content == ['Goodbye', 'Subscribe']
+
+    def test_update_static_content_string_format(self, auth_client, app, guide):
+        """Test updating static content with newline-separated string."""
+        response = auth_client.put(
+            f'/guide/{guide["id"]}/static-content',
+            json={
+                'intro_static_content': "Line 1\nLine 2\nLine 3"
+            },
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['intro_static_content'] == ['Line 1', 'Line 2', 'Line 3']
+
+    def test_clear_static_content(self, auth_client, app, guide):
+        """Test clearing static content."""
+        # First set some content
+        with app.app_context():
+            g = db.session.get(EpisodeGuide, guide['id'])
+            g.intro_static_content = ['Hello']
+            db.session.commit()
+
+        # Then clear it
+        response = auth_client.put(
+            f'/guide/{guide["id"]}/static-content',
+            json={'intro_static_content': []},
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['intro_static_content'] == []
+
+        with app.app_context():
+            g = db.session.get(EpisodeGuide, guide['id'])
+            assert g.intro_static_content is None
