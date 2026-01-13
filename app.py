@@ -51,9 +51,14 @@ def create_app(config_class=None):
 
     # Inject common variables into all templates
     @app.context_processor
-    def inject_now():
+    def inject_common():
         from datetime import date
-        return {'now': date.today()}
+        return {
+            'now': date.today(),
+            'APP_NAME': app.config.get('APP_NAME', 'Creator Hub'),
+            'APP_TAGLINE': app.config.get('APP_TAGLINE', 'Built for Creators'),
+            'ENABLE_EPISODE_GUIDE': app.config.get('ENABLE_EPISODE_GUIDE', True),
+        }
 
     # Add security headers
     @app.after_request

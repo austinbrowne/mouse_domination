@@ -79,6 +79,13 @@ class Config:
     CREATOR_CHANNEL_NAME = os.environ.get('CREATOR_CHANNEL_NAME', 'dazztrazak')
     CREATOR_CHANNEL_STATS = os.environ.get('CREATOR_CHANNEL_STATS', '4,000+ subscribers')
 
+    # App branding (for white-labeling/generification)
+    APP_NAME = os.environ.get('APP_NAME', 'Creator Hub')
+    APP_TAGLINE = os.environ.get('APP_TAGLINE', 'Built for Creators')
+
+    # Feature flags
+    ENABLE_EPISODE_GUIDE = os.environ.get('ENABLE_EPISODE_GUIDE', 'true').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

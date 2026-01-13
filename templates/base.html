@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Mouse Domination{% endblock %}</title>
+    <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -79,7 +79,7 @@
                             <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
                         </svg>
                     </div>
-                    <span class="font-semibold text-lg text-gray-900">Mouse Domination</span>
+                    <span class="font-semibold text-lg text-gray-900">{{ APP_NAME }}</span>
                 </a>
 
                 <!-- Desktop menu -->
@@ -93,10 +93,12 @@
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'inventory' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                         Inventory
                     </a>
+                    {% if ENABLE_EPISODE_GUIDE %}
                     <a href="{{ url_for('episode_guide.list_guides') }}"
                        class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'episode_guide' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
-                        MouseCast
+                        Episodes
                     </a>
+                    {% endif %}
 
                     <!-- Business Dropdown -->
                     <div class="relative" x-data="{ open: false }" @click.away="open = false">
@@ -168,7 +170,9 @@
             <div class="px-4 py-3 space-y-1">
                 <a href="{{ url_for('main.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Dashboard</a>
                 <a href="{{ url_for('inventory.list_inventory') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Inventory</a>
-                <a href="{{ url_for('episode_guide.list_guides') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">MouseCast</a>
+                {% if ENABLE_EPISODE_GUIDE %}
+                <a href="{{ url_for('episode_guide.list_guides') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Episodes</a>
+                {% endif %}
                 <hr class="my-2 border-surface-200">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
                 <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
@@ -214,8 +218,8 @@
     <footer class="border-t border-surface-200 bg-white mt-auto">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
             <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-500">
-                <span>Mouse Domination</span>
-                <span>Built for dazztrazak</span>
+                <span>{{ APP_NAME }}</span>
+                <span>{{ APP_TAGLINE }}</span>
             </div>
         </div>
     </footer>

@@ -61,6 +61,15 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 
 ---
 
+## Local Development Setup
+
+- **Testing URL**: app.dazztrazak.com (via Cloudflare Tunnel)
+- **Server**: Gunicorn on port 8000 (`gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon`)
+- **Tunnel**: cloudflared tunnel `mouse-domination`
+- **To restart after code changes**: `pkill -f "gunicorn.*8000" && .venv/bin/gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon`
+
+---
+
 ## Code Style Defaults
 
 - Write tests for new code
