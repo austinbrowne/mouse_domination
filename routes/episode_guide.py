@@ -298,6 +298,12 @@ def edit_guide(id):
     # Pre-serialize items for JavaScript (to_dict is a method, not attribute)
     items_json = [item.to_dict() for item in guide.items] if guide.items else []
 
+    # Check if Discord integration is available for this guide's template
+    discord_enabled = False
+    if guide.template and guide.template.discord_integration:
+        integration = guide.template.discord_integration
+        discord_enabled = integration.is_active and len(integration.emoji_mappings) > 0
+
     return render_template('episode_guide/edit.html',
         guide=guide,
         sections=sections,
@@ -305,6 +311,7 @@ def edit_guide(id):
         section_parents=EPISODE_GUIDE_SECTION_PARENTS,
         all_sections=EPISODE_GUIDE_SECTIONS,
         items_json=items_json,
+        discord_enabled=discord_enabled,
     )
 
 
