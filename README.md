@@ -78,6 +78,7 @@ Key environment variables:
 | `DATABASE_URL` | Database connection string | No (defaults to SQLite) |
 | `YOUTUBE_API_KEY` | YouTube Data API key | No |
 | `YOUTUBE_CHANNEL_ID` | Your YouTube channel ID | No |
+| `DISCORD_BOT_TOKEN` | Discord bot token for community topic sourcing | No |
 
 Generate a secure secret key:
 ```bash
@@ -98,6 +99,82 @@ The app uses Flask-Login with the following security features:
 
 - **Admin**: Can approve/reject users, manage user roles
 - **User**: Access to all CRM features for their own data
+
+## Discord Integration (Community Topic Sourcing)
+
+The Episode Guide feature supports importing topics from Discord. Community members can react to messages with specific emoji, and those messages can be imported as episode guide items.
+
+### Discord Bot Setup
+
+1. **Create a Discord Application**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Click "New Application" and give it a name
+   - Go to the "Bot" section and click "Add Bot"
+
+2. **Configure Bot Settings**
+   - Under "Privileged Gateway Intents", enable:
+     - **Message Content Intent** (required to read message content)
+   - Copy the bot token and add it to your `.env` file:
+     ```bash
+     DISCORD_BOT_TOKEN=your_bot_token_here
+     ```
+
+3. **Invite Bot to Your Server**
+   - Go to "OAuth2" > "URL Generator"
+   - Select scopes: `bot`
+   - Select bot permissions:
+     - Read Messages/View Channels
+     - Read Message History
+   - Copy the generated URL and open it to invite the bot to your server
+
+4. **Get Server and Channel IDs**
+   - Enable Developer Mode in Discord (User Settings > Advanced > Developer Mode)
+   - Right-click your server name → "Copy Server ID"
+   - Right-click the channel you want to monitor → "Copy Channel ID"
+
+### In-App Configuration
+
+1. Go to **Episode Guide** > **Templates**
+2. Edit a template (or create one)
+3. Scroll to **Discord Community Topic Sourcing**
+4. Enter:
+   - **Server ID**: Your Discord server ID
+   - **Channel ID**: The channel to monitor for reactions
+   - **Bot Token Env Var**: Environment variable name (default: `DISCORD_BOT_TOKEN`)
+5. Click **Save Discord Settings**
+6. Click **Test Connection** to verify it works
+
+### Emoji Mapping
+
+After saving Discord settings, configure which emoji reactions map to which sections:
+
+1. In the template form, under "Emoji Mappings"
+2. Click **+ Add Mapping**
+3. Enter the emoji (Unicode like 🎮 or custom like `<:mice:123456789>`)
+4. Select the target section (e.g., "News - Mice", "Community Recap")
+5. Repeat for each emoji you want to track
+
+### Importing Topics
+
+1. Open an Episode Guide for editing
+2. Click the **Discord Import** button (only appears if Discord is configured)
+3. Review the fetched messages - each shows:
+   - Original Discord message (expandable)
+   - Editable title and links
+   - Section dropdown to categorize the topic
+4. Select/deselect messages to import
+5. Click **Import Selected**
+
+Messages are tracked to prevent duplicate imports.
+
+### Custom Emoji Format
+
+For custom server emoji, use the format: `<:emoji_name:emoji_id>`
+
+To get a custom emoji's ID:
+1. Type the emoji in Discord with a backslash: `\:your_emoji:`
+2. It will show: `<:emoji_name:123456789012345678>`
+3. Use that full string in the emoji mapping
 
 ## Production Deployment
 
