@@ -298,9 +298,9 @@ def edit_guide(id):
     # Pre-serialize items for JavaScript (to_dict is a method, not attribute)
     items_json = [item.to_dict() for item in guide.items] if guide.items else []
 
-    # Check if Discord integration is available for this guide's template
+    # Check if Discord integration is available for this guide's template (admin only)
     discord_enabled = False
-    if guide.template and guide.template.discord_integration:
+    if current_user.is_admin and guide.template and guide.template.discord_integration:
         integration = guide.template.discord_integration
         discord_enabled = integration.is_active and len(integration.emoji_mappings) > 0
 
@@ -1228,6 +1228,10 @@ def update_or_delete_emoji_mapping(template_id, mapping_id):
 @login_required
 def discord_fetch_messages(id):
     """Fetch messages from Discord for potential import."""
+    # Admin only - Discord integration is a privileged feature
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
     from services.discord import DiscordService
 
     guide = EpisodeGuide.query.get_or_404(id)
@@ -1292,6 +1296,10 @@ def discord_fetch_messages(id):
 @login_required
 def discord_import_messages(id):
     """Import selected Discord messages as episode guide items."""
+    # Admin only - Discord integration is a privileged feature
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
     try:
         guide = EpisodeGuide.query.get_or_404(id)
 
