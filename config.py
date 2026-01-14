@@ -75,6 +75,10 @@ class Config:
     YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
     YOUTUBE_CHANNEL_ID = os.environ.get('YOUTUBE_CHANNEL_ID')  # Your channel ID
 
+    # Discord API settings (for community topic sourcing)
+    # Default bot token - can be overridden per-integration via different env var names
+    DISCORD_BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
+
     # Creator channel settings (for outreach templates)
     CREATOR_CHANNEL_NAME = os.environ.get('CREATOR_CHANNEL_NAME', 'dazztrazak')
     CREATOR_CHANNEL_STATS = os.environ.get('CREATOR_CHANNEL_STATS', '4,000+ subscribers')

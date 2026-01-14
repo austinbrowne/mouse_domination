@@ -114,6 +114,137 @@
             </div>
         </div>
 
+        {% if template %}
+        <!-- Discord Integration -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6" x-data="discordConfig({{ template.id }})">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                        Discord Community Topic Sourcing
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">Import topics from Discord based on emoji reactions</p>
+                </div>
+                <template x-if="integration && integration.is_active">
+                    <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        Active
+                    </span>
+                </template>
+            </div>
+
+            <!-- Error/Success Messages -->
+            <template x-if="error">
+                <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" x-text="error"></div>
+            </template>
+            <template x-if="success">
+                <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" x-text="success"></div>
+            </template>
+
+            <!-- Configuration Form -->
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Discord Server ID *</label>
+                        <input type="text" x-model="config.guild_id" placeholder="e.g., 123456789012345678"
+                               class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <p class="text-xs text-gray-400 mt-1">Right-click your server → Copy Server ID</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Channel ID *</label>
+                        <input type="text" x-model="config.channel_id" placeholder="e.g., 987654321098765432"
+                               class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <p class="text-xs text-gray-400 mt-1">Right-click the channel → Copy Channel ID</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Integration Name</label>
+                        <input type="text" x-model="config.name" placeholder="e.g., MouseCast Community"
+                               class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bot Token Env Variable</label>
+                        <input type="text" x-model="config.bot_token_env_var" placeholder="DISCORD_BOT_TOKEN"
+                               class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" x-model="config.is_active" id="discord_active"
+                           class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                    <label for="discord_active" class="text-sm text-gray-700">Integration active</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="button" @click="saveConfig()" :disabled="saving"
+                            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                        <span x-show="!saving">Save Discord Settings</span>
+                        <span x-show="saving">Saving...</span>
+                    </button>
+                    <button type="button" @click="testConnection()" :disabled="testing || !integration"
+                            class="px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                        <span x-show="!testing">Test Connection</span>
+                        <span x-show="testing">Testing...</span>
+                    </button>
+                    <template x-if="integration">
+                        <button type="button" @click="deleteIntegration()"
+                                class="px-4 py-2 text-red-600 text-sm font-medium hover:text-red-700">
+                            Remove Integration
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Emoji Mappings (only show if integration exists) -->
+            <template x-if="integration">
+                <div class="mt-6 pt-6 border-t border-surface-200">
+                    <h3 class="text-md font-semibold text-gray-900 mb-2">Emoji to Section Mappings</h3>
+                    <p class="text-sm text-gray-500 mb-4">When users react to messages with these emoji, they'll be categorized into the corresponding section</p>
+
+                    <!-- Existing Mappings -->
+                    <div class="space-y-2 mb-4">
+                        <template x-for="mapping in emojiMappings" :key="mapping.id">
+                            <div class="flex items-center gap-3 p-3 bg-surface-50 rounded-lg">
+                                <span class="text-2xl" x-text="mapping.emoji"></span>
+                                <span class="text-gray-400">→</span>
+                                <span class="flex-1 text-sm font-medium text-gray-700" x-text="sections[mapping.section_key] || mapping.section_key"></span>
+                                <button type="button" @click="deleteMapping(mapping.id)"
+                                        class="text-gray-400 hover:text-red-600 p-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="emojiMappings.length === 0">
+                            <p class="text-sm text-gray-400 italic p-3">No emoji mappings yet. Add one below.</p>
+                        </template>
+                    </div>
+
+                    <!-- Add New Mapping -->
+                    <div class="flex items-end gap-3">
+                        <div class="flex-shrink-0">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Emoji</label>
+                            <input type="text" x-model="newMapping.emoji" placeholder="🐭"
+                                   class="w-20 border border-surface-200 rounded-lg px-3 py-2 text-center text-xl focus:ring-2 focus:ring-primary-500">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Section</label>
+                            <select x-model="newMapping.section_key"
+                                    class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                                <option value="">Select section...</option>
+                                <template x-for="(name, key) in sections" :key="key">
+                                    <option :value="key" x-text="name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <button type="button" @click="addMapping()" :disabled="!newMapping.emoji || !newMapping.section_key"
+                                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+        {% endif %}
+
         <!-- Submit -->
         <div class="flex justify-end gap-3">
             <a href="{{ url_for('episode_guide.list_templates') }}"
@@ -127,4 +258,207 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function discordConfig(templateId) {
+    return {
+        templateId: templateId,
+        integration: null,
+        emojiMappings: [],
+        sections: {},
+        config: {
+            name: '',
+            guild_id: '',
+            channel_id: '',
+            bot_token_env_var: 'DISCORD_BOT_TOKEN',
+            is_active: true
+        },
+        newMapping: { emoji: '', section_key: '' },
+        saving: false,
+        testing: false,
+        error: null,
+        success: null,
+
+        async init() {
+            await this.loadIntegration();
+        },
+
+        async loadIntegration() {
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord`);
+                const data = await response.json();
+                if (data.success) {
+                    if (data.integration) {
+                        this.integration = data.integration;
+                        this.config = {
+                            name: data.integration.name || '',
+                            guild_id: data.integration.guild_id || '',
+                            channel_id: data.integration.channel_id || '',
+                            bot_token_env_var: data.integration.bot_token_env_var || 'DISCORD_BOT_TOKEN',
+                            is_active: data.integration.is_active
+                        };
+                        this.emojiMappings = data.integration.emoji_mappings || [];
+                    }
+                    await this.loadSections();
+                }
+            } catch (error) {
+                console.error('Failed to load Discord integration:', error);
+            }
+        },
+
+        async loadSections() {
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings`);
+                const data = await response.json();
+                if (data.success) {
+                    this.sections = data.sections || {};
+                    this.emojiMappings = data.mappings || [];
+                }
+            } catch (error) {
+                console.error('Failed to load sections:', error);
+            }
+        },
+
+        async saveConfig() {
+            this.saving = true;
+            this.error = null;
+            this.success = null;
+
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(this.config)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.integration = data.integration;
+                    this.success = 'Discord settings saved successfully!';
+                    await this.loadSections();
+                } else {
+                    this.error = data.error || 'Failed to save settings';
+                }
+            } catch (error) {
+                console.error('Failed to save Discord config:', error);
+                this.error = 'Failed to save settings. Please try again.';
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async testConnection() {
+            this.testing = true;
+            this.error = null;
+            this.success = null;
+
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.success = data.message || 'Connection successful!';
+                } else {
+                    this.error = data.error || 'Connection failed';
+                }
+            } catch (error) {
+                console.error('Failed to test connection:', error);
+                this.error = 'Connection test failed. Please try again.';
+            } finally {
+                this.testing = false;
+            }
+        },
+
+        async deleteIntegration() {
+            if (!confirm('Remove Discord integration? This will delete all emoji mappings.')) return;
+
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.integration = null;
+                    this.emojiMappings = [];
+                    this.config = {
+                        name: '',
+                        guild_id: '',
+                        channel_id: '',
+                        bot_token_env_var: 'DISCORD_BOT_TOKEN',
+                        is_active: true
+                    };
+                    this.success = 'Discord integration removed.';
+                } else {
+                    this.error = data.error || 'Failed to remove integration';
+                }
+            } catch (error) {
+                console.error('Failed to delete integration:', error);
+                this.error = 'Failed to remove integration. Please try again.';
+            }
+        },
+
+        async addMapping() {
+            if (!this.newMapping.emoji || !this.newMapping.section_key) return;
+
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(this.newMapping)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.emojiMappings.push(data.mapping);
+                    this.newMapping = { emoji: '', section_key: '' };
+                } else {
+                    this.error = data.error || 'Failed to add mapping';
+                }
+            } catch (error) {
+                console.error('Failed to add emoji mapping:', error);
+                this.error = 'Failed to add mapping. Please try again.';
+            }
+        },
+
+        async deleteMapping(mappingId) {
+            try {
+                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings/${mappingId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.emojiMappings = this.emojiMappings.filter(m => m.id !== mappingId);
+                } else {
+                    this.error = data.error || 'Failed to delete mapping';
+                }
+            } catch (error) {
+                console.error('Failed to delete emoji mapping:', error);
+                this.error = 'Failed to delete mapping. Please try again.';
+            }
+        }
+    };
+}
+</script>
 {% endblock %}

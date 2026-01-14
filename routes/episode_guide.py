@@ -4,7 +4,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from sqlalchemy import or_, exists
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
-from models import EpisodeGuide, EpisodeGuideItem, EpisodeGuideTemplate
+from models import (
+    EpisodeGuide, EpisodeGuideItem, EpisodeGuideTemplate,
+    DiscordIntegration, DiscordEmojiMapping, DiscordImportLog
+)
 from extensions import db
 from constants import (
     EPISODE_GUIDE_SECTIONS, EPISODE_GUIDE_SECTION_CHOICES,
@@ -295,6 +298,12 @@ def edit_guide(id):
     # Pre-serialize items for JavaScript (to_dict is a method, not attribute)
     items_json = [item.to_dict() for item in guide.items] if guide.items else []
 
+    # Check if Discord integration is available for this guide's template
+    discord_enabled = False
+    if guide.template and guide.template.discord_integration:
+        integration = guide.template.discord_integration
+        discord_enabled = integration.is_active and len(integration.emoji_mappings) > 0
+
     return render_template('episode_guide/edit.html',
         guide=guide,
         sections=sections,
@@ -302,6 +311,7 @@ def edit_guide(id):
         section_parents=EPISODE_GUIDE_SECTION_PARENTS,
         all_sections=EPISODE_GUIDE_SECTIONS,
         items_json=items_json,
+        discord_enabled=discord_enabled,
     )
 
 
@@ -975,6 +985,392 @@ def update_static_content(id):
             'success': True,
             'intro_static_content': guide.get_intro_content(),
             'outro_static_content': guide.get_outro_content(),
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+# ---- Discord Integration for Community Topic Sourcing ----
+
+@episode_guide_bp.route('/templates/<int:template_id>/discord', methods=['GET', 'POST'])
+@login_required
+def manage_discord_integration(template_id):
+    """Manage Discord integration for a template (create or update)."""
+    template = EpisodeGuideTemplate.query.get_or_404(template_id)
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            # Get or create integration
+            integration = template.discord_integration
+            if not integration:
+                integration = DiscordIntegration(template_id=template_id)
+                db.session.add(integration)
+
+            integration.name = (data.get('name') or f"{template.name} Discord").strip()
+            integration.guild_id = (data.get('guild_id') or '').strip()
+            integration.channel_id = (data.get('channel_id') or '').strip()
+            integration.bot_token_env_var = (data.get('bot_token_env_var') or 'DISCORD_BOT_TOKEN').strip()
+            integration.is_active = data.get('is_active', True)
+
+            if not integration.guild_id or not integration.channel_id:
+                return jsonify({'success': False, 'error': 'Guild ID and Channel ID are required'}), 400
+
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'integration': integration.to_dict()
+            })
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # GET - return current integration
+    integration = template.discord_integration
+    return jsonify({
+        'success': True,
+        'integration': integration.to_dict() if integration else None,
+        'template': {'id': template.id, 'name': template.name}
+    })
+
+
+@episode_guide_bp.route('/templates/<int:template_id>/discord/delete', methods=['POST'])
+@login_required
+def delete_discord_integration(template_id):
+    """Delete Discord integration for a template."""
+    try:
+        template = EpisodeGuideTemplate.query.get_or_404(template_id)
+        integration = template.discord_integration
+
+        if not integration:
+            return jsonify({'success': False, 'error': 'No integration found'}), 404
+
+        db.session.delete(integration)
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@episode_guide_bp.route('/templates/<int:template_id>/discord/test', methods=['POST'])
+@login_required
+def test_discord_connection(template_id):
+    """Test Discord connection for a template's integration."""
+    from services.discord import DiscordService
+
+    template = EpisodeGuideTemplate.query.get_or_404(template_id)
+    integration = template.discord_integration
+
+    if not integration:
+        return jsonify({'success': False, 'error': 'No Discord integration configured'})
+
+    service = DiscordService.from_integration(integration)
+
+    if not service.is_configured:
+        return jsonify({
+            'success': False,
+            'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+        })
+
+    result = service.get_channel_info()
+    if result.get('success'):
+        return jsonify({
+            'success': True,
+            'channel': result['channel'],
+            'message': f"Connected to #{result['channel'].get('name', 'unknown')}"
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': result.get('error', 'Connection failed')
+        })
+
+
+@episode_guide_bp.route('/templates/<int:template_id>/discord/emoji-mappings', methods=['GET', 'POST'])
+@login_required
+def manage_emoji_mappings(template_id):
+    """Manage emoji-to-section mappings for a template's Discord integration."""
+    template = EpisodeGuideTemplate.query.get_or_404(template_id)
+    integration = template.discord_integration
+
+    if not integration:
+        return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            emoji = (data.get('emoji') or '').strip()
+            section_key = (data.get('section_key') or '').strip()
+
+            if not emoji or not section_key:
+                return jsonify({'success': False, 'error': 'Emoji and section are required'}), 400
+
+            # Validate section exists in template
+            valid_sections = EPISODE_GUIDE_SECTION_CHOICES.copy()
+            if template.default_sections:
+                valid_sections.extend([s['key'] for s in template.default_sections])
+            if section_key not in valid_sections:
+                return jsonify({'success': False, 'error': 'Invalid section'}), 400
+
+            # Check for duplicate
+            existing = DiscordEmojiMapping.query.filter_by(
+                integration_id=integration.id, emoji=emoji
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'This emoji is already mapped'}), 400
+
+            # Get max display order
+            max_order = db.session.query(db.func.max(DiscordEmojiMapping.display_order)).filter_by(
+                integration_id=integration.id
+            ).scalar() or -1
+
+            mapping = DiscordEmojiMapping(
+                integration_id=integration.id,
+                emoji=emoji,
+                emoji_name=data.get('emoji_name', '').strip() or None,
+                section_key=section_key,
+                display_order=max_order + 1
+            )
+            db.session.add(mapping)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'mapping': mapping.to_dict()
+            })
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # GET - return all mappings
+    return jsonify({
+        'success': True,
+        'mappings': [m.to_dict() for m in integration.emoji_mappings],
+        'sections': EPISODE_GUIDE_SECTION_NAMES
+    })
+
+
+@episode_guide_bp.route('/templates/<int:template_id>/discord/emoji-mappings/<int:mapping_id>', methods=['PUT', 'DELETE'])
+@login_required
+def update_or_delete_emoji_mapping(template_id, mapping_id):
+    """Update or delete an emoji mapping."""
+    try:
+        template = EpisodeGuideTemplate.query.get_or_404(template_id)
+        integration = template.discord_integration
+
+        if not integration:
+            return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+        mapping = DiscordEmojiMapping.query.filter_by(
+            id=mapping_id, integration_id=integration.id
+        ).first_or_404()
+
+        if request.method == 'DELETE':
+            db.session.delete(mapping)
+            db.session.commit()
+            return jsonify({'success': True})
+
+        # PUT - Update
+        data = request.get_json()
+
+        if 'emoji' in data:
+            new_emoji = (data['emoji'] or '').strip()
+            if new_emoji and new_emoji != mapping.emoji:
+                # Check for duplicate
+                existing = DiscordEmojiMapping.query.filter(
+                    DiscordEmojiMapping.integration_id == integration.id,
+                    DiscordEmojiMapping.emoji == new_emoji,
+                    DiscordEmojiMapping.id != mapping_id
+                ).first()
+                if existing:
+                    return jsonify({'success': False, 'error': 'This emoji is already mapped'}), 400
+                mapping.emoji = new_emoji
+
+        if 'emoji_name' in data:
+            mapping.emoji_name = (data['emoji_name'] or '').strip() or None
+
+        if 'section_key' in data:
+            section_key = (data['section_key'] or '').strip()
+            if section_key:
+                valid_sections = EPISODE_GUIDE_SECTION_CHOICES.copy()
+                if template.default_sections:
+                    valid_sections.extend([s['key'] for s in template.default_sections])
+                if section_key not in valid_sections:
+                    return jsonify({'success': False, 'error': 'Invalid section'}), 400
+                mapping.section_key = section_key
+
+        db.session.commit()
+        return jsonify({'success': True, 'mapping': mapping.to_dict()})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+# ---- Discord Import for Episode Guides ----
+
+@episode_guide_bp.route('/<int:id>/discord/fetch', methods=['POST'])
+@login_required
+def discord_fetch_messages(id):
+    """Fetch messages from Discord for potential import."""
+    from services.discord import DiscordService
+
+    guide = EpisodeGuide.query.get_or_404(id)
+
+    # Get integration from guide's template
+    if not guide.template:
+        return jsonify({'success': False, 'error': 'Guide has no template assigned'}), 400
+
+    integration = guide.template.discord_integration
+    if not integration or not integration.is_active:
+        return jsonify({'success': False, 'error': 'No active Discord integration for this template'}), 400
+
+    if not integration.emoji_mappings:
+        return jsonify({'success': False, 'error': 'No emoji mappings configured. Add them in the template settings.'}), 400
+
+    service = DiscordService.from_integration(integration)
+    if not service.is_configured:
+        return jsonify({
+            'success': False,
+            'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+        }), 400
+
+    # Get already imported message IDs to exclude
+    imported_ids = {
+        log.discord_message_id for log in
+        DiscordImportLog.query.filter_by(guide_id=id).all()
+    }
+
+    # Build emoji mapping
+    emoji_mapping = DiscordService.get_emoji_mapping_from_integration(integration)
+
+    data = request.get_json() or {}
+    limit = min(data.get('limit', 50), 100)
+
+    result = service.get_messages_with_reactions(
+        emoji_mapping=emoji_mapping,
+        limit=limit,
+        exclude_message_ids=imported_ids
+    )
+
+    if not result.get('success'):
+        return jsonify({
+            'success': False,
+            'error': result.get('error', 'Failed to fetch messages')
+        }), 400
+
+    # Add section display names
+    messages = result.get('messages', [])
+    for msg in messages:
+        section = msg.get('suggested_section')
+        msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+
+    return jsonify({
+        'success': True,
+        'messages': messages,
+        'sections': EPISODE_GUIDE_SECTION_NAMES,
+        'channel_name': integration.name
+    })
+
+
+@episode_guide_bp.route('/<int:id>/discord/import', methods=['POST'])
+@login_required
+def discord_import_messages(id):
+    """Import selected Discord messages as episode guide items."""
+    try:
+        guide = EpisodeGuide.query.get_or_404(id)
+
+        if not guide.template:
+            return jsonify({'success': False, 'error': 'Guide has no template assigned'}), 400
+
+        integration = guide.template.discord_integration
+        if not integration:
+            return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+        data = request.get_json()
+        if not data or 'items' not in data:
+            return jsonify({'success': False, 'error': 'No items provided'}), 400
+
+        valid_sections = get_valid_sections_for_guide(guide)
+        items_to_import = data['items']
+        imported = []
+
+        for item_data in items_to_import:
+            section = item_data.get('section')
+            if section not in valid_sections:
+                continue
+
+            title = (item_data.get('title') or '').strip()
+            if not title:
+                continue
+
+            discord_message_id = item_data.get('discord_message_id')
+            if not discord_message_id:
+                continue
+
+            # Check if already imported
+            existing = DiscordImportLog.query.filter_by(
+                guide_id=id, discord_message_id=discord_message_id
+            ).first()
+            if existing:
+                continue
+
+            # Get max position in section
+            max_pos = db.session.query(db.func.max(EpisodeGuideItem.position)).filter_by(
+                guide_id=id, section=section
+            ).scalar() or -1
+
+            # Handle links
+            links = item_data.get('links', [])
+            if isinstance(links, str):
+                links = [links] if links.strip() else []
+            links = [l.strip() for l in links if l and l.strip()] or None
+
+            # Create the item
+            item = EpisodeGuideItem(
+                guide_id=id,
+                section=section,
+                title=title[:500],  # Truncate if needed
+                links=links,
+                notes=item_data.get('notes', '').strip()[:1000] or None,
+                position=max_pos + 1,
+            )
+            db.session.add(item)
+            db.session.flush()  # Get the ID
+
+            # Log the import
+            import_log = DiscordImportLog(
+                integration_id=integration.id,
+                guide_id=id,
+                discord_message_id=discord_message_id,
+                item_id=item.id,
+                imported_by=current_user.id
+            )
+            db.session.add(import_log)
+
+            imported.append(item.to_dict())
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'imported': imported,
+            'count': len(imported)
         })
 
     except SQLAlchemyError as e:
