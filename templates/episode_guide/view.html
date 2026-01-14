@@ -81,8 +81,14 @@
 
     <!-- Copy Timestamps Button -->
     {% if timestamped_items > 0 %}
-    <div class="flex justify-end" x-data="{ copied: false }">
-        <button @click="copyTimestamps(); copied = true; setTimeout(() => copied = false, 2000)"
+    <div class="flex justify-end items-center gap-4" x-data="{ copied: false, includePolls: false }">
+        {% if guide.previous_poll or guide.new_poll %}
+        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" x-model="includePolls" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+            Include polls
+        </label>
+        {% endif %}
+        <button @click="copyTimestamps(includePolls); copied = true; setTimeout(() => copied = false, 2000)"
             class="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
             <span x-text="copied ? 'Copied!' : 'Copy YouTube Timestamps'"></span>
@@ -160,29 +166,94 @@
 
 {% block scripts %}
 <script>
-function copyTimestamps() {
-    const timestamps = [];
+function copyTimestamps(includePolls) {
+    // Section definitions with display names
+    const sectionConfig = {
+        'introduction': { name: 'INTRO', isIntro: true },
+        'news_mice': { name: 'NEWS', group: 'news' },
+        'news_other': { name: 'NEWS', group: 'news' },
+        'news_pads': { name: 'NEWS', group: 'news' },
+        'news_keyboards': { name: 'NEWS', group: 'news' },
+        'community_recap': { name: 'COMMUNITY' },
+        'personal_ramblings': { name: 'RAMBLINGS' },
+        'outro': { name: 'OUTRO', isOutro: true }
+    };
 
-    // Always start with Intro at 0:00
-    timestamps.push({ time: '0:00', title: 'Intro', seconds: 0 });
-
+    // Collect items by section
+    const sections = {};
     {% for section_key in ['introduction', 'news_mice', 'news_other', 'news_pads', 'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'] %}
         {% set section_data = sections.get(section_key, {}) %}
         {% for item in section_data.get('items', []) %}
             {% if item.formatted_timestamp and item.timestamp_seconds %}
-    timestamps.push({ time: '{{ item.formatted_timestamp }}', title: '{{ item.title | replace("'", "\\'") }}', seconds: {{ item.timestamp_seconds }} });
+    if (!sections['{{ section_key }}']) sections['{{ section_key }}'] = [];
+    sections['{{ section_key }}'].push({ time: '{{ item.formatted_timestamp }}', title: '{{ item.title | replace("'", "\\'") | replace("\n", " ") }}', seconds: {{ item.timestamp_seconds }} });
             {% endif %}
         {% endfor %}
     {% endfor %}
 
-    // Sort by seconds and remove duplicates at 0:00 (keep only our Intro)
-    timestamps.sort((a, b) => a.seconds - b.seconds);
+    // Build output grouped by section
+    const lines = [];
+    let lastHeaderName = null;
 
-    // Remove any items at 0 seconds except our Intro
-    const filtered = timestamps.filter((t, i) => i === 0 || t.seconds > 0);
+    // Always start with 0:00 Intro
+    lines.push('0:00 Intro');
 
-    // Format for YouTube
-    const text = filtered.map(t => `${t.time} ${t.title}`).join('\n');
+    // Process sections in order
+    const sectionOrder = ['introduction', 'news_mice', 'news_other', 'news_pads', 'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'];
+
+    for (const sectionKey of sectionOrder) {
+        const items = sections[sectionKey];
+        if (!items || items.length === 0) continue;
+
+        const config = sectionConfig[sectionKey];
+        const headerName = config.group ? sectionConfig[sectionKey].name : config.name;
+
+        // Skip intro items (we already added 0:00 Intro)
+        if (config.isIntro) continue;
+
+        // Add section header if different from last
+        if (headerName !== lastHeaderName && !config.isOutro) {
+            lines.push('');
+            lines.push(headerName);
+            lastHeaderName = headerName;
+        }
+
+        // Sort items within section by timestamp
+        items.sort((a, b) => a.seconds - b.seconds);
+
+        // Add items
+        for (const item of items) {
+            if (config.isOutro) {
+                lines.push('');
+            }
+            lines.push(`${item.time} ${item.title}`);
+        }
+    }
+
+    // Add polls if requested
+    if (includePolls) {
+        const previousPoll = '{{ guide.previous_poll | default("", true) | replace("'", "\\'") }}';
+        const previousPollLink = '{{ guide.previous_poll_link | default("", true) }}';
+        const newPoll = '{{ guide.new_poll | default("", true) | replace("'", "\\'") }}';
+        const newPollLink = '{{ guide.new_poll_link | default("", true) }}';
+
+        if (previousPoll || newPoll) {
+            lines.push('');
+            lines.push('📊 POLLS');
+            if (previousPoll) {
+                let pollLine = `Previous: ${previousPoll}`;
+                if (previousPollLink) pollLine += ` → ${previousPollLink}`;
+                lines.push(pollLine);
+            }
+            if (newPoll) {
+                let pollLine = `This Week: ${newPoll}`;
+                if (newPollLink) pollLine += ` → ${newPollLink}`;
+                lines.push(pollLine);
+            }
+        }
+    }
+
+    const text = lines.join('\n');
 
     navigator.clipboard.writeText(text).then(() => {
         console.log('Timestamps copied to clipboard');

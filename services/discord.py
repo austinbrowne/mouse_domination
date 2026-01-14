@@ -8,7 +8,37 @@ This service handles:
 
 import re
 import requests
+from datetime import datetime, timezone
 from flask import current_app
+
+# Discord epoch: January 1, 2015 00:00:00 UTC (in milliseconds)
+DISCORD_EPOCH = 1420070400000
+
+
+def date_to_snowflake(dt):
+    """
+    Convert a datetime or date to a Discord snowflake ID.
+
+    Discord snowflakes encode timestamps. This allows using the `after`
+    parameter to fetch messages after a specific date.
+
+    Args:
+        dt: datetime or date object
+
+    Returns:
+        str: Discord snowflake ID representing the start of that day
+    """
+    if hasattr(dt, 'timestamp'):
+        # datetime object
+        ts_ms = int(dt.timestamp() * 1000)
+    else:
+        # date object - convert to datetime at start of day UTC
+        dt_obj = datetime.combine(dt, datetime.min.time(), tzinfo=timezone.utc)
+        ts_ms = int(dt_obj.timestamp() * 1000)
+
+    # Discord snowflake format: (timestamp_ms - DISCORD_EPOCH) << 22
+    snowflake = (ts_ms - DISCORD_EPOCH) << 22
+    return str(snowflake)
 
 
 class DiscordService:
@@ -173,6 +203,93 @@ class DiscordService:
                 filtered_messages.append(parsed)
 
         return {'success': True, 'messages': filtered_messages}
+
+    def get_messages_multi_channel(self, channel_ids, target_emoji, target_section,
+                                   limit_per_channel=50, exclude_message_ids=None, after=None):
+        """
+        Scan multiple channels for messages with a specific emoji reaction.
+
+        Args:
+            channel_ids: List of channel IDs to scan
+            target_emoji: Single emoji to look for (Unicode or custom Discord format)
+            target_section: Section key to assign to all matched messages
+            limit_per_channel: Max messages to fetch per channel (default 50)
+            exclude_message_ids: Set of message IDs to skip (already imported)
+            after: Only get messages after this message ID (snowflake)
+
+        Returns:
+            dict with 'success', 'messages' list, 'channels_scanned', 'errors'
+        """
+        if not self.bot_token:
+            return {'success': False, 'error': 'Discord bot token not configured', 'messages': []}
+
+        if not channel_ids:
+            return {'success': False, 'error': 'No channel IDs provided', 'messages': []}
+
+        if not target_emoji:
+            return {'success': False, 'error': 'No target emoji specified', 'messages': []}
+
+        exclude_ids = set(exclude_message_ids or [])
+        all_messages = []
+        channels_scanned = []
+        errors = []
+
+        # Store original channel_id to restore later
+        original_channel_id = self.channel_id
+
+        for channel_id in channel_ids:
+            # Temporarily set channel_id for API call
+            self.channel_id = channel_id
+
+            result = self.get_messages(limit=limit_per_channel, after=after)
+            if not result['success']:
+                errors.append({'channel_id': channel_id, 'error': result.get('error')})
+                continue
+
+            channels_scanned.append(channel_id)
+
+            for msg in result.get('messages', []):
+                # Skip already imported messages
+                if msg.get('id') in exclude_ids:
+                    continue
+
+                reactions = msg.get('reactions', [])
+                matched = False
+
+                for reaction in reactions:
+                    reaction_emoji = reaction.get('emoji', {})
+                    emoji_id = reaction_emoji.get('id')
+                    emoji_name = reaction_emoji.get('name', '')
+
+                    if emoji_id:
+                        animated = reaction_emoji.get('animated', False)
+                        prefix = '<a:' if animated else '<:'
+                        emoji_identifier = f"{prefix}{emoji_name}:{emoji_id}>"
+                    else:
+                        emoji_identifier = emoji_name
+
+                    # Check if this matches our target emoji
+                    if emoji_identifier == target_emoji or emoji_name == target_emoji:
+                        matched = True
+                        break
+
+                if matched:
+                    parsed = self._parse_message(msg)
+                    parsed['suggested_section'] = target_section
+                    parsed['matched_emoji'] = target_emoji
+                    parsed['source_channel_id'] = channel_id
+                    all_messages.append(parsed)
+
+        # Restore original channel_id
+        self.channel_id = original_channel_id
+
+        return {
+            'success': True,
+            'messages': all_messages,
+            'channels_scanned': len(channels_scanned),
+            'total_channels': len(channel_ids),
+            'errors': errors
+        }
 
     def _parse_message(self, msg):
         """

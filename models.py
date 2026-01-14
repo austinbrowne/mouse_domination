@@ -920,13 +920,19 @@ class DiscordIntegration(db.Model):
 
     # Discord connection settings
     guild_id = db.Column(db.String(50), nullable=False)  # Discord server ID
-    channel_id = db.Column(db.String(50), nullable=False)  # Channel to monitor
+    channel_id = db.Column(db.String(50), nullable=False)  # Channel to monitor (single mode)
 
     # Bot token stored in env var - reference by name (never store actual token)
     bot_token_env_var = db.Column(db.String(100), default='DISCORD_BOT_TOKEN')
 
     # Link to template (each podcast/show has its own template)
     template_id = db.Column(db.Integer, db.ForeignKey('episode_guide_templates.id'), nullable=False, index=True)
+
+    # Scan mode settings
+    scan_mode = db.Column(db.String(20), default='single')  # 'single' or 'multi'
+    scan_channel_ids = db.Column(db.Text, nullable=True)    # Comma-separated channel IDs for multi mode
+    scan_emoji = db.Column(db.String(100), nullable=True)   # Single emoji for multi-channel scan
+    scan_target_section = db.Column(db.String(50), nullable=True)  # Target section for multi mode imports
 
     # Settings
     is_active = db.Column(db.Boolean, default=True)
@@ -945,6 +951,12 @@ class DiscordIntegration(db.Model):
         import os
         return os.environ.get(self.bot_token_env_var)
 
+    def get_scan_channel_list(self):
+        """Get list of channel IDs for multi-channel scan mode."""
+        if not self.scan_channel_ids:
+            return []
+        return [cid.strip() for cid in self.scan_channel_ids.split(',') if cid.strip()]
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -954,6 +966,10 @@ class DiscordIntegration(db.Model):
             'template_id': self.template_id,
             'template_name': self.template.name if self.template else None,
             'is_active': self.is_active,
+            'scan_mode': self.scan_mode or 'single',
+            'scan_channel_ids': self.scan_channel_ids,
+            'scan_emoji': self.scan_emoji,
+            'scan_target_section': self.scan_target_section,
             'emoji_mappings': [m.to_dict() for m in self.emoji_mappings],
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

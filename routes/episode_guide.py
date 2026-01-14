@@ -1017,8 +1017,23 @@ def manage_discord_integration(template_id):
             integration.bot_token_env_var = (data.get('bot_token_env_var') or 'DISCORD_BOT_TOKEN').strip()
             integration.is_active = data.get('is_active', True)
 
-            if not integration.guild_id or not integration.channel_id:
-                return jsonify({'success': False, 'error': 'Guild ID and Channel ID are required'}), 400
+            # Multi-channel scan mode settings
+            integration.scan_mode = data.get('scan_mode', 'single')
+            integration.scan_channel_ids = (data.get('scan_channel_ids') or '').strip()
+            integration.scan_emoji = (data.get('scan_emoji') or '').strip()
+            integration.scan_target_section = (data.get('scan_target_section') or '').strip()
+
+            if not integration.guild_id:
+                return jsonify({'success': False, 'error': 'Guild ID is required'}), 400
+
+            # Validate based on scan mode
+            if integration.scan_mode == 'single' and not integration.channel_id:
+                return jsonify({'success': False, 'error': 'Channel ID is required for single channel mode'}), 400
+            elif integration.scan_mode == 'multi':
+                if not integration.scan_channel_ids:
+                    return jsonify({'success': False, 'error': 'Channel IDs are required for multi-channel mode'}), 400
+                if not integration.scan_emoji:
+                    return jsonify({'success': False, 'error': 'Scan emoji is required for multi-channel mode'}), 400
 
             db.session.commit()
 
@@ -1232,7 +1247,8 @@ def discord_fetch_messages(id):
     if not current_user.is_admin:
         return jsonify({'success': False, 'error': 'Admin access required'}), 403
 
-    from services.discord import DiscordService
+    from services.discord import DiscordService, date_to_snowflake
+    from datetime import timedelta
 
     guide = EpisodeGuide.query.get_or_404(id)
 
@@ -1244,15 +1260,22 @@ def discord_fetch_messages(id):
     if not integration or not integration.is_active:
         return jsonify({'success': False, 'error': 'No active Discord integration for this template'}), 400
 
-    if not integration.emoji_mappings:
-        return jsonify({'success': False, 'error': 'No emoji mappings configured. Add them in the template settings.'}), 400
+    # Find the last completed episode for this template to determine date cutoff
+    # Only fetch Discord messages after the day following the last episode
+    after_snowflake = None
+    last_episode_date = None
+    last_episode = EpisodeGuide.query.filter(
+        EpisodeGuide.template_id == guide.template_id,
+        EpisodeGuide.id != id,  # Exclude current guide
+        EpisodeGuide.status == 'completed',
+        EpisodeGuide.scheduled_date.isnot(None)
+    ).order_by(EpisodeGuide.scheduled_date.desc()).first()
 
-    service = DiscordService.from_integration(integration)
-    if not service.is_configured:
-        return jsonify({
-            'success': False,
-            'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
-        }), 400
+    if last_episode and last_episode.scheduled_date:
+        # Start from the day after the last episode
+        cutoff_date = last_episode.scheduled_date + timedelta(days=1)
+        after_snowflake = date_to_snowflake(cutoff_date)
+        last_episode_date = last_episode.scheduled_date.isoformat()
 
     # Get already imported message IDs to exclude
     imported_ids = {
@@ -1260,36 +1283,109 @@ def discord_fetch_messages(id):
         DiscordImportLog.query.filter_by(guide_id=id).all()
     }
 
-    # Build emoji mapping
-    emoji_mapping = DiscordService.get_emoji_mapping_from_integration(integration)
-
     data = request.get_json() or {}
     limit = min(data.get('limit', 50), 100)
 
-    result = service.get_messages_with_reactions(
-        emoji_mapping=emoji_mapping,
-        limit=limit,
-        exclude_message_ids=imported_ids
-    )
+    # Check scan mode
+    scan_mode = integration.scan_mode or 'single'
 
-    if not result.get('success'):
+    if scan_mode == 'multi':
+        # Multi-channel scan mode
+        channel_ids = integration.get_scan_channel_list()
+        if not channel_ids:
+            return jsonify({'success': False, 'error': 'No channel IDs configured for multi-channel mode'}), 400
+
+        if not integration.scan_emoji:
+            return jsonify({'success': False, 'error': 'No scan emoji configured for multi-channel mode'}), 400
+
+        service = DiscordService(
+            bot_token=integration.get_bot_token(),
+            channel_id=None  # Not used in multi-channel mode
+        )
+
+        if not service.bot_token:
+            return jsonify({
+                'success': False,
+                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+            }), 400
+
+        target_section = integration.scan_target_section or 'community_recap'
+
+        result = service.get_messages_multi_channel(
+            channel_ids=channel_ids,
+            target_emoji=integration.scan_emoji,
+            target_section=target_section,
+            limit_per_channel=limit,
+            exclude_message_ids=imported_ids,
+            after=after_snowflake
+        )
+
+        if not result.get('success'):
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to fetch messages')
+            }), 400
+
+        # Add section display names and scan metadata
+        messages = result.get('messages', [])
+        for msg in messages:
+            section = msg.get('suggested_section')
+            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+
         return jsonify({
-            'success': False,
-            'error': result.get('error', 'Failed to fetch messages')
-        }), 400
+            'success': True,
+            'messages': messages,
+            'sections': EPISODE_GUIDE_SECTION_NAMES,
+            'channel_name': f"{integration.name} (Multi-channel)",
+            'scan_mode': 'multi',
+            'channels_scanned': result.get('channels_scanned', 0),
+            'total_channels': result.get('total_channels', 0),
+            'errors': result.get('errors', []),
+            'last_episode_date': last_episode_date
+        })
 
-    # Add section display names
-    messages = result.get('messages', [])
-    for msg in messages:
-        section = msg.get('suggested_section')
-        msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+    else:
+        # Single channel mode (original behavior)
+        if not integration.emoji_mappings:
+            return jsonify({'success': False, 'error': 'No emoji mappings configured. Add them in the template settings.'}), 400
 
-    return jsonify({
-        'success': True,
-        'messages': messages,
-        'sections': EPISODE_GUIDE_SECTION_NAMES,
-        'channel_name': integration.name
-    })
+        service = DiscordService.from_integration(integration)
+        if not service.is_configured:
+            return jsonify({
+                'success': False,
+                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+            }), 400
+
+        # Build emoji mapping
+        emoji_mapping = DiscordService.get_emoji_mapping_from_integration(integration)
+
+        result = service.get_messages_with_reactions(
+            emoji_mapping=emoji_mapping,
+            limit=limit,
+            exclude_message_ids=imported_ids,
+            after=after_snowflake
+        )
+
+        if not result.get('success'):
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to fetch messages')
+            }), 400
+
+        # Add section display names
+        messages = result.get('messages', [])
+        for msg in messages:
+            section = msg.get('suggested_section')
+            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'sections': EPISODE_GUIDE_SECTION_NAMES,
+            'channel_name': integration.name,
+            'scan_mode': 'single',
+            'last_episode_date': last_episode_date
+        })
 
 
 @episode_guide_bp.route('/<int:id>/discord/import', methods=['POST'])
