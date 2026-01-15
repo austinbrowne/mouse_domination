@@ -574,10 +574,10 @@ def move_item(id):
 
             item.position = new_position
 
-        # Refresh the item to get accurate position after bulk updates
-        db.session.refresh(item)
-
         db.session.commit()
+
+        # Refresh AFTER commit to get the final committed state
+        db.session.refresh(item)
 
         return jsonify({
             'success': True,

@@ -41,10 +41,9 @@
 
 <!-- Items List - Using Alpine Sort plugin -->
 <div class="divide-y divide-surface-200"
-     x-sort.ghost="(itemId, newPosition) => handleSort(itemId, '{{ section_key }}', newPosition)"
-     x-sort:group="'episode-guide-items'"
-     x-sort:config="{ animation: 150 }">
-    <template x-for="(item, idx) in items['{{ section_key }}'] || []" :key="item.id">
+     x-sort="(itemId, newPosition) => handleSort(itemId, '{{ section_key }}', newPosition)"
+     x-sort:group="episode-guide-items">
+    <template x-for="(item, idx) in items['{{ section_key }}'] || []" :key="sortIteration + '-' + item.id">
         <div x-sort:item="item.id"
              :id="'item-' + item.id"
              class="py-1.5 px-3 hover:bg-surface-50 group scroll-mt-24"
@@ -360,7 +359,7 @@
                     <!-- Items List - Using Alpine Sort plugin -->
                     <div class="divide-y divide-surface-200"
                          x-sort.ghost="(itemId, newPosition) => handleSort(itemId, customSection.key, newPosition)"
-                         x-sort:group="'episode-guide-items'"
+                         x-sort:group="episode-guide-items"
                          x-sort:config="{ animation: 150 }">
                         <template x-for="(item, idx) in items[customSection.key] || []" :key="item.id">
                             <div x-sort:item="item.id"
@@ -632,11 +631,20 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         editingItemId: null,
         editingItem: { title: '', links: [''], notes: '' },
         customSections: initialCustomSections || [],
-        items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
-            if (!acc[item.section]) acc[item.section] = [];
-            acc[item.section].push(item);
-            return acc;
-        }, {}),
+        sortIteration: 0,  // Increment after sort to force x-for to re-render with fresh indices
+        items: (() => {
+            // Group items by section and sort by position
+            const grouped = {{ items_json | tojson | safe }}.reduce((acc, item) => {
+                if (!acc[item.section]) acc[item.section] = [];
+                acc[item.section].push(item);
+                return acc;
+            }, {});
+            // Sort each section by position
+            Object.keys(grouped).forEach(section => {
+                grouped[section].sort((a, b) => a.position - b.position);
+            });
+            return grouped;
+        })(),
         sortableInstances: [],
 
         // Discord import state
@@ -703,12 +711,31 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                     throw new Error(data.error || 'Unknown error');
                 }
 
-                // Update local state to match - Alpine Sort already updated the DOM
-                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
-                if (!this.items[toSection]) {
-                    this.items[toSection] = [];
+                // Update local array to match server state
+                // The sortIteration key change will force x-for to recreate elements
+                // with fresh indices, preventing the "double swap" visual glitch
+                if (fromSection === toSection) {
+                    // Same section move
+                    const oldIndex = this.items[fromSection].findIndex(i => i.id === itemId);
+                    if (oldIndex !== -1) {
+                        this.items[fromSection].splice(oldIndex, 1);
+                        this.items[fromSection].splice(newPosition, 0, data.item);
+                    }
+                } else {
+                    // Cross-section move
+                    const oldIndex = this.items[fromSection].findIndex(i => i.id === itemId);
+                    if (oldIndex !== -1) {
+                        this.items[fromSection].splice(oldIndex, 1);
+                    }
+                    if (!this.items[toSection]) {
+                        this.items[toSection] = [];
+                    }
+                    this.items[toSection].splice(newPosition, 0, data.item);
                 }
-                this.items[toSection].splice(newPosition, 0, data.item);
+
+                // Increment sortIteration to force x-for to recreate elements with new keys
+                // This prevents double-swap by making Alpine treat all items as "new"
+                this.sortIteration++;
 
             } catch (error) {
                 console.error('Move failed:', error);
