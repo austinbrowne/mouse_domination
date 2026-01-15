@@ -39,14 +39,20 @@
 </div>
 {% endif %}
 
-<!-- Items List -->
-<div class="divide-y divide-surface-200 sortable-list" id="sortable-{{ section_key }}" data-section="{{ section_key }}">
+<!-- Items List - Using Alpine Sort plugin -->
+<div class="divide-y divide-surface-200"
+     x-sort.ghost="(itemId, newPosition) => handleSort(itemId, '{{ section_key }}', newPosition)"
+     x-sort:group="'episode-guide-items'"
+     x-sort:config="{ animation: 150 }">
     <template x-for="(item, idx) in items['{{ section_key }}'] || []" :key="item.id">
-        <div :id="'item-' + item.id" class="py-1.5 px-3 hover:bg-surface-50 group sortable-item scroll-mt-24" :class="{'editing': editingItemId === item.id}" :data-id="item.id">
+        <div x-sort:item="item.id"
+             :id="'item-' + item.id"
+             class="py-1.5 px-3 hover:bg-surface-50 group scroll-mt-24"
+             :class="{'editing': editingItemId === item.id}">
             <!-- View Mode -->
             <div x-show="editingItemId !== item.id" class="flex items-start gap-2">
                 <!-- Drag Handle -->
-                <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
+                <div x-sort:handle class="cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                         <circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/>
@@ -351,12 +357,17 @@
                         <span class="text-xs font-semibold text-gray-500 uppercase">Topics</span>
                         <button type="button" @click="adding = true" class="text-primary-600 hover:text-primary-700 text-sm font-medium">+ Add</button>
                     </div>
-                    <!-- Items List -->
-                    <div class="divide-y divide-surface-200 sortable-list" :id="'sortable-' + customSection.key" :data-section="customSection.key">
+                    <!-- Items List - Using Alpine Sort plugin -->
+                    <div class="divide-y divide-surface-200"
+                         x-sort.ghost="(itemId, newPosition) => handleSort(itemId, customSection.key, newPosition)"
+                         x-sort:group="'episode-guide-items'"
+                         x-sort:config="{ animation: 150 }">
                         <template x-for="(item, idx) in items[customSection.key] || []" :key="item.id">
-                            <div :id="'item-' + item.id" class="py-1.5 px-3 hover:bg-surface-50 group sortable-item scroll-mt-24" :data-id="item.id">
+                            <div x-sort:item="item.id"
+                                 :id="'item-' + item.id"
+                                 class="py-1.5 px-3 hover:bg-surface-50 group scroll-mt-24">
                                 <div class="flex items-start gap-2">
-                                    <div class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
+                                    <div x-sort:handle class="cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0" title="Drag to reorder">
                                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                                             <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                                             <circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/>
@@ -644,38 +655,67 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             });
         },
 
+        // Alpine Sort handles drag-drop via x-sort directives - no manual init needed
         initSortables() {
-            // Destroy existing instances if reinitializing
-            this.sortableInstances.forEach(s => s.destroy());
-            this.sortableInstances = [];
+            // No longer needed - Alpine Sort plugin handles this automatically
+        },
 
-            // Built-in sections
-            const sections = [
-                'introduction', 'news_mice', 'news_other', 'news_pads',
-                'news_keyboards', 'community_recap', 'personal_ramblings', 'outro'
-            ];
+        // Alpine Sort handler - called when items are reordered via drag-drop
+        async handleSort(itemId, toSection, newPosition) {
+            // Find which section this item came from
+            let fromSection = null;
+            let item = null;
+            for (const [section, sectionItems] of Object.entries(this.items)) {
+                if (!sectionItems) continue;
+                const found = sectionItems.find(i => i.id === itemId);
+                if (found) {
+                    fromSection = section;
+                    item = found;
+                    break;
+                }
+            }
 
-            // Add custom sections
-            this.customSections.forEach(cs => sections.push(cs.key));
+            if (!item || !fromSection) {
+                console.error('Item not found:', itemId);
+                return;
+            }
 
-            sections.forEach(section => {
-                const el = document.getElementById(`sortable-${section}`);
-                if (!el) return;
-
-                const sortable = Sortable.create(el, {
-                    group: 'episode-guide-items',
-                    handle: '.drag-handle',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    dragClass: 'sortable-drag',
-                    filter: '.editing, .empty-placeholder',
-                    preventOnFilter: false,
-                    onEnd: (evt) => this.handleDragEnd(evt)
+            try {
+                const response = await fetch(`/guide/${this.guideId}/items/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        item_id: itemId,
+                        target_section: toSection,
+                        new_position: newPosition
+                    })
                 });
 
-                this.sortableInstances.push(sortable);
-            });
+                if (!response.ok) {
+                    throw new Error('Server error: ' + response.status);
+                }
+
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Unknown error');
+                }
+
+                // Update local state to match - Alpine Sort already updated the DOM
+                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
+                if (!this.items[toSection]) {
+                    this.items[toSection] = [];
+                }
+                this.items[toSection].splice(newPosition, 0, data.item);
+
+            } catch (error) {
+                console.error('Move failed:', error);
+                alert('Failed to save position: ' + error.message);
+                // Reload to reset state on error
+                window.location.reload();
+            }
         },
 
         async addCustomSection(name) {
@@ -694,8 +734,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
                 if (data.success) {
                     this.customSections.push(data.section);
-                    // Reinitialize sortables after Alpine renders the new section
-                    this.$nextTick(() => this.initSortables());
+                    // Alpine Sort will automatically handle the new section
                 } else {
                     alert('Failed to add section: ' + (data.error || 'Unknown error'));
                 }
@@ -726,102 +765,6 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             } catch (error) {
                 console.error('Failed to delete custom section:', error);
                 alert('Failed to delete section. Please try again.');
-            }
-        },
-
-        async handleDragEnd(evt) {
-            const itemId = parseInt(evt.item.dataset.id);
-            const fromSection = evt.from.dataset.section;
-            const toSection = evt.to.dataset.section;
-            const newIndex = evt.newIndex;
-
-            // Skip if nothing changed
-            if (fromSection === toSection && evt.oldIndex === newIndex) return;
-
-            // Debug logging
-            console.log('Moving item:', { itemId, fromSection, toSection, newIndex, guideId: this.guideId });
-            const url = `/guide/${this.guideId}/items/move`;
-            console.log('Request URL:', url);
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        item_id: itemId,
-                        target_section: toSection,
-                        new_position: newIndex
-                    })
-                });
-
-                // Check if response is OK before parsing JSON
-                if (!response.ok) {
-                    const text = await response.text();
-                    console.error('Server error:', response.status, text);
-                    this.revertDomMove(evt);
-                    alert('Server error: ' + response.status);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Update local Alpine state to match the move
-                    this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
-                } else {
-                    console.error('Move failed:', data.error);
-                    this.revertDomMove(evt);
-                    alert('Failed to save position: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Move request failed:', error);
-                this.revertDomMove(evt);
-                alert('Failed to save position. Please try again.');
-            }
-        },
-
-        syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
-            // Remove from old section in Alpine state
-            if (this.items[fromSection]) {
-                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
-            }
-
-            // Add to new section at correct position
-            if (!this.items[toSection]) {
-                this.items[toSection] = [];
-            }
-
-            // Insert the updated item at the new position
-            this.items[toSection].splice(newPosition, 0, updatedItem);
-
-            // Update positions in local state to match
-            this.items[toSection].forEach((item, idx) => {
-                item.position = idx;
-            });
-            if (fromSection !== toSection && this.items[fromSection]) {
-                this.items[fromSection].forEach((item, idx) => {
-                    item.position = idx;
-                });
-            }
-        },
-
-        revertDomMove(evt) {
-            // Revert the DOM change made by SortableJS
-            if (evt.from !== evt.to) {
-                // Cross-section move: put the item back in original section
-                evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
-            } else {
-                // Same section: reorder back
-                const parent = evt.from;
-                const children = Array.from(parent.children).filter(c => !c.classList.contains('empty-placeholder'));
-                if (evt.oldIndex < evt.newIndex) {
-                    parent.insertBefore(evt.item, children[evt.oldIndex] || null);
-                } else {
-                    parent.insertBefore(evt.item, children[evt.oldIndex + 1] || null);
-                }
             }
         },
 
