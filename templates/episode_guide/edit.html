@@ -621,19 +621,11 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         editingItemId: null,
         editingItem: { title: '', links: [''], notes: '' },
         customSections: initialCustomSections || [],
-        items: (() => {
-            // Group items by section and sort by position
-            const grouped = {{ items_json | tojson | safe }}.reduce((acc, item) => {
-                if (!acc[item.section]) acc[item.section] = [];
-                acc[item.section].push(item);
-                return acc;
-            }, {});
-            // Sort each section by position
-            Object.keys(grouped).forEach(section => {
-                grouped[section].sort((a, b) => a.position - b.position);
-            });
-            return grouped;
-        })(),
+        items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
+            if (!acc[item.section]) acc[item.section] = [];
+            acc[item.section].push(item);
+            return acc;
+        }, {}),
         sortableInstances: [],
 
         // Discord import state
@@ -777,22 +769,8 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Fetch fresh items from server and update Alpine state
-                    const refreshResponse = await fetch(`/guide/${this.guideId}/items`);
-                    if (refreshResponse.ok) {
-                        const freshData = await refreshResponse.json();
-                        // Group by section and sort by position
-                        const grouped = {};
-                        freshData.items.forEach(item => {
-                            if (!grouped[item.section]) grouped[item.section] = [];
-                            grouped[item.section].push(item);
-                        });
-                        Object.keys(grouped).forEach(section => {
-                            grouped[section].sort((a, b) => a.position - b.position);
-                        });
-                        // Replace all items - this forces Alpine to re-render
-                        this.items = grouped;
-                    }
+                    // Update local Alpine state to match the move
+                    this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
                 } else {
                     console.error('Move failed:', data.error);
                     this.revertDomMove(evt);
@@ -806,35 +784,27 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         },
 
         syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
-            // Update Alpine data - this triggers re-render with items in new order
-            // The x-for loop uses array index (idx) for numbering,
-            // so array order determines displayed numbers
+            // Remove from old section in Alpine state
+            if (this.items[fromSection]) {
+                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
+            }
 
-            if (fromSection === toSection) {
-                // Same section move: remove item and reinsert at new position
-                let sectionItems = (this.items[fromSection] || []).filter(i => i.id !== itemId);
+            // Add to new section at correct position
+            if (!this.items[toSection]) {
+                this.items[toSection] = [];
+            }
 
-                // Insert at new position
-                sectionItems.splice(newPosition, 0, {...updatedItem});
+            // Insert the updated item at the new position
+            this.items[toSection].splice(newPosition, 0, updatedItem);
 
-                // Update all positions to match array order
-                this.items[fromSection] = sectionItems.map((item, idx) => ({...item, position: idx}));
-            } else {
-                // Cross-section move: remove from old, add to new
-
-                // Remove from old section and renumber
-                if (this.items[fromSection]) {
-                    this.items[fromSection] = this.items[fromSection]
-                        .filter(i => i.id !== itemId)
-                        .map((item, idx) => ({...item, position: idx}));
-                }
-
-                // Add to new section at correct position
-                let targetItems = [...(this.items[toSection] || [])];
-                targetItems.splice(newPosition, 0, {...updatedItem});
-
-                // Update all positions to match array order
-                this.items[toSection] = targetItems.map((item, idx) => ({...item, position: idx}));
+            // Update positions in local state to match
+            this.items[toSection].forEach((item, idx) => {
+                item.position = idx;
+            });
+            if (fromSection !== toSection && this.items[fromSection]) {
+                this.items[fromSection].forEach((item, idx) => {
+                    item.position = idx;
+                });
             }
         },
 

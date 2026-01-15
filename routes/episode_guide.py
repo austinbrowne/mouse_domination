@@ -385,17 +385,6 @@ def update_metadata(id):
 
 # ---- AJAX Endpoints for Item Management ----
 
-@episode_guide_bp.route('/<int:id>/items', methods=['GET'])
-@login_required
-def get_items(id):
-    """Get all items for a guide (AJAX)."""
-    guide = EpisodeGuide.query.get_or_404(id)
-    items = EpisodeGuideItem.query.filter_by(guide_id=id).order_by(
-        EpisodeGuideItem.section, EpisodeGuideItem.position
-    ).all()
-    return jsonify({'items': [item.to_dict() for item in items]})
-
-
 @episode_guide_bp.route('/<int:id>/items', methods=['POST'])
 @login_required
 def add_item(id):
@@ -584,6 +573,9 @@ def move_item(id):
                 ).update({EpisodeGuideItem.position: EpisodeGuideItem.position + 1}, synchronize_session=False)
 
             item.position = new_position
+
+        # Refresh the item to get accurate position after bulk updates
+        db.session.refresh(item)
 
         db.session.commit()
 
