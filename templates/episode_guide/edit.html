@@ -777,9 +777,22 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Reload page to ensure DOM and data are in sync
-                    // This avoids SortableJS/Alpine conflicts
-                    window.location.reload();
+                    // Fetch fresh items from server and update Alpine state
+                    const refreshResponse = await fetch(`/guide/${this.guideId}/items`);
+                    if (refreshResponse.ok) {
+                        const freshData = await refreshResponse.json();
+                        // Group by section and sort by position
+                        const grouped = {};
+                        freshData.items.forEach(item => {
+                            if (!grouped[item.section]) grouped[item.section] = [];
+                            grouped[item.section].push(item);
+                        });
+                        Object.keys(grouped).forEach(section => {
+                            grouped[section].sort((a, b) => a.position - b.position);
+                        });
+                        // Replace all items - this forces Alpine to re-render
+                        this.items = grouped;
+                    }
                 } else {
                     console.error('Move failed:', data.error);
                     this.revertDomMove(evt);
