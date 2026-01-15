@@ -741,15 +741,32 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             const itemId = parseInt(evt.item.dataset.id);
             const fromSection = evt.from.dataset.section;
             const toSection = evt.to.dataset.section;
+            const oldIndex = evt.oldIndex;
             const newIndex = evt.newIndex;
 
             // Skip if nothing changed
-            if (fromSection === toSection && evt.oldIndex === newIndex) return;
+            if (fromSection === toSection && oldIndex === newIndex) return;
 
-            // Debug logging
-            console.log('Moving item:', { itemId, fromSection, toSection, newIndex, guideId: this.guideId });
+            // IMMEDIATELY revert SortableJS DOM change
+            this.revertDomMove(evt);
+
+            // IMMEDIATELY update Alpine's array - this triggers re-render
+            if (fromSection === toSection) {
+                const arr = [...this.items[fromSection]];
+                const [item] = arr.splice(oldIndex, 1);
+                arr.splice(newIndex, 0, item);
+                this.items[fromSection] = arr;
+            } else {
+                const fromArr = [...this.items[fromSection]];
+                const toArr = [...(this.items[toSection] || [])];
+                const [item] = fromArr.splice(oldIndex, 1);
+                toArr.splice(newIndex, 0, item);
+                this.items[fromSection] = fromArr;
+                this.items[toSection] = toArr;
+            }
+
+            // Now save to server (optimistic update already done)
             const url = `/guide/${this.guideId}/items/move`;
-            console.log('Request URL:', url);
 
             try {
                 const response = await fetch(url, {
@@ -769,7 +786,20 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 if (!response.ok) {
                     const text = await response.text();
                     console.error('Server error:', response.status, text);
-                    this.revertDomMove(evt);
+                    // Revert optimistic update
+                    if (fromSection === toSection) {
+                        const arr = [...this.items[fromSection]];
+                        const [item] = arr.splice(newIndex, 1);
+                        arr.splice(oldIndex, 0, item);
+                        this.items[fromSection] = arr;
+                    } else {
+                        const fromArr = [...this.items[fromSection]];
+                        const toArr = [...this.items[toSection]];
+                        const [item] = toArr.splice(newIndex, 1);
+                        fromArr.splice(oldIndex, 0, item);
+                        this.items[fromSection] = fromArr;
+                        this.items[toSection] = toArr;
+                    }
                     alert('Server error: ' + response.status);
                     return;
                 }
@@ -777,30 +807,41 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Simple array manipulation - move item from old position to new
-                    if (fromSection === toSection) {
-                        // Same section: remove from old index, insert at new index
-                        const arr = this.items[fromSection];
-                        const [item] = arr.splice(evt.oldIndex, 1);
-                        arr.splice(newIndex, 0, item);
-                        // Force reactivity by reassigning
-                        this.items[fromSection] = [...arr];
-                    } else {
-                        // Cross section: remove from old, add to new
-                        const [item] = this.items[fromSection].splice(evt.oldIndex, 1);
-                        this.items[toSection].splice(newIndex, 0, item);
-                        // Force reactivity
-                        this.items[fromSection] = [...this.items[fromSection]];
-                        this.items[toSection] = [...this.items[toSection]];
-                    }
+                    // Already updated optimistically, nothing to do
                 } else {
+                    // Revert the optimistic update
                     console.error('Move failed:', data.error);
-                    this.revertDomMove(evt);
+                    if (fromSection === toSection) {
+                        const arr = [...this.items[fromSection]];
+                        const [item] = arr.splice(newIndex, 1);
+                        arr.splice(oldIndex, 0, item);
+                        this.items[fromSection] = arr;
+                    } else {
+                        const fromArr = [...this.items[fromSection]];
+                        const toArr = [...this.items[toSection]];
+                        const [item] = toArr.splice(newIndex, 1);
+                        fromArr.splice(oldIndex, 0, item);
+                        this.items[fromSection] = fromArr;
+                        this.items[toSection] = toArr;
+                    }
                     alert('Failed to save position: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
+                // Revert the optimistic update
                 console.error('Move request failed:', error);
-                this.revertDomMove(evt);
+                if (fromSection === toSection) {
+                    const arr = [...this.items[fromSection]];
+                    const [item] = arr.splice(newIndex, 1);
+                    arr.splice(oldIndex, 0, item);
+                    this.items[fromSection] = arr;
+                } else {
+                    const fromArr = [...this.items[fromSection]];
+                    const toArr = [...this.items[toSection]];
+                    const [item] = toArr.splice(newIndex, 1);
+                    fromArr.splice(oldIndex, 0, item);
+                    this.items[fromSection] = fromArr;
+                    this.items[toSection] = toArr;
+                }
                 alert('Failed to save position. Please try again.');
             }
         },
