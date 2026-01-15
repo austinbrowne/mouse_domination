@@ -746,9 +746,6 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             // Skip if nothing changed
             if (fromSection === toSection && evt.oldIndex === newIndex) return;
 
-            // IMMEDIATELY revert SortableJS DOM change - let Alpine handle rendering
-            this.revertDomMove(evt);
-
             // Debug logging
             console.log('Moving item:', { itemId, fromSection, toSection, newIndex, guideId: this.guideId });
             const url = `/guide/${this.guideId}/items/move`;
@@ -772,7 +769,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 if (!response.ok) {
                     const text = await response.text();
                     console.error('Server error:', response.status, text);
-                    // DOM already reverted upfront
+                    this.revertDomMove(evt);
                     alert('Server error: ' + response.status);
                     return;
                 }
@@ -780,16 +777,17 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Update Alpine state - this will trigger re-render with correct order
-                    this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
+                    // Reload page to ensure DOM and data are in sync
+                    // This avoids SortableJS/Alpine conflicts
+                    window.location.reload();
                 } else {
-                    // DOM already reverted, just show error
                     console.error('Move failed:', data.error);
+                    this.revertDomMove(evt);
                     alert('Failed to save position: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                // DOM already reverted, just show error
                 console.error('Move request failed:', error);
+                this.revertDomMove(evt);
                 alert('Failed to save position. Please try again.');
             }
         },
