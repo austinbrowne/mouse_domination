@@ -777,8 +777,22 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Sync Alpine's array to match the DOM order that SortableJS created
-                    this.syncAlpineToDOM(fromSection, toSection);
+                    // Simple array manipulation - move item from old position to new
+                    if (fromSection === toSection) {
+                        // Same section: remove from old index, insert at new index
+                        const arr = this.items[fromSection];
+                        const [item] = arr.splice(evt.oldIndex, 1);
+                        arr.splice(newIndex, 0, item);
+                        // Force reactivity by reassigning
+                        this.items[fromSection] = [...arr];
+                    } else {
+                        // Cross section: remove from old, add to new
+                        const [item] = this.items[fromSection].splice(evt.oldIndex, 1);
+                        this.items[toSection].splice(newIndex, 0, item);
+                        // Force reactivity
+                        this.items[fromSection] = [...this.items[fromSection]];
+                        this.items[toSection] = [...this.items[toSection]];
+                    }
                 } else {
                     console.error('Move failed:', data.error);
                     this.revertDomMove(evt);
@@ -788,45 +802,6 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 console.error('Move request failed:', error);
                 this.revertDomMove(evt);
                 alert('Failed to save position. Please try again.');
-            }
-        },
-
-        syncAlpineToDOM(fromSection, toSection) {
-            // Read the actual DOM order after SortableJS moved elements
-            // Then rebuild Alpine's arrays to match, so idx values are correct
-
-            const syncSection = (sectionKey) => {
-                const container = document.getElementById(`sortable-${sectionKey}`);
-                if (!container) return;
-
-                // Get item IDs in current DOM order
-                const domIds = Array.from(container.querySelectorAll('.sortable-item'))
-                    .map(el => parseInt(el.dataset.id));
-
-                // Build lookup of current items
-                const itemsById = {};
-                (this.items[sectionKey] || []).forEach(item => {
-                    itemsById[item.id] = item;
-                });
-
-                // Also check the other section for cross-section moves
-                if (fromSection !== toSection) {
-                    const otherSection = sectionKey === fromSection ? toSection : fromSection;
-                    (this.items[otherSection] || []).forEach(item => {
-                        itemsById[item.id] = item;
-                    });
-                }
-
-                // Rebuild array in DOM order with correct positions
-                this.items[sectionKey] = domIds
-                    .filter(id => itemsById[id])
-                    .map((id, idx) => ({...itemsById[id], position: idx}));
-            };
-
-            // Sync both sections
-            syncSection(toSection);
-            if (fromSection !== toSection) {
-                syncSection(fromSection);
             }
         },
 
