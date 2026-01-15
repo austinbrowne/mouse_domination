@@ -55,7 +55,7 @@
                     </svg>
                 </div>
                 <!-- Topic Number -->
-                <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(item.position + 1) + '.'"></span>
+                <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
                 <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
                     <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
                     <template x-if="item.links && item.links.length">
@@ -364,7 +364,7 @@
                                             <circle cx="9" cy="20" r="1.5"/><circle cx="15" cy="20" r="1.5"/>
                                         </svg>
                                     </div>
-                                    <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(item.position + 1) + '.'"></span>
+                                    <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
                                     <div class="flex-1 min-w-0">
                                         <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
                                         <template x-if="item.links && item.links.length">
