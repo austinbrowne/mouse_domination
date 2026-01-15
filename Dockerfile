@@ -41,6 +41,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Create directories that the app needs to write to
+RUN mkdir -p /app/logs /app/backups && chown -R appuser:appuser /app/logs /app/backups
+
 # Switch to non-root user
 USER appuser
 
