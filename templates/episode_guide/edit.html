@@ -769,7 +769,9 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Update local Alpine state to match the move
+                    // Revert the DOM move - let Alpine handle the re-render based on data
+                    this.revertDomMove(evt);
+                    // Update Alpine state which will trigger proper re-render with correct numbering
                     this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
                 } else {
                     console.error('Move failed:', data.error);
@@ -784,27 +786,26 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         },
 
         syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
-            // Remove from old section in Alpine state
+            // Create NEW array references to force Alpine reactivity
+            // This ensures x-for re-renders with correct idx values
+
+            // Remove from old section - create new array reference
             if (this.items[fromSection]) {
                 this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
             }
 
-            // Add to new section at correct position
-            if (!this.items[toSection]) {
-                this.items[toSection] = [];
-            }
+            // Build new target section array
+            let targetItems = [...(this.items[toSection] || [])];
 
             // Insert the updated item at the new position
-            this.items[toSection].splice(newPosition, 0, updatedItem);
+            targetItems.splice(newPosition, 0, updatedItem);
 
-            // Update positions in local state to match
-            this.items[toSection].forEach((item, idx) => {
-                item.position = idx;
-            });
+            // Update positions and create new object references to ensure reactivity
+            this.items[toSection] = targetItems.map((item, idx) => ({...item, position: idx}));
+
+            // Also update from section positions with new references
             if (fromSection !== toSection && this.items[fromSection]) {
-                this.items[fromSection].forEach((item, idx) => {
-                    item.position = idx;
-                });
+                this.items[fromSection] = this.items[fromSection].map((item, idx) => ({...item, position: idx}));
             }
         },
 
