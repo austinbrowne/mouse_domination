@@ -55,7 +55,7 @@
                     </svg>
                 </div>
                 <!-- Topic Number -->
-                <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(item.position + 1) + '.'"></span>
+                <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
                 <div class="flex-1 min-w-0 cursor-pointer" @click="startEditingItem(item)">
                     <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
                     <template x-if="item.links && item.links.length">
@@ -364,7 +364,7 @@
                                             <circle cx="9" cy="20" r="1.5"/><circle cx="15" cy="20" r="1.5"/>
                                         </svg>
                                     </div>
-                                    <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(item.position + 1) + '.'"></span>
+                                    <span class="text-gray-400 text-xs font-medium flex-shrink-0" x-text="(idx + 1) + '.'"></span>
                                     <div class="flex-1 min-w-0">
                                         <div class="font-medium text-gray-900 text-sm" x-text="item.title"></div>
                                         <template x-if="item.links && item.links.length">
@@ -784,18 +784,27 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         },
 
         syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
-            // Remove from old section
-            let fromItems = (this.items[fromSection] || []).filter(i => i.id !== itemId);
+            // Remove from old section in Alpine state
+            if (this.items[fromSection]) {
+                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
+            }
 
-            // Build target array with item inserted at new position
-            let toItems = fromSection === toSection ? fromItems : [...(this.items[toSection] || [])];
-            toItems.splice(newPosition, 0, updatedItem);
+            // Add to new section at correct position
+            if (!this.items[toSection]) {
+                this.items[toSection] = [];
+            }
 
-            // Create new arrays with updated positions to trigger Alpine reactivity
-            this.items[toSection] = toItems.map((item, idx) => ({...item, position: idx}));
+            // Insert the updated item at the new position
+            this.items[toSection].splice(newPosition, 0, updatedItem);
 
-            if (fromSection !== toSection) {
-                this.items[fromSection] = fromItems.map((item, idx) => ({...item, position: idx}));
+            // Update positions in local state to match
+            this.items[toSection].forEach((item, idx) => {
+                item.position = idx;
+            });
+            if (fromSection !== toSection && this.items[fromSection]) {
+                this.items[fromSection].forEach((item, idx) => {
+                    item.position = idx;
+                });
             }
         },
 
