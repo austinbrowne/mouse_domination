@@ -1,0 +1,41 @@
+# Deploy Mouse Domination to Hetzner on push to main
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Hetzner
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "📦 Pulling latest code..."
+            cd /opt/apps/mouse_domination
+            git pull origin main
+
+            echo "🐳 Rebuilding and restarting..."
+            cd deploy
+            docker compose build mouse-domination
+            docker compose up -d mouse-domination
+
+            echo "🔍 Verifying..."
+            sleep 5
+            if docker compose ps mouse-domination | grep -q "Up"; then
+              echo "✅ Deployment successful!"
+              docker compose ps mouse-domination
+            else
+              echo "❌ Deployment may have failed"
+              docker compose logs --tail=30 mouse-domination
+              exit 1
+            fi
