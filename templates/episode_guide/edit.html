@@ -621,11 +621,19 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         editingItemId: null,
         editingItem: { title: '', links: [''], notes: '' },
         customSections: initialCustomSections || [],
-        items: {{ items_json | tojson | safe }}.reduce((acc, item) => {
-            if (!acc[item.section]) acc[item.section] = [];
-            acc[item.section].push(item);
-            return acc;
-        }, {}),
+        items: (() => {
+            // Group items by section and sort by position
+            const grouped = {{ items_json | tojson | safe }}.reduce((acc, item) => {
+                if (!acc[item.section]) acc[item.section] = [];
+                acc[item.section].push(item);
+                return acc;
+            }, {});
+            // Sort each section by position
+            Object.keys(grouped).forEach(section => {
+                grouped[section].sort((a, b) => a.position - b.position);
+            });
+            return grouped;
+        })(),
         sortableInstances: [],
 
         // Discord import state
@@ -769,9 +777,8 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 const data = await response.json();
 
                 if (data.success) {
-                    // Revert the DOM move - let Alpine handle the re-render based on data
-                    this.revertDomMove(evt);
-                    // Update Alpine state which will trigger proper re-render with correct numbering
+                    // Update Alpine state to match the DOM move that SortableJS already made
+                    // Don't revert DOM - SortableJS already put it where we want it
                     this.syncItemsAfterMove(itemId, fromSection, toSection, newIndex, data.item);
                 } else {
                     console.error('Move failed:', data.error);
@@ -786,26 +793,35 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         },
 
         syncItemsAfterMove(itemId, fromSection, toSection, newPosition, updatedItem) {
-            // Create NEW array references to force Alpine reactivity
-            // This ensures x-for re-renders with correct idx values
+            // Update Alpine data to match the DOM order that SortableJS created
+            // The key is that x-for uses array index (idx) for numbering,
+            // so array order must match visual order
 
-            // Remove from old section - create new array reference
-            if (this.items[fromSection]) {
-                this.items[fromSection] = this.items[fromSection].filter(i => i.id !== itemId);
-            }
+            if (fromSection === toSection) {
+                // Same section move: remove item and reinsert at new position
+                let sectionItems = (this.items[fromSection] || []).filter(i => i.id !== itemId);
 
-            // Build new target section array
-            let targetItems = [...(this.items[toSection] || [])];
+                // Insert at new position
+                sectionItems.splice(newPosition, 0, {...updatedItem});
 
-            // Insert the updated item at the new position
-            targetItems.splice(newPosition, 0, updatedItem);
+                // Update all positions to match array order
+                this.items[fromSection] = sectionItems.map((item, idx) => ({...item, position: idx}));
+            } else {
+                // Cross-section move: remove from old, add to new
 
-            // Update positions and create new object references to ensure reactivity
-            this.items[toSection] = targetItems.map((item, idx) => ({...item, position: idx}));
+                // Remove from old section and renumber
+                if (this.items[fromSection]) {
+                    this.items[fromSection] = this.items[fromSection]
+                        .filter(i => i.id !== itemId)
+                        .map((item, idx) => ({...item, position: idx}));
+                }
 
-            // Also update from section positions with new references
-            if (fromSection !== toSection && this.items[fromSection]) {
-                this.items[fromSection] = this.items[fromSection].map((item, idx) => ({...item, position: idx}));
+                // Add to new section at correct position
+                let targetItems = [...(this.items[toSection] || [])];
+                targetItems.splice(newPosition, 0, {...updatedItem});
+
+                // Update all positions to match array order
+                this.items[toSection] = targetItems.map((item, idx) => ({...item, position: idx}));
             }
         },
 
