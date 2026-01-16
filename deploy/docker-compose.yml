@@ -58,8 +58,9 @@ services:
       - DISCORD_TOKEN=${DISCORD_BOT_TOKEN:?Set DISCORD_BOT_TOKEN in .env}
       - DISCORD_CHANNEL_ID=${DISCORD_NOTIFICATION_CHANNEL_ID:-}
     volumes:
-      - discord_bot_state:/app/state
-      - discord_bot_config:/app/config
+      # Bind mount config and state files directly (persists across rebuilds)
+      - ./discord-bot-data/config.json:/app/config.json
+      - ./discord-bot-data/state.json:/app/state.json
     # No ports - bot only makes outbound connections
 
   # ===================
@@ -97,7 +98,5 @@ volumes:
   postgres_data:
   app_uploads:
   app_backups:
-  discord_bot_state:
-  discord_bot_config:
   certbot_certs:
   certbot_www:
