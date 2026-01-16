@@ -70,6 +70,48 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 
 ---
 
+## Production Deployment
+
+- **Server**: Hetzner (178.156.211.75), user `austin`
+- **Stack**: Docker Compose at `/opt/apps/infra/docker-compose.yml`
+- **App code**: `/opt/apps/mouse_domination`
+- **Database**: PostgreSQL in `infra-postgres-1` container (user: `mousedom`, db: `mousedom`)
+
+### CI/CD Pipeline (GitHub Actions)
+
+**On push to `main`:**
+1. Pulls latest code to server
+2. Rebuilds and restarts the Docker container
+3. Runs migrations automatically **IF** files in `migrations/` changed
+
+**Manual migration trigger:**
+- Run workflow from GitHub Actions with "Force run database migrations" checked
+
+### Schema Change Workflow
+
+```bash
+# 1. Create migration locally
+flask db migrate -m "Add new field to User"
+
+# 2. Commit and push
+git add migrations/
+git commit -m "feat: Add new field migration"
+git push origin main
+
+# GitHub Actions detects migrations/ change and runs flask db upgrade
+```
+
+### Manual Server Access
+
+```bash
+ssh austin@178.156.211.75
+cd /opt/apps/infra
+docker compose logs -f mouse-domination  # View logs
+docker compose exec mouse-domination flask db upgrade  # Manual migration
+```
+
+---
+
 ## Code Style Defaults
 
 - Write tests for new code
