@@ -60,7 +60,7 @@ def get_valid_sections_for_guide(guide):
 def list_guides():
     """List all episode guides with filtering by status."""
     status = request.args.get('status')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '').strip()[:100]  # Max 100 chars
     page = request.args.get('page', 1, type=int)
 
     query = EpisodeGuide.query

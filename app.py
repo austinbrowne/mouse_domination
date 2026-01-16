@@ -2,7 +2,7 @@ import os
 from flask import Flask, g
 from flask_login import current_user
 from config import Config, DevelopmentConfig, ProductionConfig
-from extensions import db, csrf, login_manager, limiter
+from extensions import db, csrf, login_manager, limiter, migrate
 import uuid
 
 
@@ -24,6 +24,7 @@ def create_app(config_class=None):
 
     # Initialize extensions
     db.init_app(app)
+    migrate.init_app(app, db)
     csrf.init_app(app)
     login_manager.init_app(app)
     limiter.init_app(app)

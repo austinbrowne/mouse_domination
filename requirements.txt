@@ -10,6 +10,8 @@ argon2-cffi>=23.1.0
 
 # Database
 SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.9
+Flask-Migrate>=4.0.0
 
 # Data processing (for import)
 pandas>=2.2.0

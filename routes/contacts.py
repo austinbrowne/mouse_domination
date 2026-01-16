@@ -20,7 +20,7 @@ def list_contacts():
     """List all contacts with optional filtering and pagination."""
     role = request.args.get('role')
     status = request.args.get('status')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '').strip()[:100]  # Max 100 chars
     page = request.args.get('page', 1, type=int)
 
     # Get valid values for filtering (includes custom options)

@@ -4,19 +4,50 @@ name: Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: 'Force run database migrations'
+        required: false
+        default: 'false'
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      migrations: ${{ steps.changes.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect migration changes
+        id: changes
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.run_migrations }}" == "true" ]]; then
+            echo "migrations=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+            if echo "$CHANGED" | grep -q "^migrations/"; then
+              echo "migrations=true" >> $GITHUB_OUTPUT
+              echo "Migration changes detected"
+            fi
+          fi
+
   deploy:
+    needs: detect-changes
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to Hetzner
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          RUN_MIGRATIONS: ${{ needs.detect-changes.outputs.migrations }}
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: RUN_MIGRATIONS
           script: |
             set -e
             echo "📦 Pulling latest code..."
@@ -27,6 +58,12 @@ jobs:
             cd /opt/apps/infra
             docker compose build mouse-domination
             docker compose up -d mouse-domination
+
+            # Run migrations if migrations/ changed
+            if [[ "$RUN_MIGRATIONS" == "true" ]]; then
+              echo "🗄️ Running database migrations..."
+              docker compose exec -T mouse-domination flask db upgrade
+            fi
 
             echo "🔍 Verifying..."
             sleep 5

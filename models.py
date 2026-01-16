@@ -228,7 +228,7 @@ class Inventory(db.Model):
     buyer = db.Column(db.String(100), nullable=True)
     sale_notes = db.Column(db.Text, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)  # Index for sorting
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships

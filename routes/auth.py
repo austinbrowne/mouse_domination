@@ -125,10 +125,12 @@ def register():
             flash('Please enter a valid email address.', 'error')
             return render_template('auth/register.html')
 
-        # Check existing user
+        # Check existing user - don't reveal if email exists (prevents enumeration)
         if User.query.filter_by(email=email).first():
-            flash('An account with this email already exists.', 'error')
-            return render_template('auth/register.html')
+            # Log for admin awareness, but show same success message to user
+            current_app.logger.info(f"Registration attempted for existing email: {email}")
+            flash('Account created. Please wait for admin approval.', 'success')
+            return redirect(url_for('auth.pending'))
 
         # Validate password match
         if password != confirm_password:

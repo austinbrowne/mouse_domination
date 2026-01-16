@@ -22,7 +22,7 @@ def list_collabs():
     collab_type = request.args.get('type')
     status = request.args.get('status')
     follow_up = request.args.get('follow_up')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '').strip()[:100]  # Max 100 chars
     page = request.args.get('page', 1, type=int)
 
     # Get valid values for filtering (includes custom options)

@@ -25,7 +25,7 @@ def list_inventory():
     category = request.args.get('category')
     status = request.args.get('status')
     sold = request.args.get('sold')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '').strip()[:100]  # Max 100 chars
     page = request.args.get('page', 1, type=int)
 
     # Get valid values for filtering (includes custom options)

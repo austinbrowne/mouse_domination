@@ -18,7 +18,7 @@ templates_bp = Blueprint('templates', __name__)
 def list_templates():
     """List all outreach templates with optional filtering."""
     category = request.args.get('category')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '').strip()[:100]  # Max 100 chars
     page = request.args.get('page', 1, type=int)
 
     query = OutreachTemplate.query
