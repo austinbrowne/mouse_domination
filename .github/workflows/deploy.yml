@@ -24,7 +24,7 @@ jobs:
             git pull origin main
 
             echo "🐳 Rebuilding and restarting..."
-            cd deploy
+            cd /opt/apps/infra
             docker compose build mouse-domination
             docker compose up -d mouse-domination
 
