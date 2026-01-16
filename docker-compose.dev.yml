@@ -1,28 +1,27 @@
-# Mouse Domination CRM - Development Docker Compose
-# Use: docker compose -f docker-compose.dev.yml up
+# Local development database only
+# Flask runs natively (not in Docker) for faster iteration
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   flask run --port 5001
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: mouse_domination_dev
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - SECRET_KEY=dev-secret-key-not-for-production
-      - DATABASE_URL=sqlite:////app/data/mouse_domination.db
+  db:
+    image: postgres:16-alpine
+    container_name: mouse_domination_dev_db
     ports:
-      - "5000:5000"
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=mouse
+      - POSTGRES_PASSWORD=mouse
+      - POSTGRES_DB=mouse_domination
     volumes:
-      # Mount source code for hot reload
-      - .:/app
-      # Persist SQLite database
-      - ./data:/app/data
-    command: >
-      sh -c "
-        pip install -r requirements.txt &&
-        python -c 'from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()' &&
-        flask run --host=0.0.0.0 --debug
-      "
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mouse -d mouse_domination"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:

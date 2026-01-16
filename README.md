@@ -17,7 +17,7 @@ A creator-focused CRM for managing brand relationships, inventory tracking, cont
 
 - **Backend**: Python 3.11+, Flask 3.x, SQLAlchemy 2.x
 - **Authentication**: Flask-Login, Argon2id password hashing
-- **Database**: SQLite (dev/single-user), PostgreSQL (optional)
+- **Database**: PostgreSQL (recommended), SQLite (fallback)
 - **Frontend**: Jinja2, TailwindCSS (CDN), Alpine.js
 - **Server**: Gunicorn, Cloudflare Tunnel (HTTPS)
 
@@ -54,6 +54,26 @@ flask run --port 5001
 ```
 
 The app will be available at `http://localhost:5001`.
+
+### Local PostgreSQL (Recommended)
+
+For dev/prod parity, use local PostgreSQL instead of SQLite:
+
+```bash
+# Start local PostgreSQL
+docker compose -f docker-compose.dev.yml up -d
+
+# Add to .env (or uncomment in .env.example)
+echo "DATABASE_URL=postgresql://mouse:mouse@localhost:5433/mouse_domination" >> .env
+
+# Run migrations to create tables
+flask db upgrade
+
+# (Optional) Sync data from production
+python scripts/sync_from_production.py
+```
+
+This matches production's PostgreSQL setup and avoids SQLite ↔ PostgreSQL type conversion issues.
 
 ### First-Time Setup
 
