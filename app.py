@@ -70,7 +70,7 @@ def create_app(config_class=None):
         if not app.debug:
             response.headers['Content-Security-Policy'] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.tailwindcss.com cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' cdn.tailwindcss.com fonts.googleapis.com; "
                 "font-src 'self' fonts.gstatic.com; "
                 "img-src 'self' data: https:; "
