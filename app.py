@@ -1,6 +1,7 @@
 import os
 from flask import Flask, g
 from flask_login import current_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config, DevelopmentConfig, ProductionConfig
 from extensions import db, csrf, login_manager, limiter, migrate
 import uuid
@@ -21,6 +22,12 @@ def create_app(config_class=None):
 
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Trust proxy headers (Cloudflare, nginx, etc.)
+    # x_for=1: trust X-Forwarded-For for client IP
+    # x_proto=1: trust X-Forwarded-Proto for HTTPS detection
+    if os.environ.get('FLASK_ENV') == 'production':
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # Initialize extensions
     db.init_app(app)

@@ -1,5 +1,5 @@
 -- PostgreSQL data export from SQLite
--- Generated: 2026-01-15T18:59:22.473091
+-- Generated: 2026-01-16T13:57:26.042143
 -- Run this AFTER the Flask app has created the tables
 
 BEGIN;
@@ -7,7 +7,7 @@ BEGIN;
 SET session_replication_role = 'replica';
 
 -- Table: users (2 rows)
-INSERT INTO users (id, email, name, created_at, last_login_at, password_hash, failed_login_attempts, locked_until, password_changed_at, is_approved, is_admin) VALUES (1, 'austinjbrowne@gmail.com', NULL, '2026-01-12 05:46:38.366681', '2026-01-15 06:09:29.467426', '$argon2id$v=19$m=65536,t=3,p=4$VG+1Clngq7UqGPPw56LU4g$MnAA0jbm48L9AE5ltN1JPHIlX8VBfPU7Rn+NOqoPPsU', 0, NULL, '2026-01-12 19:15:58.233291', TRUE, TRUE);
+INSERT INTO users (id, email, name, created_at, last_login_at, password_hash, failed_login_attempts, locked_until, password_changed_at, is_approved, is_admin) VALUES (1, 'austinjbrowne@gmail.com', NULL, '2026-01-12 05:46:38.366681', '2026-01-16 17:38:15.746745', '$argon2id$v=19$m=65536,t=3,p=4$VG+1Clngq7UqGPPw56LU4g$MnAA0jbm48L9AE5ltN1JPHIlX8VBfPU7Rn+NOqoPPsU', 0, NULL, '2026-01-12 19:15:58.233291', TRUE, TRUE);
 INSERT INTO users (id, email, name, created_at, last_login_at, password_hash, failed_login_attempts, locked_until, password_changed_at, is_approved, is_admin) VALUES (2, 'phalangesco@gmail.com', 'PhalangesCo', '2026-01-12 20:12:48.366180', '2026-01-15 03:28:57.441125', '$argon2id$v=19$m=65536,t=3,p=4$thfPF3G0HdL9jFpbNFz6DA$/21lNMcmIl+2KQ0gvvAnT4ehsIURFWwO8l5rigBjzks', 0, NULL, '2026-01-12 20:12:48.365493', TRUE, FALSE);
 
 -- Table: companies (49 rows)
