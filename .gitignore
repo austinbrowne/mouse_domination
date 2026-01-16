@@ -48,3 +48,4 @@ static/uploads/profiles/*.jpg
 static/uploads/profiles/*.jpeg
 static/uploads/profiles/*.gif
 static/uploads/profiles/*.webp
+DEPLOYMENT.md

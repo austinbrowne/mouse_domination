@@ -178,28 +178,73 @@ To get a custom emoji's ID:
 
 ## Production Deployment
 
-Production deployment uses Docker via the [dazz-infra](https://github.com/austinbrowne/dazz-infra) repo.
+Production uses Docker Compose with PostgreSQL and Cloudflare Tunnel for HTTPS.
 
-### Auto-Deploy
+### Required .env File
 
-Push to `main` branch triggers automatic deployment via GitHub Actions.
-
-### Manual Deploy
+Create `.env` on the server:
 
 ```bash
-ssh user@server
-cd /opt/apps/infra
-docker compose build mouse-domination
-docker compose up -d mouse-domination
+SECRET_KEY=<generate-with-python>
+DATABASE_URL=postgresql://<user>:<pass>@db:5432/<dbname>
+POSTGRES_USER=<user>
+POSTGRES_PASSWORD=<pass>
+POSTGRES_DB=<dbname>
 ```
 
-### Infrastructure
+Generate secret key: `python3 -c "import secrets; print(secrets.token_hex(32))"`
 
-See [dazz-infra](https://github.com/austinbrowne/dazz-infra) for:
-- Docker Compose configuration
-- Nginx reverse proxy with SSL
-- PostgreSQL database
-- Deployment scripts
+### Docker Commands
+
+```bash
+# Start services
+docker compose up -d --build
+
+# View logs
+docker compose logs -f app
+
+# Run database migrations
+docker compose exec app flask db upgrade
+
+# Database shell
+docker compose exec db psql -U <user> -d <dbname>
+
+# Full reset (WARNING: deletes all data)
+docker compose down -v
+docker compose up -d
+```
+
+**Note:** The database service is named `db` in docker-compose.yml.
+
+### Cloudflare Tunnel
+
+HTTPS is provided by Cloudflare Tunnel (dashboard-managed).
+
+1. Create tunnel in Cloudflare Zero Trust dashboard
+2. Add public hostname pointing to `http://localhost:5000`
+3. Run the connector install command on the server
+
+**Important:** Use Cloudflare Tunnel's CNAME, not an A record pointing to the server IP.
+
+### Data Migration
+
+Export from local SQLite and import to production PostgreSQL:
+
+```bash
+# Local: export data
+python scripts/export_for_postgres.py
+
+# Copy to server
+scp scripts/data_export.sql user@server:/tmp/
+
+# Server: import data
+docker compose exec app flask db upgrade
+docker compose exec -T db psql -U <user> -d <dbname> < /tmp/data_export.sql
+```
+
+### Server-Specific Details
+
+See `DEPLOYMENT.md` (gitignored) for credentials, IPs, and server-specific commands.
 
 ## Project Structure
 
