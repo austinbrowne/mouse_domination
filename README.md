@@ -178,24 +178,28 @@ To get a custom emoji's ID:
 
 ## Production Deployment
 
-### Self-Hosted with Cloudflare Tunnel (Current Setup)
+Production deployment uses Docker via the [dazz-infra](https://github.com/austinbrowne/dazz-infra) repo.
+
+### Auto-Deploy
+
+Push to `main` branch triggers automatic deployment via GitHub Actions.
+
+### Manual Deploy
 
 ```bash
-# Start gunicorn
-source .venv/bin/activate
-gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon
-
-# Or use deploy script(test)
-./deploy.sh
+ssh user@server
+cd /opt/apps/infra
+docker compose build mouse-domination
+docker compose up -d mouse-domination
 ```
 
-Cloudflare Tunnel handles HTTPS and routes traffic to localhost:8000.
+### Infrastructure
 
-### Quick Deploy (Restart App)
-
-```bash
-./deploy.sh
-```
+See [dazz-infra](https://github.com/austinbrowne/dazz-infra) for:
+- Docker Compose configuration
+- Nginx reverse proxy with SSL
+- PostgreSQL database
+- Deployment scripts
 
 ## Project Structure
 
