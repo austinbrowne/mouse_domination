@@ -12,13 +12,13 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=mouse
-      - POSTGRES_PASSWORD=mouse
-      - POSTGRES_DB=mouse_domination
+      - POSTGRES_USER=mousedom
+      - POSTGRES_PASSWORD=mousedom
+      - POSTGRES_DB=mousedom
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mouse -d mouse_domination"]
+      test: ["CMD-SHELL", "pg_isready -U mousedom -d mousedom"]
       interval: 5s
       timeout: 5s
       retries: 5

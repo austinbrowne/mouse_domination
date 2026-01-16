@@ -30,8 +30,8 @@ if [ -f "$PROJECT_DIR/.env" ]; then
     source "$PROJECT_DIR/.env"
 fi
 
-POSTGRES_USER=${POSTGRES_USER:-mouse}
-POSTGRES_DB=${POSTGRES_DB:-mouse_domination}
+POSTGRES_USER=${POSTGRES_USER:-mousedom}
+POSTGRES_DB=${POSTGRES_DB:-mousedom}
 
 backup() {
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)

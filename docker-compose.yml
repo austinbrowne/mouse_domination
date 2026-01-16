@@ -13,7 +13,7 @@ services:
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-mouse}:${POSTGRES_PASSWORD:-mouse}@db:5432/${POSTGRES_DB:-mouse_domination}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mousedom}:${POSTGRES_PASSWORD:-mousedom}@db:5432/${POSTGRES_DB:-mousedom}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
       - YOUTUBE_CHANNEL_ID=${YOUTUBE_CHANNEL_ID:-}
@@ -39,13 +39,13 @@ services:
     container_name: mouse_domination_db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-mouse}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mouse}
-      - POSTGRES_DB=${POSTGRES_DB:-mouse_domination}
+      - POSTGRES_USER=${POSTGRES_USER:-mousedom}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mousedom}
+      - POSTGRES_DB=${POSTGRES_DB:-mousedom}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mouse} -d ${POSTGRES_DB:-mouse_domination}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mousedom} -d ${POSTGRES_DB:-mousedom}"]
       interval: 10s
       timeout: 5s
       retries: 5

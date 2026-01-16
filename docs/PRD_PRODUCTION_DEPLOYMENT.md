@@ -46,7 +46,7 @@ This document outlines the plan to take Mouse Domination CRM from development to
 # .env.example
 FLASK_ENV=production
 SECRET_KEY=<generate-64-char-hex>
-DATABASE_URL=postgresql://user:pass@localhost:5432/mouse_domination
+DATABASE_URL=postgresql://user:pass@localhost:5432/mousedom
 
 # Optional
 YOUTUBE_API_KEY=
@@ -151,7 +151,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mouse_domination
+      - DATABASE_URL=postgresql://mousedom:postgres@db:5432/mousedom
       - SECRET_KEY=${SECRET_KEY}
       - FLASK_ENV=production
     depends_on:
@@ -162,13 +162,13 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_DB=mouse_domination
-      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mousedom
+      - POSTGRES_USER=mousedom
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U mousedom"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -182,7 +182,7 @@ services:
       - ./backups:/backups
     command: >
       sh -c "while true; do
-        pg_dump -h db -U postgres mouse_domination > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql
+        pg_dump -h db -U mousedom mousedom > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql
         find /backups -type f -mtime +7 -delete
         sleep 86400
       done"
@@ -467,7 +467,7 @@ docker compose up -d
 docker compose stop app
 
 # Restore from backup
-docker exec -i db psql -U postgres mouse_domination < /backups/backup_YYYYMMDD.sql
+docker exec -i db psql -U mousedom mousedom < /backups/backup_YYYYMMDD.sql
 
 # Restart application
 docker compose start app
