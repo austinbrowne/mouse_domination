@@ -16,7 +16,7 @@ depends_on = None
 
 
 def upgrade():
-    op.create_index('ix_inventory_created_at', 'inventory', ['created_at'], unique=False)
+    op.create_index('ix_inventory_created_at', 'inventory', ['created_at'], unique=False, if_not_exists=True)
 
 
 def downgrade():
