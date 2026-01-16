@@ -1,5 +1,5 @@
-from flask_login import login_required
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, abort
 from sqlalchemy import func, case
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -29,7 +29,10 @@ def list_collabs():
     valid_collab_types = get_valid_values_for_type('collab_type')
 
     # Eager load contact to avoid N+1
-    query = Collaboration.query.options(joinedload(Collaboration.contact))
+    # Filter by current user for data isolation
+    query = Collaboration.query.options(
+        joinedload(Collaboration.contact)
+    ).filter_by(user_id=current_user.id)
 
     if collab_type and collab_type in valid_collab_types:
         query = query.filter_by(collab_type=collab_type)
@@ -46,14 +49,14 @@ def list_collabs():
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
 
-    # Stats - single aggregated query for all status counts
+    # Stats - single aggregated query for all status counts (user's data only)
     stats_result = db.session.query(
         func.sum(case((Collaboration.status == 'idea', 1), else_=0)).label('idea'),
         func.sum(case((Collaboration.status == 'reached_out', 1), else_=0)).label('reached_out'),
         func.sum(case((Collaboration.status == 'confirmed', 1), else_=0)).label('confirmed'),
         func.sum(case((Collaboration.status == 'completed', 1), else_=0)).label('completed'),
         func.sum(case((Collaboration.follow_up_needed == True, 1), else_=0)).label('need_follow_up')
-    ).first()
+    ).filter(Collaboration.user_id == current_user.id).first()
 
     # Create stats dict for template
     stats = {
@@ -101,6 +104,7 @@ def new_collab():
                 platform = 'other'
 
             collab = Collaboration(
+                user_id=current_user.id,
                 contact_id=contact_id,
                 collab_type=form.choice('collab_type', valid_collab_types, default='collab_video'),
                 status=form.choice('status', COLLAB_STATUS_CHOICES, default='idea'),
@@ -145,6 +149,9 @@ def new_collab():
 def edit_collab(id):
     """Edit an existing collaboration."""
     collab = Collaboration.query.options(joinedload(Collaboration.contact)).get_or_404(id)
+    # Verify ownership
+    if collab.user_id != current_user.id:
+        abort(403)
 
     # Get dynamic choices for form
     collab_type_choices = get_choices_for_type('collab_type')
@@ -201,17 +208,17 @@ def edit_collab(id):
                            collab_type_choices=collab_type_choices)
 
 
-# Use generic delete view factory
+# Use generic delete view factory with user ownership check
 collabs_bp.add_url_rule(
     '/<int:id>/delete',
     'delete_collab',
-    make_delete_view(Collaboration, 'contact', 'collabs.list_collabs', 'Collaboration'),
+    make_delete_view(Collaboration, 'contact', 'collabs.list_collabs', 'Collaboration', check_user_id=True),
     methods=['POST']
 )
 
 
 @collabs_bp.route('/<int:id>/complete', methods=['POST'])
-@quick_action(Collaboration, 'collabs.list_collabs')
+@quick_action(Collaboration, 'collabs.list_collabs', check_user_id=True)
 def complete_collab(collab):
     """Quick action to mark a collaboration as completed."""
     collab.status = 'completed'
@@ -220,7 +227,7 @@ def complete_collab(collab):
 
 
 @collabs_bp.route('/<int:id>/clear-followup', methods=['POST'])
-@quick_action(Collaboration, 'collabs.list_collabs')
+@quick_action(Collaboration, 'collabs.list_collabs', check_user_id=True)
 def clear_followup(collab):
     """Clear follow-up flag."""
     collab.follow_up_needed = False

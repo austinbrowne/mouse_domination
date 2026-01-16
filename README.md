@@ -19,7 +19,7 @@ A creator-focused CRM for managing brand relationships, inventory tracking, cont
 - **Authentication**: Flask-Login, Argon2id password hashing
 - **Database**: PostgreSQL (recommended), SQLite (fallback)
 - **Frontend**: Jinja2, TailwindCSS (CDN), Alpine.js
-- **Server**: Gunicorn, Cloudflare Tunnel (HTTPS)
+- **Server**: Gunicorn (production), Flask dev server (local)
 
 ## Quick Start
 
@@ -296,10 +296,10 @@ mouse_domination/
 │   ├── episode_guide/    # MouseCast templates
 │   └── ...
 ├── utils/                # Utility functions
-├── scripts/              # Deployment and migration scripts
-│   ├── deploy.sh         # Restart gunicorn
-│   ├── backup_db.sh      # SQLite backup
-│   └── migrate_flask_login.py  # Auth migration
+├── scripts/              # Migration and utility scripts
+│   ├── backup_db.sh      # Database backup (legacy)
+│   ├── migrate_flask_login.py  # Auth migration
+│   └── sync_from_production.py # Sync data from production
 └── backups/              # Database backups
 ```
 

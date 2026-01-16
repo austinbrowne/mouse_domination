@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Alpine.js cloak */
+[x-cloak] { display: none !important; }
+
+/* Better focus states */
+:focus { outline: none; }
+:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 2px; }
+
+/* Placeholder styling - ensure proper visibility */
+input::placeholder, textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+}
+input:not(:placeholder-shown)::placeholder,
+textarea:not(:placeholder-shown)::placeholder {
+    opacity: 0;
+}
+
+/* Sortable table styles */
+.sortable th[data-sort] { cursor: pointer; user-select: none; }
+.sortable th[data-sort]:hover { background-color: #f4f4f5; }
+.sortable th[data-sort]::after { content: ''; display: inline-block; width: 0; height: 0; margin-left: 8px; vertical-align: middle; opacity: 0.3; }
+.sortable th[data-sort].asc::after { border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 6px solid currentColor; opacity: 1; }
+.sortable th[data-sort].desc::after { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid currentColor; opacity: 1; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f4f4f5; }
+::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+
+/* Modern select styling */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+select:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #0ea5e9;
+    border-color: #0ea5e9;
+}
+select:hover {
+    background-color: #fafafa;
+}
+
+/* Targeted transitions (replaces global * transition) */
+.transition-colors {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+.transition-opacity {
+    transition-property: opacity;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+.transition-shadow {
+    transition-property: box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+.transition-transform {
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}

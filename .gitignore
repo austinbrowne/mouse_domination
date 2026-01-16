@@ -37,6 +37,9 @@ htmlcov/
 # Backups (we'll store these in a specific folder)
 backups/
 
+# Generated data exports
+scripts/data_export.sql
+
 # Spreadsheet (user data, don't commit)
 Mouse_Mastersheet.xlsx
 logs/
@@ -49,3 +52,7 @@ static/uploads/profiles/*.jpeg
 static/uploads/profiles/*.gif
 static/uploads/profiles/*.webp
 DEPLOYMENT.md
+
+# Node.js (for Tailwind CSS build)
+node_modules/
+package-lock.json

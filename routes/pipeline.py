@@ -1,9 +1,10 @@
-from flask_login import login_required
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, abort
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from models import SalesPipeline, Company, Contact
+from models import SalesPipeline, Company, Contact, AffiliateRevenue
+from datetime import date
 from extensions import db
 from constants import DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 from services.options import get_choices_for_type, get_valid_values_for_type
@@ -29,10 +30,11 @@ def list_deals():
     valid_deal_types = get_valid_values_for_type('deal_type')
 
     # Eager load relationships to avoid N+1
+    # Filter by current user for data isolation
     query = SalesPipeline.query.options(
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact)
-    )
+    ).filter_by(user_id=current_user.id)
 
     if deal_type and deal_type in valid_deal_types:
         query = query.filter_by(deal_type=deal_type)
@@ -48,7 +50,7 @@ def list_deals():
         page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False
     )
 
-    # Stats using database aggregation - compute what the template expects
+    # Stats using database aggregation - compute what the template expects (user's data only)
     stats_query = db.session.query(
         func.sum(func.cast(SalesPipeline.status == 'lead', db.Integer)).label('lead'),
         func.sum(func.cast(SalesPipeline.status == 'negotiating', db.Integer)).label('negotiating'),
@@ -60,7 +62,7 @@ def list_deals():
             func.cast(SalesPipeline.status.in_(['lead', 'negotiating', 'confirmed']), db.Integer) *
             func.coalesce(SalesPipeline.rate_quoted, 0)
         ), 0).label('pipeline_value'),
-    ).first()
+    ).filter(SalesPipeline.user_id == current_user.id).first()
 
     stats = {
         'lead': stats_query.lead or 0,
@@ -103,6 +105,7 @@ def new_deal():
                 raise ValidationError('Company', 'This field is required.')
 
             deal = SalesPipeline(
+                user_id=current_user.id,
                 company_id=company_id,
                 contact_id=form.foreign_key('contact_id', Contact),
                 deal_type=form.choice('deal_type', valid_deal_types, default='paid_review'),
@@ -153,6 +156,9 @@ def edit_deal(id):
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact)
     ).get_or_404(id)
+    # Verify ownership
+    if deal.user_id != current_user.id:
+        abort(403)
 
     # Get dynamic choices for form
     deal_type_choices = get_choices_for_type('deal_type')
@@ -207,27 +213,97 @@ def edit_deal(id):
                            deal_type_choices=deal_type_choices)
 
 
-# Use generic delete view factory
+# Use generic delete view factory with user ownership check
 pipeline_bp.add_url_rule(
     '/<int:id>/delete',
     'delete_deal',
-    make_delete_view(SalesPipeline, 'description', 'pipeline.list_deals', 'Deal'),
+    make_delete_view(SalesPipeline, 'deliverables', 'pipeline.list_deals', 'Deal', check_user_id=True),
     methods=['POST']
 )
 
 
 @pipeline_bp.route('/<int:id>/mark-complete', methods=['POST'])
-@quick_action(SalesPipeline, 'pipeline.list_deals')
+@quick_action(SalesPipeline, 'pipeline.list_deals', check_user_id=True)
 def mark_complete(deal):
-    """Quick action to mark a deal as completed."""
+    """Quick action to mark a deal as completed.
+
+    If deal is paid with an agreed rate, auto-creates an affiliate revenue entry.
+    """
     deal.status = 'completed'
+
+    # Auto-create revenue entry if fully paid with agreed rate
+    if deal.payment_status == 'paid' and deal.rate_agreed and deal.company_id:
+        today = date.today()
+
+        # Check if entry already exists for this user/company/month
+        existing = AffiliateRevenue.query.filter_by(
+            user_id=deal.user_id,
+            company_id=deal.company_id,
+            year=today.year,
+            month=today.month
+        ).first()
+
+        if existing:
+            existing.revenue = (existing.revenue or 0) + deal.rate_agreed
+            if existing.notes:
+                existing.notes += f"\n+ Deal: {deal.deliverables or 'N/A'}"
+            else:
+                existing.notes = f"From deal: {deal.deliverables or 'N/A'}"
+        else:
+            revenue = AffiliateRevenue(
+                user_id=deal.user_id,
+                company_id=deal.company_id,
+                year=today.year,
+                month=today.month,
+                revenue=deal.rate_agreed,
+                notes=f"From deal: {deal.deliverables or 'N/A'}"
+            )
+            db.session.add(revenue)
+
+        return 'Deal marked as completed. Revenue entry created.'
+
     return 'Deal marked as completed.'
 
 
 @pipeline_bp.route('/<int:id>/mark-paid', methods=['POST'])
-@quick_action(SalesPipeline, 'pipeline.list_deals')
+@quick_action(SalesPipeline, 'pipeline.list_deals', check_user_id=True)
 def mark_paid(deal):
-    """Quick action to mark a deal as paid."""
+    """Quick action to mark a deal as paid.
+
+    If deal is completed with an agreed rate, auto-creates an affiliate revenue entry.
+    """
     deal.payment_status = 'paid'
     deal.payment_date = db.func.current_date()
+
+    # Auto-create revenue entry if completed with agreed rate
+    if deal.status == 'completed' and deal.rate_agreed and deal.company_id:
+        today = date.today()
+
+        # Check if entry already exists for this user/company/month
+        existing = AffiliateRevenue.query.filter_by(
+            user_id=deal.user_id,
+            company_id=deal.company_id,
+            year=today.year,
+            month=today.month
+        ).first()
+
+        if existing:
+            existing.revenue = (existing.revenue or 0) + deal.rate_agreed
+            if existing.notes:
+                existing.notes += f"\n+ Deal: {deal.deliverables or 'N/A'}"
+            else:
+                existing.notes = f"From deal: {deal.deliverables or 'N/A'}"
+        else:
+            revenue = AffiliateRevenue(
+                user_id=deal.user_id,
+                company_id=deal.company_id,
+                year=today.year,
+                month=today.month,
+                revenue=deal.rate_agreed,
+                notes=f"From deal: {deal.deliverables or 'N/A'}"
+            )
+            db.session.add(revenue)
+
+        return 'Deal marked as paid. Revenue entry created.'
+
     return 'Deal marked as paid.'

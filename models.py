@@ -358,13 +358,16 @@ class Contact(db.Model):
     # Relationships
     company = db.relationship('Company', back_populates='contacts')
 
-    def to_dict(self):
+    def to_dict(self, include_company=None):
+        """Serialize contact. Pass pre-loaded company to avoid N+1 queries."""
+        # Use provided company or fall back to relationship (may cause N+1 if not eager loaded)
+        company = include_company if include_company is not None else self.company
         return {
             'id': self.id,
             'name': self.name,
             'role': self.role,
             'company_id': self.company_id,
-            'company_name': self.company.name if self.company else None,
+            'company_name': company.name if company else None,
             'email': self.email,
             'twitter': self.twitter,
             'discord': self.discord,
@@ -474,13 +477,16 @@ class Inventory(db.Model):
 
         return sale - fees - shipping - cost
 
-    def to_dict(self):
+    def to_dict(self, include_company=None):
+        """Serialize inventory item. Pass pre-loaded company to avoid N+1 queries."""
+        # Use provided company or fall back to relationship (may cause N+1 if not eager loaded)
+        company = include_company if include_company is not None else self.company
         return {
             'id': self.id,
             'user_id': self.user_id,
             'product_name': self.product_name,
             'company_id': self.company_id,
-            'company_name': self.company.name if self.company else None,
+            'company_name': company.name if company else None,
             'category': self.category,
             'source_type': self.source_type,
             'date_acquired': self.date_acquired.isoformat() if self.date_acquired else None,
@@ -512,6 +518,7 @@ class AffiliateRevenue(db.Model):
     __tablename__ = 'affiliate_revenue'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False, index=True)
     year = db.Column(db.Integer, nullable=False, index=True)  # Index for year filtering
     month = db.Column(db.Integer, nullable=False, index=True)  # Index for month filtering
@@ -522,11 +529,12 @@ class AffiliateRevenue(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    user = db.relationship('User', backref='affiliate_revenues')
     company = db.relationship('Company', back_populates='affiliate_revenues')
 
-    # Unique constraint: one entry per company per month
+    # Unique constraint: one entry per user per company per month
     __table_args__ = (
-        db.UniqueConstraint('company_id', 'year', 'month', name='unique_company_month'),
+        db.UniqueConstraint('user_id', 'company_id', 'year', 'month', name='unique_user_company_month'),
     )
 
     @property
@@ -539,6 +547,7 @@ class AffiliateRevenue(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'company_id': self.company_id,
             'company_name': self.company.name if self.company else None,
             'year': self.year,
@@ -556,6 +565,7 @@ class Collaboration(db.Model):
     __tablename__ = 'collaborations'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=False, index=True)
     collab_type = db.Column(db.String(30), default='collab_video', index=True)
     # Types: guest_on_their_channel, guest_on_mousecast, cross_promo, collab_video
@@ -576,11 +586,13 @@ class Collaboration(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    user = db.relationship('User', backref='collaborations')
     contact = db.relationship('Contact', backref='collaborations')
 
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'contact_id': self.contact_id,
             'contact_name': self.contact.name if self.contact else None,
             'collab_type': self.collab_type,
@@ -605,6 +617,7 @@ class SalesPipeline(db.Model):
     __tablename__ = 'sales_pipeline'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False, index=True)
     contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'), nullable=True, index=True)
     deal_type = db.Column(db.String(30), default='paid_review', index=True)
@@ -626,12 +639,14 @@ class SalesPipeline(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    user = db.relationship('User', backref='deals')
     company = db.relationship('Company', backref='deals')
     contact = db.relationship('Contact', backref='deals')
 
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'company_id': self.company_id,
             'company_name': self.company.name if self.company else None,
             'contact_id': self.contact_id,

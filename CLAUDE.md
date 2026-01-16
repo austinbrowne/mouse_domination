@@ -63,10 +63,13 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 
 ## Local Development Setup
 
-- **Testing URL**: app.dazztrazak.com (via Cloudflare Tunnel)
-- **Server**: Gunicorn on port 8000 (`gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon`)
-- **Tunnel**: cloudflared tunnel `mouse-domination`
-- **To restart after code changes**: `pkill -f "gunicorn.*8000" && .venv/bin/gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon`
+- **Local URL**: http://127.0.0.1:5001
+- **Server**: Flask development server (`flask run --port 5001`)
+- **Database**: PostgreSQL via Docker (`docker compose -f docker-compose.dev.yml up -d`)
+- **DB credentials**: `mouse:mouse@localhost:5433/mouse_domination`
+- **To start local dev**: `source .venv/bin/activate && flask run --port 5001`
+
+**Note:** `app.dazztrazak.com` is the PRODUCTION URL (remote server only). Do not use for local testing.
 
 ---
 
@@ -112,12 +115,53 @@ docker compose exec mouse-domination flask db upgrade  # Manual migration
 
 ---
 
+## Multi-User Data Isolation
+
+**CRITICAL:** This is a multi-user app. User-scoped data MUST filter by `current_user.id`.
+
+| User-Scoped (filter by user_id) | Shared (no user filter) |
+|--------------------------------|-------------------------|
+| Inventory | Company |
+| AffiliateRevenue | Contact |
+| SalesPipeline | EpisodeGuide |
+| Collaboration | OutreachTemplate |
+
+```python
+# CORRECT - filter by user
+Inventory.query.filter_by(user_id=current_user.id)
+
+# WRONG - exposes all users' data
+Inventory.query.all()
+```
+
+When creating new user-scoped records, always set `user_id=current_user.id`.
+
+---
+
+## Testing
+
+- **Run locally before push**: `pytest`
+- **CI runs tests**: GitHub Actions runs `pytest` before deploying to production
+- **Tests must pass**: Deploy is blocked if tests fail
+
+---
+
 ## Code Style Defaults
 
 - Write tests for new code
 - Use type hints (Python) or TypeScript
 - Follow existing project conventions
 - Conventional commits (feat:, fix:, docs:, refactor:)
+
+---
+
+## Already Implemented (Don't Re-implement)
+
+- **2FA/TOTP**: Full implementation in `routes/settings.py` (setup, verify, disable, recovery codes)
+- **Rate limiting**: Auth endpoints protected via Flask-Limiter
+- **Session timeout**: 2-hour idle timeout configured
+- **Password requirements**: 12+ chars, mixed case, digits, special chars
+- **Account lockout**: Progressive lockout after failed login attempts
 
 ---
 

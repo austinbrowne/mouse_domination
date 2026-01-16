@@ -4,12 +4,37 @@ This service handles:
 - Fetching messages from Discord channels
 - Filtering messages by emoji reactions
 - Supporting both Unicode and custom Discord emoji
+- Rate limiting to avoid Discord API limits (50 req/sec)
 """
 
 import re
+import time
 import requests
 from datetime import datetime, timezone
+from functools import wraps
 from flask import current_app
+
+
+def rate_limit(min_interval=0.1):
+    """
+    Decorator to enforce minimum interval between API calls.
+
+    Args:
+        min_interval: Minimum seconds between calls (default 100ms for ~10 req/sec)
+    """
+    last_call = [0]
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            elapsed = time.time() - last_call[0]
+            if elapsed < min_interval:
+                time.sleep(min_interval - elapsed)
+            result = func(*args, **kwargs)
+            last_call[0] = time.time()
+            return result
+        return wrapper
+    return decorator
 
 # Discord epoch: January 1, 2015 00:00:00 UTC (in milliseconds)
 DISCORD_EPOCH = 1420070400000
@@ -69,25 +94,80 @@ class DiscordService:
             'Content-Type': 'application/json',
         }
 
-    def _make_request(self, method, endpoint, **kwargs):
-        """Make a request to Discord API with error handling."""
+    @rate_limit(min_interval=0.1)  # 100ms between requests (~10 req/sec)
+    def _make_request(self, method, endpoint, max_retries=3, **kwargs):
+        """
+        Make a request to Discord API with rate limiting, retry logic, and error handling.
+
+        Args:
+            method: HTTP method
+            endpoint: API endpoint (e.g., /channels/123/messages)
+            max_retries: Number of retries for transient failures
+            **kwargs: Additional arguments for requests
+
+        Returns:
+            dict with 'success' and 'data' or 'error'
+        """
         url = f"{self.BASE_URL}{endpoint}"
         kwargs.setdefault('timeout', 10)
         kwargs['headers'] = self._headers()
 
-        try:
-            resp = requests.request(method, url, **kwargs)
-            resp.raise_for_status()
-            return {'success': True, 'data': resp.json()}
-        except requests.RequestException as e:
-            error_msg = str(e)
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_data = e.response.json()
-                    error_msg = error_data.get('message', str(e))
-                except ValueError:
-                    error_msg = e.response.text or str(e)
-            return {'success': False, 'error': error_msg}
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                resp = requests.request(method, url, **kwargs)
+
+                # Handle rate limiting (429)
+                if resp.status_code == 429:
+                    retry_after = 1.0
+                    try:
+                        retry_data = resp.json()
+                        retry_after = retry_data.get('retry_after', 1.0)
+                    except (ValueError, KeyError):
+                        pass
+                    current_app.logger.warning(
+                        f"Discord rate limited, waiting {retry_after}s (attempt {attempt + 1})"
+                    )
+                    time.sleep(retry_after)
+                    continue
+
+                resp.raise_for_status()
+                return {'success': True, 'data': resp.json()}
+
+            except requests.Timeout:
+                last_error = 'Request timed out'
+                current_app.logger.warning(f"Discord timeout (attempt {attempt + 1})")
+            except requests.ConnectionError:
+                last_error = 'Connection failed'
+                current_app.logger.warning(f"Discord connection error (attempt {attempt + 1})")
+            except requests.HTTPError as e:
+                # Don't retry on client errors (4xx) except rate limiting
+                if e.response is not None and 400 <= e.response.status_code < 500:
+                    if e.response.status_code == 401:
+                        return {'success': False, 'error': 'Invalid bot token'}
+                    elif e.response.status_code == 403:
+                        return {'success': False, 'error': 'Bot lacks permission for this channel'}
+                    elif e.response.status_code == 404:
+                        return {'success': False, 'error': 'Channel not found'}
+                    else:
+                        try:
+                            error_data = e.response.json()
+                            last_error = error_data.get('message', str(e))
+                        except (ValueError, KeyError):
+                            last_error = e.response.text or str(e)
+                        return {'success': False, 'error': last_error}
+                else:
+                    last_error = str(e)
+                    current_app.logger.warning(f"Discord HTTP error (attempt {attempt + 1}): {e}")
+            except requests.RequestException as e:
+                last_error = str(e)
+                current_app.logger.warning(f"Discord request error (attempt {attempt + 1}): {e}")
+
+            # Exponential backoff for retries
+            if attempt < max_retries - 1:
+                time.sleep(min(2 ** attempt, 10))
+
+        return {'success': False, 'error': last_error or 'Request failed after retries'}
 
     def get_channel_info(self):
         """Get information about the configured channel."""
@@ -204,10 +284,36 @@ class DiscordService:
 
         return {'success': True, 'messages': filtered_messages}
 
+    def _get_messages_for_channel(self, channel_id, limit=100, after=None):
+        """
+        Fetch messages from a specific channel (thread-safe helper).
+
+        Args:
+            channel_id: Channel ID to fetch from
+            limit: Number of messages to fetch (max 100)
+            after: Get messages after this message ID
+
+        Returns:
+            dict with 'success', 'messages' list or 'error'
+        """
+        if not self.bot_token:
+            return {'success': False, 'error': 'Discord not configured', 'messages': []}
+
+        params = {'limit': min(limit, 100)}
+        if after:
+            params['after'] = after
+
+        result = self._make_request('GET', f'/channels/{channel_id}/messages', params=params)
+        if result['success']:
+            return {'success': True, 'messages': result['data']}
+        return {'success': False, 'error': result.get('error'), 'messages': []}
+
     def get_messages_multi_channel(self, channel_ids, target_emoji, target_section,
                                    limit_per_channel=50, exclude_message_ids=None, after=None):
         """
         Scan multiple channels for messages with a specific emoji reaction.
+
+        This method is thread-safe - it does not mutate instance state.
 
         Args:
             channel_ids: List of channel IDs to scan
@@ -234,14 +340,9 @@ class DiscordService:
         channels_scanned = []
         errors = []
 
-        # Store original channel_id to restore later
-        original_channel_id = self.channel_id
-
         for channel_id in channel_ids:
-            # Temporarily set channel_id for API call
-            self.channel_id = channel_id
-
-            result = self.get_messages(limit=limit_per_channel, after=after)
+            # Use thread-safe helper that doesn't mutate self.channel_id
+            result = self._get_messages_for_channel(channel_id, limit=limit_per_channel, after=after)
             if not result['success']:
                 errors.append({'channel_id': channel_id, 'error': result.get('error')})
                 continue
@@ -279,9 +380,6 @@ class DiscordService:
                     parsed['matched_emoji'] = target_emoji
                     parsed['source_channel_id'] = channel_id
                     all_messages.append(parsed)
-
-        # Restore original channel_id
-        self.channel_id = original_channel_id
 
         return {
             'success': True,

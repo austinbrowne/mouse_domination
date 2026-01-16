@@ -109,6 +109,7 @@ def login():
         db.session.commit()
 
         login_user(user, remember=remember)
+        session.permanent = True  # Enable session timeout from PERMANENT_SESSION_LIFETIME
 
         next_page = request.args.get('next')
         if next_page and is_safe_url(next_page):
@@ -164,6 +165,7 @@ def verify_2fa_login():
                 db.session.commit()
 
                 login_user(user, remember=remember)
+                session.permanent = True  # Enable session timeout
                 flash('Logged in with recovery code. Consider generating new recovery codes.', 'info')
 
                 if next_page and is_safe_url(next_page):
@@ -190,6 +192,7 @@ def verify_2fa_login():
                 db.session.commit()
 
                 login_user(user, remember=remember)
+                session.permanent = True  # Enable session timeout
 
                 if next_page and is_safe_url(next_page):
                     return redirect(next_page)
@@ -300,6 +303,7 @@ def forgot_password():
 
 
 @auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", error_message="Too many reset attempts. Please wait.")
 def reset_password(token):
     """Handle password reset with token."""
     if current_user.is_authenticated:
@@ -346,6 +350,7 @@ def reset_password(token):
 
 
 @auth_bp.route('/verify-email/<token>')
+@limiter.limit("10 per minute", error_message="Too many verification attempts. Please wait.")
 def verify_email(token):
     """Verify user's email address."""
     user = User.query.filter_by(email_verification_token=token).first()

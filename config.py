@@ -1,6 +1,7 @@
 import os
 import secrets
 from pathlib import Path
+from datetime import timedelta
 
 # Load environment variables from .env file if present
 try:
@@ -67,6 +68,10 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
 
+    # Session timeout settings
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=2)  # Sessions expire after 2 hours of inactivity
+    SESSION_REFRESH_EACH_REQUEST = True  # Refresh session on each request (sliding window)
+
     # Backup settings
     BACKUP_DIR = BASE_DIR / 'backups'
     BACKUP_RETENTION_DAYS = 30
@@ -89,6 +94,9 @@ class Config:
 
     # Feature flags
     ENABLE_EPISODE_GUIDE = os.environ.get('ENABLE_EPISODE_GUIDE', 'true').lower() == 'true'
+
+    # CSS build mode: 'cdn' for Tailwind CDN (dev), 'static' for pre-built CSS (prod)
+    CSS_BUILD_MODE = os.environ.get('CSS_BUILD_MODE', 'cdn')
 
 
 class DevelopmentConfig(Config):

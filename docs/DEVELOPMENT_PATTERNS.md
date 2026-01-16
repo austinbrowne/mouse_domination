@@ -217,10 +217,17 @@ Native `<select>` elements are difficult to style consistently. Use Alpine.js fo
 
 ---
 
-## Gunicorn Restart
+## Local Development
 
-After deploying changes, restart gunicorn:
+Run the Flask development server for local testing:
 
 ```bash
-pkill -f gunicorn && sleep 1 && .venv/bin/gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon
+# Start PostgreSQL (if not running)
+docker compose -f docker-compose.dev.yml up -d
+
+# Run Flask dev server
+flask run --port 5001
+# Access at http://127.0.0.1:5001
 ```
+
+The dev server auto-reloads on code changes. No restart needed.

@@ -20,7 +20,7 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
 
 ## Architecture Overview
 
-### Stack
+### Production Stack
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -30,13 +30,13 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Cloudflare Tunnel (HTTPS)                       │
-│              app.dazztrazak.com → localhost:8000            │
+│              app.dazztrazak.com → Docker container          │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Gunicorn (WSGI Server)                          │
-│              127.0.0.1:8000, 2 workers                       │
+│              Docker (Hetzner Server)                         │
+│              Gunicorn WSGI Server                            │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
@@ -52,20 +52,35 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              SQLite Database                                 │
-│              mouse_domination.db                             │
+│              PostgreSQL Database                             │
+│              Docker container                                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Request Flow
+### Local Development Stack
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Flask Development Server                        │
+│              http://127.0.0.1:5001                           │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│              PostgreSQL (Docker)                             │
+│              localhost:5433                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Request Flow (Production)
 
 1. User requests `https://app.dazztrazak.com/inventory`
-2. Cloudflare Tunnel forwards to `localhost:8000`
+2. Cloudflare Tunnel forwards to Docker container on Hetzner
 3. Gunicorn receives request, passes to Flask app
 4. Flask-Login checks session cookie for authentication
 5. If not authenticated → redirect to `/auth/login`
 6. If authenticated → route handler processes request
-7. SQLAlchemy queries database, filtered by `user_id`
+7. SQLAlchemy queries PostgreSQL, filtered by `user_id`
 8. Jinja2 renders template with TailwindCSS
 9. Response returned through the stack
 
@@ -73,47 +88,62 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
 
 ## Current Deployment
 
-### Host Machine
+### Production (Remote)
 
-- **Location**: Austin's MacBook (local machine)
+- **Server**: Hetzner (178.156.211.75), user `austin`
+- **Stack**: Docker Compose at `/opt/apps/infra/docker-compose.yml`
+- **Domain**: `app.dazztrazak.com` (via Cloudflare Tunnel)
+- **Database**: PostgreSQL in Docker container
+
+### Local Development
+
 - **Directory**: `/Users/austin/Git_Repos/mouse_domination`
 - **Python**: 3.14 (in `.venv`)
-- **Domain**: `app.dazztrazak.com`
+- **URL**: http://127.0.0.1:5001
+- **Database**: PostgreSQL via `docker-compose.dev.yml` (port 5433)
 
 ### Running Services
 
-| Service | Port | Command |
-|---------|------|---------|
-| Gunicorn | 8000 | `gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon` |
-| Cloudflare Tunnel | - | Runs as system service, routes to 8000 |
-| Flask Dev Server | 5001 | `flask run --port 5001` (development only) |
+| Environment | Service | Port | Command |
+|-------------|---------|------|---------|
+| Local | Flask Dev Server | 5001 | `flask run --port 5001` |
+| Local | PostgreSQL | 5433 | `docker compose -f docker-compose.dev.yml up -d` |
+| Production | Docker/Gunicorn | 5000 | Managed by Docker Compose |
+| Production | PostgreSQL | 5432 | Managed by Docker Compose |
 
-### Key Files on Disk
+### Key Files on Disk (Local)
 
 ```
 /Users/austin/Git_Repos/mouse_domination/
-├── .env                    # Environment variables (SECRET_KEY, etc.)
-├── mouse_domination.db     # SQLite database (ALL DATA)
+├── .env                    # Environment variables (SECRET_KEY, DATABASE_URL)
 ├── backups/                # Database backups
 └── .venv/                  # Python virtual environment
 ```
 
 ### Starting/Stopping the App
 
+**Local Development:**
 ```bash
-# Restart production (gunicorn)
-./deploy.sh
+# Start PostgreSQL (if not running)
+docker compose -f docker-compose.dev.yml up -d
 
-# Or manually:
-pkill -f gunicorn
+# Start Flask dev server
 source .venv/bin/activate
-gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon
+flask run --port 5001
+
+# Or with debug mode
+FLASK_ENV=development flask run --port 5001
 
 # Check if running
-pgrep -f gunicorn
+curl http://127.0.0.1:5001/health
+```
 
-# View gunicorn logs (if not daemonized)
-# Logs go to stderr when running in foreground
+**Production (Remote):**
+```bash
+ssh austin@178.156.211.75
+cd /opt/apps/infra
+docker compose logs -f mouse-domination  # View logs
+docker compose restart mouse-domination  # Restart app
 ```
 
 ---
@@ -294,9 +324,9 @@ Inventory.query.filter_by(user_id=current_user.id)
 
 | File | Purpose |
 |------|---------|
-| `deploy.sh` | Restart gunicorn |
-| `scripts/backup_db.sh` | SQLite backup |
+| `scripts/backup_db.sh` | Database backup (legacy SQLite) |
 | `scripts/migrate_flask_login.py` | Auth migration + admin setup |
+| `scripts/sync_from_production.py` | Sync data from production to local |
 
 ---
 
@@ -304,15 +334,32 @@ Inventory.query.filter_by(user_id=current_user.id)
 
 ### Restart the Application
 
+**Local:**
 ```bash
-./deploy.sh
+# Flask dev server auto-reloads, or manually:
+pkill -f "flask run.*5001"
+flask run --port 5001
+```
+
+**Production:**
+```bash
+ssh austin@178.156.211.75
+cd /opt/apps/infra
+docker compose restart mouse-domination
 ```
 
 ### Create Database Backup
 
+**Local (PostgreSQL):**
 ```bash
-./scripts/backup_db.sh
-# Backup saved to: backups/mouse_domination_YYYYMMDD_HHMMSS.db
+docker compose -f docker-compose.dev.yml exec db pg_dump -U mouse mouse_domination > backup.sql
+```
+
+**Production:**
+```bash
+ssh austin@178.156.211.75
+cd /opt/apps/infra
+docker compose exec db pg_dump -U mousedom mousedom > backup_$(date +%Y%m%d).sql
 ```
 
 ### Add a New Admin User
@@ -378,8 +425,12 @@ EOF
 ### Check Application Health
 
 ```bash
-curl http://127.0.0.1:8000/health
-# Should return: {"status": "healthy"}
+# Local
+curl http://127.0.0.1:5001/health
+
+# Production
+curl https://app.dazztrazak.com/health
+# Should return: {"status": "healthy", "database": "connected", ...}
 ```
 
 ### View All Users
@@ -406,22 +457,30 @@ EOF
 ```bash
 cd /Users/austin/Git_Repos/mouse_domination
 source .venv/bin/activate
+
+# Start local PostgreSQL (first time or after reboot)
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 ### Run Development Server
 
 ```bash
-flask run --port 5001 --debug
-# Access at http://localhost:5001
+flask run --port 5001
+# Access at http://127.0.0.1:5001
 # Auto-reloads on code changes
 ```
 
 ### Code Changes → Production
 
-Changes to Python files are automatically picked up by gunicorn (if it's watching) or require a restart:
+Push to `main` branch triggers GitHub Actions CI/CD:
+1. Pulls latest code to Hetzner server
+2. Rebuilds and restarts Docker container
+3. Runs migrations if `migrations/` folder changed
 
 ```bash
-./deploy.sh
+git add .
+git commit -m "feat: your change"
+git push origin main
 ```
 
 ### Adding a New Route
@@ -458,8 +517,8 @@ cat .env | grep SECRET_KEY
 python -c "import secrets; print(secrets.token_hex(32))"
 # Add to .env: SECRET_KEY=<generated_key>
 
-# Restart app
-./deploy.sh
+# Restart Flask dev server (local)
+pkill -f "flask run.*5001" && flask run --port 5001
 
 # Clear browser cookies and try again
 ```
@@ -493,18 +552,20 @@ with app.app_context():
 
 **Fix**: See [Unlock a Locked Account](#unlock-a-locked-account) above.
 
-### Gunicorn Not Starting
+### Flask Dev Server Not Starting
 
-**Symptom**: `./deploy.sh` fails, health check returns 000
+**Symptom**: `flask run` fails or port already in use
 
 **Debug**:
 ```bash
-# Run gunicorn in foreground to see errors
-source .venv/bin/activate
-gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 1
-
 # Check for port conflicts
-lsof -i:8000
+lsof -i:5001
+
+# Kill existing process
+pkill -f "flask run.*5001"
+
+# Check PostgreSQL is running
+docker compose -f docker-compose.dev.yml ps
 ```
 
 ### Database Errors
@@ -585,12 +646,12 @@ When starting a new Claude Code session on this project:
 2. **Check current state**:
    ```bash
    git status
-   pgrep -f gunicorn && echo "App running" || echo "App stopped"
+   curl -s http://127.0.0.1:5001/health && echo "Local app running" || echo "Local app stopped"
    ```
 3. **Key architectural decisions**:
    - Flask-Login for auth (replaced Cloudflare Access Jan 2026)
-   - SQLite database (single file, no migrations framework)
-   - Self-hosted on Austin's MacBook via Cloudflare Tunnel
+   - PostgreSQL database (local via Docker, production via Docker Compose)
+   - Production on Hetzner server via Cloudflare Tunnel
    - Multi-user with admin approval workflow
 
 ### Common Tasks for AI Assistants
@@ -600,15 +661,15 @@ When starting a new Claude Code session on this project:
 | Add new feature | `routes/*.py`, `templates/*/`, `models.py` |
 | Fix auth issue | `routes/auth.py`, `models.py` (User class) |
 | Update UI | `templates/base.html`, `templates/*/` |
-| Database changes | `models.py`, `scripts/migrate_*.py` |
-| Deployment issues | `deploy.sh`, `.env`, check gunicorn |
+| Database changes | `models.py`, `flask db migrate`, `flask db upgrade` |
+| Deployment issues | Check GitHub Actions, SSH to Hetzner |
 
 ### Don't Forget
 
 - All routes need `@login_required` (except `/auth/*`, `/health`)
 - User-scoped data must filter by `current_user.id`
-- Test on `localhost:5001` before deploying
-- Run `./deploy.sh` to push changes to production
+- Test on `http://127.0.0.1:5001` before pushing to main
+- Push to `main` triggers auto-deploy to production
 - CSRF tokens required on all POST forms
 
 ---

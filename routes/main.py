@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, jsonify, g
+from flask import Blueprint, render_template, jsonify, g, current_app
 from flask_login import login_required, current_user
-from models import Contact, Company, Inventory, AffiliateRevenue
+from models import Contact, Company, Inventory, AffiliateRevenue, SalesPipeline, Collaboration
 from app import db
 from sqlalchemy import func, case, and_, text
 from sqlalchemy.orm import joinedload
@@ -90,25 +90,26 @@ def dashboard():
         joinedload(Inventory.company)
     ).filter_by(user_id=user_id, sold=True).order_by(Inventory.updated_at.desc()).limit(5).all()
 
-    # Affiliate revenue stats
+    # Affiliate revenue stats - filtered by current user
     current_year = datetime.now().year
 
-    # Single query for yearly and total affiliate revenue
+    # Single query for yearly and total affiliate revenue (user's data only)
     affiliate_stats = db.session.query(
         func.coalesce(func.sum(case((AffiliateRevenue.year == current_year, AffiliateRevenue.revenue), else_=0)), 0).label('yearly'),
         func.coalesce(func.sum(AffiliateRevenue.revenue), 0).label('total')
-    ).first()
+    ).filter(AffiliateRevenue.user_id == user_id).first()
 
     yearly_affiliate_revenue = affiliate_stats.yearly
     total_affiliate_revenue = affiliate_stats.total
 
-    # Monthly affiliate revenue for chart - single query with GROUP BY instead of 12 separate queries
+    # Monthly affiliate revenue for chart - single query with GROUP BY (user's data only)
     current_month = datetime.now().month
     monthly_data = db.session.query(
         AffiliateRevenue.year,
         AffiliateRevenue.month,
         func.sum(AffiliateRevenue.revenue).label('total')
     ).filter(
+        AffiliateRevenue.user_id == user_id,
         # Last 12 months
         ((AffiliateRevenue.year == current_year) |
          ((AffiliateRevenue.year == current_year - 1) & (AffiliateRevenue.month > current_month)))
@@ -133,6 +134,34 @@ def dashboard():
     # Total revenue from all sources
     total_revenue = total_affiliate_revenue + total_profit_loss
 
+    # Pipeline conversion funnel (user's data only)
+    pipeline_funnel = db.session.query(
+        func.sum(case((SalesPipeline.status == 'lead', 1), else_=0)).label('leads'),
+        func.sum(case((SalesPipeline.status == 'negotiating', 1), else_=0)).label('negotiating'),
+        func.sum(case((SalesPipeline.status == 'confirmed', 1), else_=0)).label('confirmed'),
+        func.sum(case((SalesPipeline.status == 'completed', 1), else_=0)).label('completed'),
+        func.sum(case((SalesPipeline.status == 'lost', 1), else_=0)).label('lost'),
+    ).filter(SalesPipeline.user_id == user_id).first()
+
+    funnel = {
+        'leads': int(pipeline_funnel.leads or 0),
+        'negotiating': int(pipeline_funnel.negotiating or 0),
+        'confirmed': int(pipeline_funnel.confirmed or 0),
+        'completed': int(pipeline_funnel.completed or 0),
+        'lost': int(pipeline_funnel.lost or 0),
+    }
+    # Calculate conversion rate
+    total_leads = funnel['leads'] + funnel['negotiating'] + funnel['confirmed'] + funnel['completed'] + funnel['lost']
+    funnel['conversion_rate'] = (funnel['completed'] / total_leads * 100) if total_leads > 0 else 0
+
+    # Collaboration stats (user's data only)
+    collab_stats = db.session.query(
+        func.count(Collaboration.id).label('total'),
+        func.sum(case((Collaboration.status == 'confirmed', 1), else_=0)).label('confirmed'),
+        func.sum(case((Collaboration.status == 'completed', 1), else_=0)).label('completed'),
+        func.sum(case((Collaboration.follow_up_needed == True, 1), else_=0)).label('needs_follow_up'),
+    ).filter(Collaboration.user_id == user_id).first()
+
     return render_template('dashboard.html',
         total_contacts=total_contacts,
         total_companies=total_companies,
@@ -153,4 +182,11 @@ def dashboard():
         total_revenue=total_revenue,
         monthly_revenue=monthly_revenue,  # Use tojson filter in template for XSS safety
         current_year=current_year,
+        # Pipeline funnel
+        pipeline_funnel=funnel,
+        # Collaboration stats
+        collab_total=collab_stats.total or 0,
+        collab_confirmed=collab_stats.confirmed or 0,
+        collab_completed=collab_stats.completed or 0,
+        collab_needs_follow_up=collab_stats.needs_follow_up or 0,
     )

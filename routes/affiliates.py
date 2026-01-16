@@ -1,5 +1,7 @@
-from flask_login import login_required
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
+import io
+import csv
+from flask_login import login_required, current_user
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, abort, Response
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,7 +27,10 @@ def list_revenue():
     page = request.args.get('page', 1, type=int)
 
     # Eager load company to avoid N+1
-    query = AffiliateRevenue.query.options(joinedload(AffiliateRevenue.company))
+    # Filter by current user for data isolation
+    query = AffiliateRevenue.query.options(
+        joinedload(AffiliateRevenue.company)
+    ).filter_by(user_id=current_user.id)
 
     if year:
         query = query.filter_by(year=year)
@@ -37,25 +42,33 @@ def list_revenue():
         AffiliateRevenue.year.desc(), AffiliateRevenue.month.desc()
     ).paginate(page=page, per_page=DEFAULT_PAGE_SIZE, error_out=False)
 
-    # Get available years for filter
-    years = db.session.query(AffiliateRevenue.year).distinct().order_by(AffiliateRevenue.year.desc()).all()
+    # Get available years for filter (user's data only)
+    years = db.session.query(AffiliateRevenue.year).filter_by(
+        user_id=current_user.id
+    ).distinct().order_by(AffiliateRevenue.year.desc()).all()
     years = [y[0] for y in years]
 
-    # Stats - use database aggregation
-    total_revenue = db.session.query(func.coalesce(func.sum(AffiliateRevenue.revenue), 0)).scalar()
+    # Stats - use database aggregation (user's data only)
+    total_revenue = db.session.query(
+        func.coalesce(func.sum(AffiliateRevenue.revenue), 0)
+    ).filter_by(user_id=current_user.id).scalar()
 
-    # Revenue by company - single efficient query
+    # Revenue by company - single efficient query (user's data only)
     revenue_by_company = db.session.query(
         Company.name,
         func.sum(AffiliateRevenue.revenue).label('total')
-    ).join(AffiliateRevenue).group_by(Company.name).order_by(func.sum(AffiliateRevenue.revenue).desc()).all()
+    ).join(AffiliateRevenue).filter(
+        AffiliateRevenue.user_id == current_user.id
+    ).group_by(Company.name).order_by(func.sum(AffiliateRevenue.revenue).desc()).all()
 
-    # Monthly totals for chart
+    # Monthly totals for chart (user's data only)
     monthly_totals = db.session.query(
         AffiliateRevenue.year,
         AffiliateRevenue.month,
         func.sum(AffiliateRevenue.revenue).label('total')
-    ).group_by(AffiliateRevenue.year, AffiliateRevenue.month).order_by(
+    ).filter_by(user_id=current_user.id).group_by(
+        AffiliateRevenue.year, AffiliateRevenue.month
+    ).order_by(
         AffiliateRevenue.year, AffiliateRevenue.month
     ).all()
 
@@ -103,9 +116,9 @@ def new_revenue():
 
             sales_count = parse_int(request.form.get('sales_count', ''), 'Sales Count', allow_negative=False)
 
-            # Check for existing entry
+            # Check for existing entry (for this user)
             existing = AffiliateRevenue.query.filter_by(
-                company_id=company_id, year=year, month=month
+                user_id=current_user.id, company_id=company_id, year=year, month=month
             ).first()
 
             if existing:
@@ -117,6 +130,7 @@ def new_revenue():
                                       current_year=current_year, current_month=current_month)
 
             entry = AffiliateRevenue(
+                user_id=current_user.id,
                 company_id=company_id,
                 year=year,
                 month=month,
@@ -160,6 +174,9 @@ def new_revenue():
 def edit_revenue(id):
     """Edit an existing revenue entry."""
     entry = AffiliateRevenue.query.get_or_404(id)
+    # Verify ownership
+    if entry.user_id != current_user.id:
+        abort(403)
 
     if request.method == 'POST':
         try:
@@ -201,6 +218,9 @@ def delete_revenue(id):
     """Delete a revenue entry."""
     try:
         entry = AffiliateRevenue.query.get_or_404(id)
+        # Verify ownership
+        if entry.user_id != current_user.id:
+            abort(403)
         db.session.delete(entry)
         db.session.commit()
         flash('Revenue entry deleted.', 'success')
@@ -209,3 +229,44 @@ def delete_revenue(id):
         log_exception(current_app.logger, 'Database operation', e)
         flash('Database error occurred. Please try again.', 'error')
     return redirect(url_for('affiliates.list_revenue'))
+
+
+@affiliates_bp.route('/export/csv')
+@login_required
+def export_csv():
+    """Export affiliate revenue data as CSV for accounting/tax purposes."""
+    from sqlalchemy.orm import joinedload
+
+    # Get all revenue entries for current user
+    revenues = AffiliateRevenue.query.options(
+        joinedload(AffiliateRevenue.company)
+    ).filter_by(user_id=current_user.id).order_by(
+        AffiliateRevenue.year.desc(),
+        AffiliateRevenue.month.desc()
+    ).all()
+
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow(['Year', 'Month', 'Company', 'Revenue', 'Sales Count', 'Notes'])
+
+    # Data rows
+    for r in revenues:
+        writer.writerow([
+            r.year,
+            r.month,
+            r.company.name if r.company else '',
+            f'{r.revenue:.2f}' if r.revenue else '0.00',
+            r.sales_count if r.sales_count else '',
+            r.notes or ''
+        ])
+
+    # Create response
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=affiliate_revenue.csv'}
+    )

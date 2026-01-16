@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+    {% if config.CSS_BUILD_MODE == 'static' %}
+    <!-- Pre-built Tailwind CSS for production (faster page loads) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.min.css') }}">
+    {% else %}
+    <!-- Tailwind CDN for development (JIT compilation) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -36,6 +41,7 @@
             }
         }
     </script>
+    {% endif %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -44,8 +50,8 @@
     <style>
         [x-cloak] { display: none !important; }
 
-        /* Smooth transitions */
-        * { transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        /* Targeted transitions (removed global * transition for better performance) */
+        /* Use .transition-colors, .transition-opacity, etc. classes on interactive elements */
 
         /* Better focus states */
         :focus { outline: none; }
@@ -145,7 +151,7 @@
                             class="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-surface-200 py-1 z-50">
                             <a href="{{ url_for('calendar.view') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'calendar' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Calendar</a>
                             <a href="{{ url_for('pipeline.list_deals') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'pipeline' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Pipeline</a>
-                            <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Revenue</a>
+                            <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Affiliates</a>
                             <a href="{{ url_for('collabs.list_collabs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'collabs' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Collabs</a>
                             <a href="{{ url_for('templates.list_templates') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Templates</a>
                             <a href="{{ url_for('media_kit.edit_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'media_kit' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Media Kit</a>
@@ -221,7 +227,7 @@
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
                 <a href="{{ url_for('calendar.view') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Calendar</a>
                 <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
-                <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
+                <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Affiliates</a>
                 <a href="{{ url_for('collabs.list_collabs') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Collabs</a>
                 <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
                 <hr class="my-2 border-surface-200">

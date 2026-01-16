@@ -162,7 +162,7 @@ class FormData:
         return {field: self.optional(field) for field in fields}
 
 
-def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None):
+def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None, check_user_id=False):
     """Factory function to create a standard delete view for a model.
 
     Args:
@@ -170,6 +170,7 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
         name_attr: The attribute to use for the name in flash message (e.g., 'name', 'title')
         redirect_endpoint: The endpoint to redirect to after delete (e.g., 'contacts.list_contacts')
         entity_name: Human-readable name for flash message (defaults to model class name)
+        check_user_id: If True, verify entity.user_id == current_user.id before deleting
 
     Returns:
         A view function that handles DELETE for the model
@@ -183,7 +184,8 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
             methods=['POST']
         )
     """
-    from flask_login import login_required
+    from flask_login import login_required, current_user
+    from flask import abort
 
     display_name = entity_name or model_class.__name__
 
@@ -191,6 +193,9 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
     def delete_view(id):
         try:
             entity = model_class.query.get_or_404(id)
+            # Check ownership if required
+            if check_user_id and getattr(entity, 'user_id', None) != current_user.id:
+                abort(403)
             name = getattr(entity, name_attr, str(id))
             db.session.delete(entity)
             db.session.commit()
@@ -212,23 +217,25 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
     return delete_view
 
 
-def quick_action(model_class, redirect_endpoint, operation_name=None):
+def quick_action(model_class, redirect_endpoint, operation_name=None, check_user_id=False):
     """Decorator for quick action routes that update a model and redirect.
 
     Args:
         model_class: The SQLAlchemy model class
         redirect_endpoint: The endpoint to redirect to after action
         operation_name: Human-readable name for logging (defaults to function name)
+        check_user_id: If True, verify entity.user_id == current_user.id before action
 
     Usage:
         @collabs_bp.route('/<int:id>/complete', methods=['POST'])
-        @quick_action(Collaboration, 'collabs.list_collabs')
+        @quick_action(Collaboration, 'collabs.list_collabs', check_user_id=True)
         def complete_collab(entity):
             entity.status = 'completed'
             entity.completed_date = db.func.current_date()
             return 'Collaboration marked as completed.'
     """
-    from flask_login import login_required
+    from flask_login import login_required, current_user
+    from flask import abort
 
     def decorator(f):
         @wraps(f)
@@ -237,6 +244,9 @@ def quick_action(model_class, redirect_endpoint, operation_name=None):
             op_name = operation_name or f.__name__
             try:
                 entity = model_class.query.get_or_404(id)
+                # Check ownership if required
+                if check_user_id and getattr(entity, 'user_id', None) != current_user.id:
+                    abort(403)
                 message = f(entity)
                 db.session.commit()
                 flash(message, 'success')
