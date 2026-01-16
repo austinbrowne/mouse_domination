@@ -185,7 +185,7 @@ To get a custom emoji's ID:
 source .venv/bin/activate
 gunicorn "app:create_app()" --bind 127.0.0.1:8000 --workers 2 --daemon
 
-# Or use deploy script
+# Or use deploy script(test)
 ./deploy.sh
 ```
 
