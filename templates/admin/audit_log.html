@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit Log - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-6 px-4">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Audit Log</h1>
+            <p class="text-sm text-gray-500 mt-1">History of administrative actions</p>
+        </div>
+        <a href="{{ url_for('admin.index') }}"
+           class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            Back to Admin
+        </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-surface-200">
+        {% if logs.items %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-surface-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-100">
+                    {% for log in logs.items %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ log.actor_email or 'System' }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set action_colors = {
+                                'user_approved': 'bg-emerald-100 text-emerald-800',
+                                'user_rejected': 'bg-red-100 text-red-800',
+                                'user_deleted': 'bg-red-100 text-red-800',
+                                'admin_granted': 'bg-purple-100 text-purple-800',
+                                'admin_revoked': 'bg-amber-100 text-amber-800',
+                                'password_reset_requested': 'bg-blue-100 text-blue-800',
+                                'password_changed': 'bg-blue-100 text-blue-800',
+                                'login_success': 'bg-emerald-100 text-emerald-800',
+                                'login_failed': 'bg-red-100 text-red-800',
+                                'account_locked': 'bg-red-100 text-red-800'
+                            } %}
+                            <span class="px-2 py-1 text-xs font-medium rounded {{ action_colors.get(log.action, 'bg-gray-100 text-gray-800') }}">
+                                {{ log.action.replace('_', ' ').title() }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if log.target_email %}
+                                {{ log.target_email }}
+                            {% elif log.target_type %}
+                                {{ log.target_type }} #{{ log.target_id }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
+                            {{ log.ip_address or '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if logs.pages > 1 %}
+        <div class="px-6 py-4 border-t border-surface-200 flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                Showing {{ logs.page }} of {{ logs.pages }} pages ({{ logs.total }} total entries)
+            </div>
+            <div class="flex gap-2">
+                {% if logs.has_prev %}
+                <a href="{{ url_for('admin.audit_log', page=logs.prev_num) }}"
+                   class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Previous
+                </a>
+                {% endif %}
+                {% if logs.has_next %}
+                <a href="{{ url_for('admin.audit_log', page=logs.next_num) }}"
+                   class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="px-6 py-12 text-center text-gray-500">
+            <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p>No audit log entries yet.</p>
+            <p class="text-sm mt-1">Admin actions will be recorded here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -33,10 +33,15 @@
                            placeholder="Enter your password">
                 </div>
 
-                <div class="flex items-center">
-                    <input type="checkbox" id="remember" name="remember"
-                           class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-                    <label for="remember" class="ml-2 text-sm text-gray-600">Remember me for 7 days</label>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="remember" name="remember"
+                               class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                        <label for="remember" class="ml-2 text-sm text-gray-600">Remember me for 7 days</label>
+                    </div>
+                    <a href="{{ url_for('auth.forgot_password') }}" class="text-sm text-primary-600 hover:text-primary-700">
+                        Forgot password?
+                    </a>
                 </div>
 
                 <button type="submit"

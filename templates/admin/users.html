@@ -15,6 +15,40 @@
         </a>
     </div>
 
+    <!-- Search and Filter -->
+    <div class="bg-white rounded-xl shadow-sm border border-surface-200 p-4 mb-6">
+        <form method="GET" action="{{ url_for('admin.list_users') }}" class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <input type="text" id="search" name="search" value="{{ search }}"
+                       placeholder="Search by email or name..."
+                       class="w-full px-3 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div class="w-40">
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="status" name="status"
+                        class="w-full px-3 py-2 border border-surface-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Users</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="admin" {% if status_filter == 'admin' %}selected{% endif %}>Admins</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit"
+                        class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition">
+                    Filter
+                </button>
+                {% if search or status_filter != 'all' %}
+                <a href="{{ url_for('admin.list_users') }}"
+                   class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Clear
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
     {% if pending %}
     <div class="bg-white rounded-xl shadow-sm border border-surface-200 mb-6">
         <div class="px-6 py-4 border-b border-surface-200 bg-amber-50">
@@ -29,7 +63,21 @@
             {% for user in pending %}
             <div class="px-6 py-4 flex items-center justify-between">
                 <div>
-                    <div class="font-medium text-gray-900">{{ user.email }}</div>
+                    <div class="font-medium text-gray-900 flex items-center gap-2">
+                        {{ user.email }}
+                        {% if user.email_verified %}
+                        <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded" title="Email verified">
+                            <svg class="w-3 h-3 inline -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Verified
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded" title="Email not verified">
+                            Unverified
+                        </span>
+                        {% endif %}
+                    </div>
                     {% if user.name %}
                     <div class="text-sm text-gray-500">{{ user.name }}</div>
                     {% endif %}
@@ -84,6 +132,13 @@
                             {{ user.email }}
                             {% if user.is_admin %}
                             <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">Admin</span>
+                            {% endif %}
+                            {% if user.email_verified %}
+                            <span class="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded" title="Email verified">
+                                <svg class="w-3 h-3 inline -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </span>
                             {% endif %}
                         </div>
                         {% if user.name %}

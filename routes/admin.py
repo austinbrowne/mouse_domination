@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, r
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from extensions import db
-from models import User, CustomOption
+from models import User, CustomOption, AuditLog
 from constants import BUILTIN_CHOICES, OPTION_TYPE_LABELS
 from services.options import get_all_custom_options, get_option_types
 
@@ -37,9 +37,40 @@ def index():
 @admin_required
 def list_users():
     """List all users with pending/approved status."""
-    pending = User.query.filter_by(is_approved=False).order_by(User.created_at.desc()).all()
-    approved = User.query.filter_by(is_approved=True).order_by(User.email).all()
-    return render_template('admin/users.html', pending=pending, approved=approved)
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', 'all')
+
+    # Base queries
+    pending_query = User.query.filter_by(is_approved=False)
+    approved_query = User.query.filter_by(is_approved=True)
+
+    # Apply search filter
+    if search:
+        search_pattern = f'%{search}%'
+        pending_query = pending_query.filter(
+            db.or_(User.email.ilike(search_pattern), User.name.ilike(search_pattern))
+        )
+        approved_query = approved_query.filter(
+            db.or_(User.email.ilike(search_pattern), User.name.ilike(search_pattern))
+        )
+
+    # Apply status filter
+    if status_filter == 'pending':
+        approved_query = approved_query.filter(db.false())
+    elif status_filter == 'approved':
+        pending_query = pending_query.filter(db.false())
+    elif status_filter == 'admin':
+        pending_query = pending_query.filter(db.false())
+        approved_query = approved_query.filter(User.is_admin == True)
+
+    pending = pending_query.order_by(User.created_at.desc()).all()
+    approved = approved_query.order_by(User.email).all()
+
+    return render_template('admin/users.html',
+                           pending=pending,
+                           approved=approved,
+                           search=search,
+                           status_filter=status_filter)
 
 
 @admin_bp.route('/users/<int:id>/approve', methods=['POST'])
@@ -53,6 +84,14 @@ def approve_user(id):
             flash(f'{user.email} is already approved.', 'info')
         else:
             user.is_approved = True
+            AuditLog.log(
+                action=AuditLog.ACTION_USER_APPROVED,
+                actor=current_user,
+                target_type='user',
+                target_id=user.id,
+                target_email=user.email,
+                ip_address=request.remote_addr
+            )
             db.session.commit()
             flash(f'{user.email} has been approved.', 'success')
     except SQLAlchemyError:
@@ -74,7 +113,16 @@ def reject_user(id):
             flash('Cannot delete admin users.', 'error')
         else:
             email = user.email
+            user_id = user.id
             db.session.delete(user)
+            AuditLog.log(
+                action=AuditLog.ACTION_USER_REJECTED,
+                actor=current_user,
+                target_type='user',
+                target_id=user_id,
+                target_email=email,
+                ip_address=request.remote_addr
+            )
             db.session.commit()
             flash(f'{email} has been rejected and removed.', 'success')
     except SQLAlchemyError:
@@ -94,6 +142,15 @@ def toggle_admin(id):
             flash('You cannot modify your own admin status.', 'error')
         else:
             user.is_admin = not user.is_admin
+            action = AuditLog.ACTION_ADMIN_GRANTED if user.is_admin else AuditLog.ACTION_ADMIN_REVOKED
+            AuditLog.log(
+                action=action,
+                actor=current_user,
+                target_type='user',
+                target_id=user.id,
+                target_email=user.email,
+                ip_address=request.remote_addr
+            )
             db.session.commit()
             status = 'granted' if user.is_admin else 'revoked'
             flash(f'Admin privileges {status} for {user.email}.', 'success')
@@ -183,3 +240,18 @@ def delete_option(id):
         db.session.rollback()
         flash('An error occurred. Please try again.', 'error')
     return redirect(url_for('admin.list_options'))
+
+
+@admin_bp.route('/audit-log')
+@login_required
+@admin_required
+def audit_log():
+    """View audit log of admin actions."""
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    return render_template('admin/audit_log.html', logs=logs)
