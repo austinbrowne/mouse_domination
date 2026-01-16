@@ -240,6 +240,54 @@ mouse_domination/
 
 ## Database Operations
 
+### Migrations (Alembic/Flask-Migrate)
+
+Database schema changes are managed with Flask-Migrate (Alembic wrapper).
+
+**Making schema changes:**
+
+```bash
+# 1. Modify models.py with your changes
+
+# 2. Generate migration locally
+source .venv/bin/activate
+flask db migrate -m "Add avatar_url to users"
+
+# 3. Review the generated migration in migrations/versions/
+
+# 4. Commit and push
+git add migrations/
+git commit -m "feat: Add avatar_url to users"
+git push origin main
+```
+
+Migrations auto-run on deploy when the `migrations/` folder changes.
+
+**Manual migration commands (on server):**
+
+```bash
+cd /opt/apps/infra
+
+# Run pending migrations
+docker compose exec mouse-domination flask db upgrade
+
+# Mark database as current (without running migrations)
+docker compose exec mouse-domination flask db stamp head
+
+# View migration history
+docker compose exec mouse-domination flask db history
+
+# Rollback one migration
+docker compose exec mouse-domination flask db downgrade
+```
+
+**First-time setup (existing database):**
+
+```bash
+# Mark existing database as up-to-date
+docker compose exec mouse-domination flask db stamp head
+```
+
 ### Backup (SQLite)
 
 ```bash
@@ -248,9 +296,11 @@ mouse_domination/
 
 Backups are stored in `backups/` directory.
 
-### Schema Updates
+### Add Indexes (One-time)
 
-The app auto-creates tables on startup. For column additions, use the migration scripts in `scripts/`.
+```bash
+docker compose exec mouse-domination python -m scripts.add_indexes
+```
 
 ## API Endpoints
 
