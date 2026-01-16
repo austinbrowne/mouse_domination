@@ -387,19 +387,19 @@ class TestAffiliateRevenueModel:
 
             assert revenue.month_year == 'Dec 2025'
 
-    def test_unique_constraint(self, app):
-        """Test unique constraint on company/year/month."""
+    def test_unique_constraint(self, app, test_user):
+        """Test unique constraint on user/company/year/month."""
         with app.app_context():
             company = Company(name='Test')
             db.session.add(company)
             db.session.commit()
 
-            rev1 = AffiliateRevenue(company_id=company.id, year=2025, month=6, revenue=100.0)
+            rev1 = AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=6, revenue=100.0)
             db.session.add(rev1)
             db.session.commit()
 
-            # Try to add duplicate
-            rev2 = AffiliateRevenue(company_id=company.id, year=2025, month=6, revenue=200.0)
+            # Try to add duplicate for same user
+            rev2 = AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=6, revenue=200.0)
             db.session.add(rev2)
 
             with pytest.raises(Exception):  # IntegrityError

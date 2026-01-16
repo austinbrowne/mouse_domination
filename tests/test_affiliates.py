@@ -15,10 +15,11 @@ def affiliate_company(app):
 
 
 @pytest.fixture
-def revenue_entry(app, affiliate_company):
-    """Create a test revenue entry."""
+def revenue_entry(app, affiliate_company, test_user):
+    """Create a test revenue entry owned by test_user."""
     with app.app_context():
         entry = AffiliateRevenue(
+            user_id=test_user['id'],
             company_id=affiliate_company['id'],
             year=2024,
             month=1,

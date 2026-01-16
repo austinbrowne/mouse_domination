@@ -626,7 +626,7 @@ class TestAffiliateRoutes:
             assert entry.sales_count == 12
             assert entry.notes == 'Good month'
 
-    def test_duplicate_revenue_entry_fails(self, auth_client, app):
+    def test_duplicate_revenue_entry_fails(self, auth_client, app, test_user):
         """Test that duplicate company/month entries are rejected."""
         with app.app_context():
             company = Company(name='Pulsar', affiliate_status='yes')
@@ -634,8 +634,8 @@ class TestAffiliateRoutes:
             db.session.commit()
             company_id = company.id
 
-            # Create existing entry
-            entry = AffiliateRevenue(company_id=company_id, year=2025, month=1, revenue=100)
+            # Create existing entry owned by test_user
+            entry = AffiliateRevenue(user_id=test_user['id'], company_id=company_id, year=2025, month=1, revenue=100)
             db.session.add(entry)
             db.session.commit()
 
@@ -649,14 +649,14 @@ class TestAffiliateRoutes:
         assert response.status_code == 200
         assert b'already exists' in response.data
 
-    def test_edit_revenue_entry(self, auth_client, app):
+    def test_edit_revenue_entry(self, auth_client, app, test_user):
         """Test editing a revenue entry."""
         with app.app_context():
             company = Company(name='Pulsar', affiliate_status='yes')
             db.session.add(company)
             db.session.commit()
 
-            entry = AffiliateRevenue(company_id=company.id, year=2025, month=1, revenue=100)
+            entry = AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=1, revenue=100)
             db.session.add(entry)
             db.session.commit()
             entry_id = entry.id
@@ -675,14 +675,14 @@ class TestAffiliateRoutes:
             assert entry.sales_count == 20
             assert entry.notes == 'Updated notes'
 
-    def test_delete_revenue_entry(self, auth_client, app):
+    def test_delete_revenue_entry(self, auth_client, app, test_user):
         """Test deleting a revenue entry."""
         with app.app_context():
             company = Company(name='Pulsar', affiliate_status='yes')
             db.session.add(company)
             db.session.commit()
 
-            entry = AffiliateRevenue(company_id=company.id, year=2025, month=1, revenue=100)
+            entry = AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=1, revenue=100)
             db.session.add(entry)
             db.session.commit()
             entry_id = entry.id
@@ -724,15 +724,15 @@ class TestAffiliateRoutes:
         response = auth_client.get(f'/affiliates/?company_id={company1_id}')
         assert response.status_code == 200
 
-    def test_revenue_stats_calculation(self, auth_client, app):
+    def test_revenue_stats_calculation(self, auth_client, app, test_user):
         """Test that revenue stats are calculated correctly."""
         with app.app_context():
             company = Company(name='Pulsar', affiliate_status='yes')
             db.session.add(company)
             db.session.commit()
 
-            db.session.add(AffiliateRevenue(company_id=company.id, year=2025, month=1, revenue=100))
-            db.session.add(AffiliateRevenue(company_id=company.id, year=2025, month=2, revenue=150))
+            db.session.add(AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=1, revenue=100))
+            db.session.add(AffiliateRevenue(user_id=test_user['id'], company_id=company.id, year=2025, month=2, revenue=150))
             db.session.commit()
 
         response = auth_client.get('/affiliates/')

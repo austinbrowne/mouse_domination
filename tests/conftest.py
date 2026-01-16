@@ -229,11 +229,12 @@ def template(app):
 
 
 @pytest.fixture
-def collab(app, contact):
-    """Create a test collaboration."""
+def collab(app, contact, test_user):
+    """Create a test collaboration owned by test_user."""
     with app.app_context():
         from models import Collaboration
         c = Collaboration(
+            user_id=test_user['id'],
             contact_id=contact['id'],
             collab_type='collab_video',
             status='idea'

@@ -5,10 +5,11 @@ from extensions import db
 
 
 @pytest.fixture
-def deal(app, company, contact):
-    """Create a test pipeline deal."""
+def deal(app, company, contact, test_user):
+    """Create a test pipeline deal owned by test_user."""
     with app.app_context():
         d = SalesPipeline(
+            user_id=test_user['id'],
             company_id=company['id'],
             contact_id=contact['id'],
             deal_type='podcast_ad',

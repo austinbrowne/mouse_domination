@@ -364,14 +364,15 @@ class TestRegister:
         assert b'valid email' in response.data.lower()
 
     def test_register_duplicate_email(self, client, test_user):
-        """Test registration with existing email."""
+        """Test registration with existing email shows same message (prevents enumeration)."""
         response = client.post('/auth/register', data={
             'email': test_user['email'],
             'password': 'SecurePass123!',
             'confirm_password': 'SecurePass123!'
-        })
+        }, follow_redirects=True)
+        # Security: don't reveal if email exists - show same success message
         assert response.status_code == 200
-        assert b'already exists' in response.data.lower()
+        assert b'account created' in response.data.lower() or b'pending' in response.data.lower()
 
     def test_register_password_mismatch(self, client):
         """Test registration with mismatched passwords."""

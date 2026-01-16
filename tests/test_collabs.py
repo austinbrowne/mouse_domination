@@ -5,11 +5,12 @@ from extensions import db
 
 
 @pytest.fixture
-def collab_with_followup(app, contact):
-    """Create a test collaboration with follow-up needed."""
+def collab_with_followup(app, contact, test_user):
+    """Create a test collaboration with follow-up needed, owned by test_user."""
     from datetime import date
     with app.app_context():
         c = Collaboration(
+            user_id=test_user['id'],
             contact_id=contact['id'],
             collab_type='collab_video',
             status='reached_out',
