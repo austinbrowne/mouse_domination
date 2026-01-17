@@ -60,8 +60,8 @@ jobs:
 
             # Check if migrations are needed by comparing DB version to code
             echo "🔍 Checking migration status..."
-            DB_VERSION=$(docker compose exec -T mouse-domination flask db current 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || echo "none")
-            CODE_HEAD=$(docker compose exec -T mouse-domination flask db heads 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || echo "unknown")
+            DB_VERSION=$(docker compose exec -T mouse-domination flask db current 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "none")
+            CODE_HEAD=$(docker compose exec -T mouse-domination flask db heads 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "unknown")
 
             echo "   Database version: $DB_VERSION"
             echo "   Code head:        $CODE_HEAD"
