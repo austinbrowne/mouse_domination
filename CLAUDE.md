@@ -83,12 +83,13 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 ### CI/CD Pipeline (GitHub Actions)
 
 **On push to `main`:**
-1. Pulls latest code to server
-2. Rebuilds and restarts the Docker container
-3. Runs migrations automatically **IF** files in `migrations/` changed
+1. Runs tests (must pass before deploy)
+2. Pulls latest code to server
+3. Compares database version to code's migration head
+4. Runs migrations automatically **IF** database is behind
+5. Rebuilds and restarts the Docker container
 
-**Manual migration trigger:**
-- Run workflow from GitHub Actions with "Force run database migrations" checked
+**Migration safety:** The pipeline queries `alembic_version` in the database and compares it to the code's migration head. This prevents outages from missed migrations even if a previous deploy failed.
 
 ### Schema Change Workflow
 
@@ -101,7 +102,7 @@ git add migrations/
 git commit -m "feat: Add new field migration"
 git push origin main
 
-# GitHub Actions detects migrations/ change and runs flask db upgrade
+# GitHub Actions compares DB version to code head and runs migrations if needed
 ```
 
 ### Manual Server Access

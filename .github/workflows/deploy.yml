@@ -7,11 +7,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      run_migrations:
-        description: 'Force run database migrations'
-        required: false
-        default: 'false'
 
 jobs:
   test:
@@ -43,59 +38,45 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      migrations: ${{ steps.changes.outputs.migrations }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Detect migration changes
-        id: changes
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.run_migrations }}" == "true" ]]; then
-            echo "migrations=true" >> $GITHUB_OUTPUT
-          else
-            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
-            if echo "$CHANGED" | grep -q "^migrations/"; then
-              echo "migrations=true" >> $GITHUB_OUTPUT
-              echo "Migration changes detected"
-            fi
-          fi
-
   deploy:
-    needs: [test, detect-changes]
+    needs: [test]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to Hetzner
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          RUN_MIGRATIONS: ${{ needs.detect-changes.outputs.migrations }}
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: RUN_MIGRATIONS
           script: |
             set -e
             echo "📦 Pulling latest code..."
             cd /opt/apps/mouse_domination
             git pull origin main
 
-            echo "🐳 Rebuilding and restarting..."
             cd /opt/apps/infra
-            docker compose build mouse-domination
-            docker compose up -d mouse-domination
 
-            # Run migrations if migrations/ changed
-            if [[ "$RUN_MIGRATIONS" == "true" ]]; then
+            # Check if migrations are needed by comparing DB version to code
+            echo "🔍 Checking migration status..."
+            DB_VERSION=$(docker compose exec -T mouse-domination flask db current 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || echo "none")
+            CODE_HEAD=$(docker compose exec -T mouse-domination flask db heads 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || echo "unknown")
+
+            echo "   Database version: $DB_VERSION"
+            echo "   Code head:        $CODE_HEAD"
+
+            if [[ "$DB_VERSION" != "$CODE_HEAD" ]]; then
               echo "🗄️ Running database migrations..."
               docker compose exec -T mouse-domination flask db upgrade
+              echo "✅ Migrations complete"
+            else
+              echo "✅ Database is up to date"
             fi
+
+            echo "🐳 Rebuilding and restarting..."
+            docker compose build mouse-domination
+            docker compose up -d mouse-domination
 
             echo "🔍 Verifying..."
             sleep 5
