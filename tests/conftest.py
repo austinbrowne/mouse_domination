@@ -278,3 +278,55 @@ def guide_with_items(app, guide):
         db.session.commit()
         item1_id, item2_id = item1.id, item2.id
     return {'guide_id': guide['id'], 'item_ids': [item1_id, item2_id]}
+
+
+@pytest.fixture
+def podcast(app, test_user):
+    """Create a test podcast with test_user as admin."""
+    with app.app_context():
+        from models import Podcast, PodcastMember
+        p = Podcast(name='Test Podcast', slug='test-podcast', created_by=test_user['id'])
+        db.session.add(p)
+        db.session.commit()
+        # Add user as admin member
+        member = PodcastMember(podcast_id=p.id, user_id=test_user['id'], role='admin')
+        db.session.add(member)
+        db.session.commit()
+        return {'id': p.id, 'name': p.name, 'slug': p.slug}
+
+
+@pytest.fixture
+def podcast_episode(app, podcast):
+    """Create a test episode for a podcast."""
+    with app.app_context():
+        ep = EpisodeGuide(title='Podcast Episode', podcast_id=podcast['id'], status='draft')
+        db.session.add(ep)
+        db.session.commit()
+        return {'id': ep.id, 'podcast_id': podcast['id'], 'title': ep.title}
+
+
+@pytest.fixture
+def podcast_episode_with_items(app, podcast_episode):
+    """Create podcast episode with sample items."""
+    with app.app_context():
+        item1 = EpisodeGuideItem(
+            guide_id=podcast_episode['id'],
+            section='introduction',
+            title='Podcast Item 1',
+            links=['https://example.com'],
+            position=0
+        )
+        item2 = EpisodeGuideItem(
+            guide_id=podcast_episode['id'],
+            section='news_mice',
+            title='Podcast Item 2',
+            links=None,
+            position=0
+        )
+        db.session.add_all([item1, item2])
+        db.session.commit()
+        return {
+            'episode_id': podcast_episode['id'],
+            'podcast_id': podcast_episode['podcast_id'],
+            'item_ids': [item1.id, item2.id]
+        }

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Podcasts - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Your Podcasts</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ podcasts|length }} podcast{% if podcasts|length != 1 %}s{% endif %}</p>
+        </div>
+        <a href="{{ url_for('podcasts.new_podcast') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Podcast
+        </a>
+    </div>
+
+    {% if podcasts %}
+    <!-- Podcast Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for podcast in podcasts %}
+        <a href="{{ url_for('podcasts.view_podcast', podcast_id=podcast.id) }}"
+           class="bg-white rounded-xl border border-surface-200 p-6 hover:shadow-md transition-shadow group">
+            <div class="flex items-start gap-4">
+                {% if podcast.artwork_url %}
+                <img src="{{ podcast.artwork_url }}" alt="{{ podcast.name }}" class="w-16 h-16 rounded-lg object-cover">
+                {% else %}
+                <div class="w-16 h-16 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                    </svg>
+                </div>
+                {% endif %}
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">{{ podcast.name }}</h3>
+                    {% if podcast.description %}
+                    <p class="text-sm text-gray-500 mt-1 line-clamp-2">{{ podcast.description }}</p>
+                    {% endif %}
+                    <div class="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                        <span>{{ podcast.episodes.count() }} episodes</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if podcast_roles[podcast.id] == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {{ podcast_roles[podcast.id]|capitalize }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-xl border border-surface-200 p-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-primary-100 mx-auto flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">No podcasts yet</h3>
+        <p class="text-gray-500 mb-6">Create your first podcast to start planning episodes.</p>
+        <a href="{{ url_for('podcasts.new_podcast') }}" class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 font-medium shadow-sm">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Create Your First Podcast
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

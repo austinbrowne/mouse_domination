@@ -102,6 +102,7 @@ def create_app(config_class=None):
     from routes.pipeline import pipeline_bp
     from routes.templates import templates_bp
     from routes.episode_guide import episode_guide_bp
+    from routes.podcasts import podcast_bp
     from routes.media_kit import media_kit_bp
     from routes.calendar import calendar_bp
     from routes.settings import settings_bp
@@ -117,13 +118,10 @@ def create_app(config_class=None):
     app.register_blueprint(pipeline_bp, url_prefix='/pipeline')
     app.register_blueprint(templates_bp, url_prefix='/templates')
     app.register_blueprint(episode_guide_bp, url_prefix='/guide')
+    app.register_blueprint(podcast_bp, url_prefix='/podcasts')
     app.register_blueprint(media_kit_bp, url_prefix='/media-kit')
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
     app.register_blueprint(settings_bp, url_prefix='/settings')
-
-    # Create database tables
-    with app.app_context():
-        db.create_all()
 
     return app
 

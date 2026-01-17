@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+
+{% block title %}{{ podcast.name }} - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% include "podcasts/_subnav.html" %}
+
+    <!-- Upcoming Episode Widget -->
+    {% if upcoming_episode %}
+    <div class="bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-primary-200/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white">
+                        Up Next
+                    </span>
+                    <h3 class="font-semibold text-gray-900">
+                        {% if upcoming_episode.episode_number %}Ep {{ upcoming_episode.episode_number }}: {% endif %}{{ upcoming_episode.title }}
+                    </h3>
+                </div>
+                <p class="text-sm text-gray-600 mt-0.5">
+                    {% if upcoming_episode.scheduled_date %}
+                        {{ upcoming_episode.scheduled_date.strftime('%A, %B %d, %Y') }}
+                    {% else %}
+                        No date scheduled
+                    {% endif %}
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-white border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit Episode
+                </a>
+                <a href="{{ url_for('podcasts.live_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Go Live
+                </a>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <!-- Quick Add Form -->
+            <form id="quick-add-form" class="mb-6">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="flex-1">
+                        <input type="text" id="quick-add-title" name="title" placeholder="Add a topic or item..." required
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                    </div>
+                    <div class="sm:w-48">
+                        <select id="quick-add-section" name="section"
+                                class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                            {% for key, name, parent in upcoming_sections %}
+                                <option value="{{ key }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" id="quick-add-btn"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <input type="text" id="quick-add-link" name="link" placeholder="Link (optional)"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-sm">
+                </div>
+            </form>
+
+            <!-- Items by Section -->
+            <div id="upcoming-items" class="space-y-4">
+                {% for key, name, parent in upcoming_sections %}
+                    {% if key in upcoming_items_by_section %}
+                    <div class="section-group" data-section="{{ key }}">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ name }}</h4>
+                        <ul class="space-y-1.5 section-items">
+                            {% for item in upcoming_items_by_section[key] %}
+                            <li class="flex items-start gap-2 text-sm bg-white px-3 py-2 rounded-lg border border-gray-200" data-item-id="{{ item.id }}">
+                                <span class="flex-1 text-gray-800">{{ item.title }}</span>
+                                {% if item.all_links %}
+                                    <a href="{{ item.all_links[0] }}" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-700 flex-shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                        </svg>
+                                    </a>
+                                {% endif %}
+                                <button type="button" class="delete-item text-gray-400 hover:text-red-600 flex-shrink-0" title="Delete">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {% if not upcoming_items_by_section %}
+            <p id="no-items-msg" class="text-center text-gray-500 py-4">No items added yet. Use the form above to add topics!</p>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <!-- No Upcoming Episode - Prompt to Create -->
+    <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 p-8 text-center">
+        <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-gray-200 flex items-center justify-center">
+            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">No upcoming episode</h3>
+        <p class="text-gray-500 mb-4">Create an episode with a future date to start collecting topics.</p>
+        <a href="{{ url_for('podcasts.new_episode', podcast_id=podcast.id) }}"
+           class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Create Episode
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Episodes</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ episode_count }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ draft_count }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ completed_count }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-surface-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Templates</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">{{ template_count }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent Episodes -->
+        <div class="lg:col-span-2 bg-white rounded-xl border border-surface-200">
+            <div class="px-6 py-4 border-b border-surface-200 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Recent Episodes</h3>
+                <a href="{{ url_for('podcasts.new_episode', podcast_id=podcast.id) }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">+ New Episode</a>
+            </div>
+            <div class="divide-y divide-surface-100">
+                {% if recent_episodes %}
+                {% for episode in recent_episodes %}
+                <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=episode.id) }}"
+                   class="flex items-center justify-between px-6 py-4 hover:bg-surface-50 transition-colors">
+                    <div class="min-w-0">
+                        <p class="font-medium text-gray-900 truncate">
+                            {% if episode.episode_number %}Ep {{ episode.episode_number }}: {% endif %}{{ episode.title }}
+                        </p>
+                        <p class="text-sm text-gray-500">
+                            {% if episode.scheduled_date %}{{ episode.scheduled_date.strftime('%b %d, %Y') }}{% else %}No date{% endif %}
+                        </p>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if episode.status == 'draft' %}bg-amber-100 text-amber-800
+                        {% elif episode.status == 'recording' %}bg-red-100 text-red-800
+                        {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                        {{ episode.status|capitalize }}
+                    </span>
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    <p>No episodes yet.</p>
+                    <a href="{{ url_for('podcasts.new_episode', podcast_id=podcast.id) }}" class="text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">Create your first episode</a>
+                </div>
+                {% endif %}
+            </div>
+            {% if episode_count > 5 %}
+            <div class="px-6 py-3 border-t border-surface-200">
+                <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all {{ episode_count }} episodes &rarr;</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar: Members & Quick Links -->
+        <div class="space-y-6">
+            <!-- Quick Links -->
+            <div class="bg-white rounded-xl border border-surface-200 p-6">
+                <h3 class="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    <a href="{{ url_for('podcasts.new_episode', podcast_id=podcast.id) }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-gray-900 transition-colors">
+                        <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        New Episode
+                    </a>
+                    <a href="{{ url_for('podcasts.list_templates', podcast_id=podcast.id) }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-gray-900 transition-colors">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                        </svg>
+                        Manage Templates
+                    </a>
+                    {% if user_role == 'admin' %}
+                    <a href="{{ url_for('podcasts.podcast_settings', podcast_id=podcast.id) }}"
+                       class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-gray-900 transition-colors">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Settings
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Members -->
+            <div class="bg-white rounded-xl border border-surface-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-gray-900">Team Members</h3>
+                    {% if user_role == 'admin' %}
+                    <a href="{{ url_for('podcasts.list_members', podcast_id=podcast.id) }}" class="text-sm text-primary-600 hover:text-primary-700">Manage</a>
+                    {% endif %}
+                </div>
+                <div class="space-y-3">
+                    {% for member in members %}
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-medium">
+                            {{ (member.user.name or member.user.email)[0]|upper }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ member.user.name or member.user.email }}</p>
+                            <p class="text-xs text-gray-500 capitalize">{{ member.role }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Podcast Info -->
+            {% if podcast.website_url or podcast.rss_feed_url %}
+            <div class="bg-white rounded-xl border border-surface-200 p-6">
+                <h3 class="font-semibold text-gray-900 mb-4">Links</h3>
+                <div class="space-y-2 text-sm">
+                    {% if podcast.website_url %}
+                    <a href="{{ podcast.website_url }}" target="_blank" rel="noopener"
+                       class="flex items-center gap-2 text-primary-600 hover:text-primary-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                        Website
+                    </a>
+                    {% endif %}
+                    {% if podcast.rss_feed_url %}
+                    <a href="{{ podcast.rss_feed_url }}" target="_blank" rel="noopener"
+                       class="flex items-center gap-2 text-orange-600 hover:text-orange-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"/>
+                        </svg>
+                        RSS Feed
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if upcoming_episode %}
+<script>
+(function() {
+    const podcastId = {{ podcast.id }};
+    const episodeId = {{ upcoming_episode.id }};
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    const form = document.getElementById('quick-add-form');
+    const titleInput = document.getElementById('quick-add-title');
+    const sectionSelect = document.getElementById('quick-add-section');
+    const linkInput = document.getElementById('quick-add-link');
+    const itemsContainer = document.getElementById('upcoming-items');
+    const noItemsMsg = document.getElementById('no-items-msg');
+
+    // Section display names for creating new groups
+    const sectionNames = {
+        {% for key, name, parent in upcoming_sections %}
+        '{{ key }}': '{{ name }}',
+        {% endfor %}
+    };
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const title = titleInput.value.trim();
+        const section = sectionSelect.value;
+        const link = linkInput.value.trim();
+
+        if (!title) return;
+
+        const btn = document.getElementById('quick-add-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+
+        try {
+            const response = await fetch(`/podcasts/${podcastId}/episodes/${episodeId}/items`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    title: title,
+                    section: section,
+                    links: link ? [link] : []
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                // Add item to UI
+                addItemToUI(data.item);
+                titleInput.value = '';
+                linkInput.value = '';
+                titleInput.focus();
+            } else {
+                alert(data.error || 'Failed to add item');
+            }
+        } catch (err) {
+            console.error('Error adding item:', err);
+            alert('Failed to add item');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg> Add';
+        }
+    });
+
+    function addItemToUI(item) {
+        // Hide "no items" message
+        if (noItemsMsg) noItemsMsg.style.display = 'none';
+
+        // Find or create section group
+        let sectionGroup = itemsContainer.querySelector(`[data-section="${item.section}"]`);
+        if (!sectionGroup) {
+            sectionGroup = document.createElement('div');
+            sectionGroup.className = 'section-group';
+            sectionGroup.dataset.section = item.section;
+            sectionGroup.innerHTML = `
+                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">${sectionNames[item.section] || item.section}</h4>
+                <ul class="space-y-1.5 section-items"></ul>
+            `;
+            itemsContainer.appendChild(sectionGroup);
+        }
+
+        const itemsList = sectionGroup.querySelector('.section-items');
+        const li = document.createElement('li');
+        li.className = 'flex items-start gap-2 text-sm bg-white px-3 py-2 rounded-lg border border-gray-200';
+        li.dataset.itemId = item.id;
+
+        let linkHtml = '';
+        if (item.links && item.links.length > 0) {
+            linkHtml = `<a href="${item.links[0]}" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-700 flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+            </a>`;
+        }
+
+        li.innerHTML = `
+            <span class="flex-1 text-gray-800">${escapeHtml(item.title)}</span>
+            ${linkHtml}
+            <button type="button" class="delete-item text-gray-400 hover:text-red-600 flex-shrink-0" title="Delete">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        `;
+
+        itemsList.appendChild(li);
+    }
+
+    // Delete item handler
+    itemsContainer.addEventListener('click', async function(e) {
+        const deleteBtn = e.target.closest('.delete-item');
+        if (!deleteBtn) return;
+
+        const li = deleteBtn.closest('li');
+        const itemId = li.dataset.itemId;
+
+        if (!confirm('Delete this item?')) return;
+
+        try {
+            const response = await fetch(`/podcasts/${podcastId}/episodes/${episodeId}/items/${itemId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                li.remove();
+
+                // Check if section is now empty
+                const sectionGroup = itemsContainer.querySelector(`[data-section]`);
+                if (sectionGroup) {
+                    const items = sectionGroup.querySelectorAll('li');
+                    if (items.length === 0) {
+                        sectionGroup.remove();
+                    }
+                }
+
+                // Show "no items" if all empty
+                if (itemsContainer.children.length === 0 && noItemsMsg) {
+                    noItemsMsg.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            console.error('Error deleting item:', err);
+        }
+    });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

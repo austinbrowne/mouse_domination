@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - {{ podcast.name }} - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% include "podcasts/_subnav.html" %}
+
+    <div class="max-w-2xl">
+        <h1 class="text-xl font-bold text-gray-900 mb-6">Podcast Settings</h1>
+
+        <!-- Edit Form -->
+        <form method="POST" class="bg-white rounded-xl border border-surface-200 p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Podcast Name <span class="text-red-500">*</span></label>
+                <input type="text" name="name" id="name" value="{{ podcast.name }}" required maxlength="150"
+                       class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea name="description" id="description" rows="3"
+                          class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">{{ podcast.description or '' }}</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="website_url" class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                    <input type="url" name="website_url" id="website_url" value="{{ podcast.website_url or '' }}"
+                           class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div>
+                    <label for="rss_feed_url" class="block text-sm font-medium text-gray-700 mb-1">RSS Feed URL</label>
+                    <input type="url" name="rss_feed_url" id="rss_feed_url" value="{{ podcast.rss_feed_url or '' }}"
+                           class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+
+            <!-- Slug Update Option -->
+            <div class="bg-surface-50 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                    <input type="checkbox" name="update_slug" id="update_slug" value="yes"
+                           class="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                    <div>
+                        <label for="update_slug" class="text-sm font-medium text-gray-700">Update URL slug when name changes</label>
+                        <p class="text-xs text-gray-500 mt-1">Current slug: <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ podcast.slug }}</code></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t border-surface-200">
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+
+        <!-- Danger Zone -->
+        <div class="mt-8 bg-white rounded-xl border border-red-200 p-6" x-data="{ showDelete: false }">
+            <h2 class="text-lg font-semibold text-red-700 mb-2">Danger Zone</h2>
+            <p class="text-sm text-gray-600 mb-4">Deleting this podcast will permanently remove all episodes, templates, and members. This action cannot be undone.</p>
+
+            <button type="button" @click="showDelete = true"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                Delete Podcast
+            </button>
+
+            <!-- Delete Confirmation Modal -->
+            <div x-show="showDelete" x-cloak
+                 class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                 @click.self="showDelete = false">
+                <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete "{{ podcast.name }}"?</h3>
+                    <p class="text-sm text-gray-600 mb-4">This will permanently delete:</p>
+                    <ul class="text-sm text-gray-600 mb-6 space-y-1 list-disc list-inside">
+                        <li>{{ podcast.episodes.count() }} episode guide{% if podcast.episodes.count() != 1 %}s{% endif %}</li>
+                        <li>{{ podcast.templates.count() }} template{% if podcast.templates.count() != 1 %}s{% endif %}</li>
+                        <li>All team member access</li>
+                    </ul>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" @click="showDelete = false"
+                                class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+                            Cancel
+                        </button>
+                        <form method="POST" action="{{ url_for('podcasts.delete_podcast', podcast_id=podcast.id) }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                                Yes, Delete Podcast
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,106 @@
+{# Hidden element for JavaScript to read stats #}
+<div id="episode-stats" class="hidden" data-total="{{ stats.total }}" data-drafts="{{ stats.drafts }}" data-completed="{{ stats.completed }}"></div>
+
+{% if guides %}
+<div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-surface-200">
+        <thead class="bg-surface-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Episode</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Topics</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-surface-100">
+            {% for guide in guides %}
+            <tr class="hover:bg-surface-50">
+                <td class="px-6 py-4">
+                    <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=guide.id) }}" class="font-medium text-primary-600 hover:text-primary-700">
+                        {% if guide.episode_number %}Ep {{ guide.episode_number }}: {% endif %}{{ guide.title }}
+                    </a>
+                    {% if search and guide.id in matching_items %}
+                    <div class="mt-2 space-y-1">
+                        {% for item in matching_items[guide.id][:3] %}
+                        <p class="text-xs text-gray-500 truncate">
+                            <span class="text-gray-400">&bull;</span> {{ item.title }}
+                        </p>
+                        {% endfor %}
+                        {% if matching_items[guide.id]|length > 3 %}
+                        <p class="text-xs text-gray-400">+ {{ matching_items[guide.id]|length - 3 }} more</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if guide.scheduled_date %}
+                    {{ guide.scheduled_date.strftime('%b %d, %Y') }}
+                    {% else %}
+                    <span class="text-gray-400">No date</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if guide.status == 'draft' %}bg-amber-100 text-amber-800
+                        {% elif guide.status == 'recording' %}bg-red-100 text-red-800
+                        {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                        {{ guide.status|capitalize }}
+                    </span>
+                    {% if guide.formatted_duration %}
+                    <span class="text-xs text-gray-500 ml-2">{{ guide.formatted_duration }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ guide.items|length if guide.items else 0 }} items
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <div class="flex items-center justify-end gap-2">
+                        {% if guide.status != 'completed' %}
+                        <a href="{{ url_for('podcasts.live_episode', podcast_id=podcast.id, episode_id=guide.id) }}"
+                           class="text-red-600 hover:text-red-700" title="Live Mode">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('podcasts.view_episode', podcast_id=podcast.id, episode_id=guide.id) }}"
+                           class="text-gray-400 hover:text-gray-600" title="View">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </a>
+                        <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=guide.id) }}"
+                           class="text-gray-400 hover:text-gray-600" title="Edit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-surface-200 p-12 text-center">
+    {% if search %}
+    <p class="text-gray-500">No episodes found matching "{{ search }}"</p>
+    {% else %}
+    <div class="w-12 h-12 rounded-full bg-primary-100 mx-auto flex items-center justify-center mb-4">
+        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">No episodes yet</h3>
+    <p class="text-gray-500 mb-4">Create your first episode guide to get started.</p>
+    <a href="{{ url_for('podcasts.new_episode', podcast_id=podcast.id) }}"
+       class="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm font-medium">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Create Episode
+    </a>
+    {% endif %}
+</div>
+{% endif %}

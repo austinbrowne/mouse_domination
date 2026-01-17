@@ -134,9 +134,9 @@
                         Inventory
                     </a>
                     {% if ENABLE_EPISODE_GUIDE %}
-                    <a href="{{ url_for('episode_guide.list_guides') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'episode_guide' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
-                        Episodes
+                    <a href="{{ url_for('podcasts.list_podcasts') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('podcasts' in current_endpoint or 'episode_guide' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                        Podcasts
                     </a>
                     {% endif %}
 
@@ -221,7 +221,7 @@
                 <a href="{{ url_for('main.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Dashboard</a>
                 <a href="{{ url_for('inventory.list_inventory') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Inventory</a>
                 {% if ENABLE_EPISODE_GUIDE %}
-                <a href="{{ url_for('episode_guide.list_guides') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Episodes</a>
+                <a href="{{ url_for('podcasts.list_podcasts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Podcasts</a>
                 {% endif %}
                 <hr class="my-2 border-surface-200">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>

@@ -735,6 +735,9 @@ class EpisodeGuideTemplate(db.Model):
     name = db.Column(db.String(100), nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
 
+    # Podcast ownership
+    podcast_id = db.Column(db.Integer, db.ForeignKey('podcasts.id'), nullable=True, index=True)
+
     # Default static content (JSON arrays of strings)
     intro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
     outro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
@@ -756,12 +759,15 @@ class EpisodeGuideTemplate(db.Model):
     # Relationships
     creator = db.relationship('User', backref='episode_guide_templates')
     guides = db.relationship('EpisodeGuide', back_populates='template', lazy='dynamic')
+    podcast = db.relationship('Podcast', back_populates='templates')
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
+            'podcast_id': self.podcast_id,
+            'podcast_name': self.podcast.name if self.podcast else None,
             'intro_static_content': self.intro_static_content,
             'outro_static_content': self.outro_static_content,
             'default_sections': self.default_sections,
@@ -784,6 +790,9 @@ class EpisodeGuide(db.Model):
     title = db.Column(db.String(200), nullable=False, index=True)
     episode_number = db.Column(db.Integer, nullable=True, index=True)
     scheduled_date = db.Column(db.Date, nullable=True, index=True)  # Episode recording/publish date
+
+    # Podcast ownership
+    podcast_id = db.Column(db.Integer, db.ForeignKey('podcasts.id'), nullable=True, index=True)
 
     # Template reference (optional - guides can be created without template)
     template_id = db.Column(db.Integer, db.ForeignKey('episode_guide_templates.id'), nullable=True, index=True)
@@ -814,6 +823,7 @@ class EpisodeGuide(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    podcast = db.relationship('Podcast', back_populates='episodes')
     template = db.relationship('EpisodeGuideTemplate', back_populates='guides')
     items = db.relationship('EpisodeGuideItem', back_populates='guide', cascade='all, delete-orphan',
                            order_by='EpisodeGuideItem.section, EpisodeGuideItem.position', lazy='select')
@@ -836,7 +846,7 @@ class EpisodeGuide(db.Model):
 
     def get_all_sections(self):
         """Get all sections for this guide (builtin + template defaults + custom)."""
-        from constants import EPISODE_GUIDE_SECTIONS
+        from constants import EPISODE_GUIDE_SECTIONS, EPISODE_GUIDE_SECTION_NAMES, EPISODE_GUIDE_SECTION_PARENTS
 
         # Start with builtin sections
         sections = list(EPISODE_GUIDE_SECTIONS)
@@ -844,7 +854,14 @@ class EpisodeGuide(db.Model):
         # Add custom sections from this guide
         if self.custom_sections:
             for cs in self.custom_sections:
-                sections.append((cs['key'], cs['name'], cs.get('parent')))
+                if isinstance(cs, dict):
+                    # Dict format: {"key": "...", "name": "...", "parent": "..."}
+                    sections.append((cs['key'], cs['name'], cs.get('parent')))
+                elif isinstance(cs, str):
+                    # String format: just the key - look up name from builtins or use key
+                    name = EPISODE_GUIDE_SECTION_NAMES.get(cs, cs.replace('_', ' ').title())
+                    parent = EPISODE_GUIDE_SECTION_PARENTS.get(cs)
+                    sections.append((cs, name, parent))
 
         return sections
 
@@ -866,6 +883,8 @@ class EpisodeGuide(db.Model):
             'title': self.title,
             'episode_number': self.episode_number,
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
+            'podcast_id': self.podcast_id,
+            'podcast_name': self.podcast.name if self.podcast else None,
             'template_id': self.template_id,
             'template_name': self.template.name if self.template else None,
             'status': self.status,
@@ -1288,3 +1307,106 @@ class DiscordImportLog(db.Model):
     __table_args__ = (
         db.UniqueConstraint('guide_id', 'discord_message_id', name='unique_guide_message'),
     )
+
+
+class Podcast(db.Model):
+    """A podcast that owns episodes and templates with role-based access control."""
+    __tablename__ = 'podcasts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  # URL-friendly identifier
+    description = db.Column(db.Text, nullable=True)
+    artwork_url = db.Column(db.String(500), nullable=True)  # Cover art
+    website_url = db.Column(db.String(500), nullable=True)  # Podcast website
+    rss_feed_url = db.Column(db.String(500), nullable=True)  # RSS feed
+
+    # Creator (first admin, for reference)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Settings
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_podcasts')
+    members = db.relationship('PodcastMember', back_populates='podcast', cascade='all, delete-orphan')
+    episodes = db.relationship('EpisodeGuide', back_populates='podcast', lazy='dynamic',
+                               cascade='all, delete-orphan')
+    templates = db.relationship('EpisodeGuideTemplate', back_populates='podcast', lazy='dynamic',
+                                cascade='all, delete-orphan')
+
+    def generate_slug(self):
+        """Generate URL-friendly slug from name."""
+        import re
+        slug = self.name.lower()
+        slug = re.sub(r'[^a-z0-9]+', '-', slug)
+        slug = slug.strip('-')
+        return slug
+
+    def get_admins(self):
+        """Get all admin members of this podcast."""
+        return [m for m in self.members if m.role == 'admin']
+
+    def get_contributors(self):
+        """Get all contributor members of this podcast."""
+        return [m for m in self.members if m.role == 'contributor']
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'description': self.description,
+            'artwork_url': self.artwork_url,
+            'website_url': self.website_url,
+            'rss_feed_url': self.rss_feed_url,
+            'created_by': self.created_by,
+            'is_active': self.is_active,
+            'episode_count': self.episodes.count() if self.episodes else 0,
+            'template_count': self.templates.count() if self.templates else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class PodcastMember(db.Model):
+    """Users who have access to a podcast with role-based permissions.
+
+    Roles:
+    - 'admin': Can edit podcast settings, add/remove members, full episode/template access
+    - 'contributor': Can create/edit episodes and templates, but not manage podcast settings
+    """
+    __tablename__ = 'podcast_members'
+
+    id = db.Column(db.Integer, primary_key=True)
+    podcast_id = db.Column(db.Integer, db.ForeignKey('podcasts.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    role = db.Column(db.String(20), nullable=False, default='contributor')  # 'admin' or 'contributor'
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    added_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    # Relationships
+    podcast = db.relationship('Podcast', back_populates='members')
+    user = db.relationship('User', foreign_keys=[user_id], backref='podcast_memberships')
+    adder = db.relationship('User', foreign_keys=[added_by])
+
+    __table_args__ = (
+        db.UniqueConstraint('podcast_id', 'user_id', name='unique_podcast_member'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'podcast_id': self.podcast_id,
+            'user_id': self.user_id,
+            'user_email': self.user.email if self.user else None,
+            'user_name': self.user.name if self.user else None,
+            'role': self.role,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'added_by': self.added_by,
+        }

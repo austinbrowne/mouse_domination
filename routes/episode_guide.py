@@ -408,7 +408,7 @@ def add_item(id):
         ).scalar() or -1
 
         # Handle links (support both new 'links' array and legacy 'link' single value)
-        links = data.get('links', [])
+        links = data.get('links') or []
         single_link = (data.get('link') or '').strip()
         if single_link and not links:
             links = [single_link]

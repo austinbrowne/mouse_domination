@@ -1,0 +1,43 @@
+{# Podcast sub-navigation - include on all podcast-scoped pages #}
+<nav class="bg-white border-b border-gray-200 mb-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            {# Podcast name with optional back to list #}
+            <a href="{{ url_for('podcasts.list_podcasts') }}" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h2 class="text-lg font-semibold text-gray-900">{{ podcast.name }}</h2>
+        </div>
+        <div class="flex items-center gap-1">
+            {% set active_tab = request.endpoint %}
+
+            <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) }}"
+               class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      {% if 'episode' in active_tab or active_tab == 'podcasts.view_podcast' %}text-primary-600 border-primary-500{% else %}text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300{% endif %}">
+                Episodes
+            </a>
+
+            <a href="{{ url_for('podcasts.list_templates', podcast_id=podcast.id) }}"
+               class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      {% if 'template' in active_tab %}text-primary-600 border-primary-500{% else %}text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300{% endif %}">
+                Templates
+            </a>
+
+            {% if user_role == 'admin' %}
+            <a href="{{ url_for('podcasts.podcast_settings', podcast_id=podcast.id) }}"
+               class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      {% if active_tab == 'podcasts.podcast_settings' %}text-primary-600 border-primary-500{% else %}text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300{% endif %}">
+                Settings
+            </a>
+
+            <a href="{{ url_for('podcasts.list_members', podcast_id=podcast.id) }}"
+               class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      {% if active_tab == 'podcasts.list_members' %}text-primary-600 border-primary-500{% else %}text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300{% endif %}">
+                Members
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
