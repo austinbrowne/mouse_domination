@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if template else 'New' }} Prompt Template - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('atomizer.list_templates') }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ 'Edit' if template else 'New' }} Prompt Template</h1>
+            <p class="text-sm text-gray-500 mt-1">Customize how AI generates content for a specific platform</p>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Basic Info -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Basic Information</h3>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Template Name *</label>
+                    <input type="text" name="name" value="{{ template.name if template else '' }}" required
+                        placeholder="e.g., Twitter Thread Style"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Platform *</label>
+                    <select name="platform" required class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        {% for key, config in platforms.items() %}
+                        <option value="{{ key }}" {% if template and template.platform == key %}selected{% endif %}>
+                            {{ config.display_name }} ({{ config.max_length }} chars)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                    <input type="text" name="description" value="{{ template.description if template else '' }}"
+                        placeholder="Brief description of this template's purpose"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Prompt Configuration -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">AI Prompt Configuration</h3>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Prompt Template *</label>
+                    <textarea name="prompt_template" rows="6" required
+                        placeholder="Write the prompt that tells the AI how to transform content.
+
+Available placeholders:
+{content} - The source content to transform
+{max_length} - The platform's character limit
+{platform} - The platform display name
+
+Example:
+Transform this content into a {platform} post. Maximum {max_length} characters. Be engaging and include a hook.
+
+Content: {content}"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 font-mono">{{ template.prompt_template if template else '' }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">Use {content}, {max_length}, and {platform} as placeholders.</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">System Prompt (optional)</label>
+                    <textarea name="system_prompt" rows="3"
+                        placeholder="Optional system prompt to set the AI's persona or context. Leave blank for default."
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 font-mono">{{ template.system_prompt if template else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Settings -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Output Settings</h3>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tone</label>
+                    <select name="tone" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <option value="">Platform default</option>
+                        {% for value, label in tones %}
+                        <option value="{{ value }}" {% if template and template.tone == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Max Length (chars)</label>
+                    <input type="number" name="max_length" value="{{ template.max_length if template else '' }}"
+                        placeholder="Platform default"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <p class="text-xs text-gray-500 mt-1">Override platform default if needed.</p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-surface-200">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Default Options</label>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_hashtags" value="1"
+                            {% if template and template.include_hashtags %}checked{% endif %}
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include hashtags
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_emoji" value="1"
+                            {% if template and template.include_emoji %}checked{% endif %}
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include emojis
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_cta" value="1"
+                            {% if template and template.include_cta %}checked{% endif %}
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include call-to-action
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="is_default" value="1"
+                            {% if template and template.is_default %}checked{% endif %}
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Set as default for this platform
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <a href="{{ url_for('atomizer.list_templates') }}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 font-medium">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {{ 'Save Changes' if template else 'Create Template' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

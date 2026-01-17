@@ -1634,3 +1634,370 @@ class PodcastMember(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'added_by': self.added_by,
         }
+
+
+# ============== Creator Hub Phase 2: Content Atomizer ==============
+
+class ContentAtomicTemplate(db.Model):
+    """AI prompt template for generating platform-specific content.
+
+    Each template defines how to transform long-form content into
+    platform-optimized snippets (tweets, Instagram captions, etc.).
+    """
+    __tablename__ = 'content_atomic_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Template metadata
+    name = db.Column(db.String(100), nullable=False)
+    platform = db.Column(db.String(50), nullable=False, index=True)
+    description = db.Column(db.Text, nullable=True)
+
+    # AI prompt configuration
+    prompt_template = db.Column(db.Text, nullable=False)  # Prompt with {content} placeholder
+    system_prompt = db.Column(db.Text, nullable=True)  # Optional system prompt for AI
+    tone = db.Column(db.String(50), nullable=True)  # casual, professional, humorous, etc.
+
+    # Platform constraints
+    max_length = db.Column(db.Integer, nullable=True)  # Platform character limit
+    include_hashtags = db.Column(db.Boolean, default=False)
+    include_emoji = db.Column(db.Boolean, default=False)
+    include_cta = db.Column(db.Boolean, default=False)  # Call-to-action
+
+    # Status
+    is_default = db.Column(db.Boolean, default=False)  # Default template for this platform
+    is_active = db.Column(db.Boolean, default=True)
+    times_used = db.Column(db.Integer, default=0)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    user = db.relationship('User', backref='atomizer_templates')
+
+    # Platform constants
+    PLATFORM_TWITTER = 'twitter'
+    PLATFORM_INSTAGRAM = 'instagram'
+    PLATFORM_YOUTUBE = 'youtube'
+    PLATFORM_LINKEDIN = 'linkedin'
+    PLATFORM_TIKTOK = 'tiktok'
+    PLATFORM_THREADS = 'threads'
+    PLATFORM_FACEBOOK = 'facebook'
+    PLATFORM_BLUESKY = 'bluesky'
+
+    PLATFORMS = [
+        (PLATFORM_TWITTER, 'Twitter/X', 280),
+        (PLATFORM_INSTAGRAM, 'Instagram', 2200),
+        (PLATFORM_YOUTUBE, 'YouTube Description', 5000),
+        (PLATFORM_LINKEDIN, 'LinkedIn', 3000),
+        (PLATFORM_TIKTOK, 'TikTok', 2200),
+        (PLATFORM_THREADS, 'Threads', 500),
+        (PLATFORM_FACEBOOK, 'Facebook', 63206),
+        (PLATFORM_BLUESKY, 'Bluesky', 300),
+    ]
+
+    TONES = [
+        ('casual', 'Casual'),
+        ('professional', 'Professional'),
+        ('humorous', 'Humorous'),
+        ('inspirational', 'Inspirational'),
+        ('educational', 'Educational'),
+        ('conversational', 'Conversational'),
+    ]
+
+    @classmethod
+    def get_platform_limit(cls, platform):
+        """Get character limit for a platform."""
+        for p, name, limit in cls.PLATFORMS:
+            if p == platform:
+                return limit
+        return None
+
+    @classmethod
+    def get_platform_display(cls, platform):
+        """Get display name for a platform."""
+        for p, name, limit in cls.PLATFORMS:
+            if p == platform:
+                return name
+        return platform.title()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'name': self.name,
+            'platform': self.platform,
+            'platform_display': self.get_platform_display(self.platform),
+            'description': self.description,
+            'prompt_template': self.prompt_template,
+            'system_prompt': self.system_prompt,
+            'tone': self.tone,
+            'max_length': self.max_length,
+            'include_hashtags': self.include_hashtags,
+            'include_emoji': self.include_emoji,
+            'include_cta': self.include_cta,
+            'is_default': self.is_default,
+            'is_active': self.is_active,
+            'times_used': self.times_used,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ContentAtomicSnippet(db.Model):
+    """AI-generated platform-optimized content snippet.
+
+    Stores the source content, generated output, and metadata for
+    tracking and iteration on content atomization.
+    """
+    __tablename__ = 'content_atomic_snippets'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Source content reference
+    source_type = db.Column(db.String(50), nullable=False, default='manual', index=True)
+    # Types: manual, episode, transcript, blog, notes
+    source_id = db.Column(db.Integer, nullable=True, index=True)  # FK to source (e.g., episode_guides.id)
+    source_title = db.Column(db.String(255), nullable=True)  # Cached title for display
+
+    # Template used (optional - can generate without template)
+    template_id = db.Column(db.Integer, db.ForeignKey('content_atomic_templates.id'), nullable=True)
+
+    # Content
+    platform = db.Column(db.String(50), nullable=False, index=True)
+    source_content = db.Column(db.Text, nullable=False)  # Original content excerpt
+    generated_content = db.Column(db.Text, nullable=False)  # AI-generated snippet
+    edited_content = db.Column(db.Text, nullable=True)  # User-edited version (if modified)
+
+    # Metadata
+    character_count = db.Column(db.Integer)
+    word_count = db.Column(db.Integer)
+    hashtags = db.Column(db.JSON, nullable=True)  # Extracted/suggested hashtags
+
+    # AI details
+    ai_model = db.Column(db.String(50), nullable=True)  # gpt-4, claude-3-opus, etc.
+    ai_temperature = db.Column(db.Float, nullable=True)
+    generation_time_ms = db.Column(db.Integer, nullable=True)  # Time taken to generate
+
+    # Status workflow
+    status = db.Column(db.String(20), default='draft', index=True)
+    # Status: draft, approved, scheduled, published, archived
+
+    # Publishing tracking
+    scheduled_date = db.Column(db.DateTime, nullable=True)
+    published_date = db.Column(db.DateTime, nullable=True)
+    published_url = db.Column(db.Text, nullable=True)  # Link to actual post
+
+    # User feedback
+    rating = db.Column(db.Integer, nullable=True)  # 1-5 user rating for AI quality
+    feedback_notes = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    user = db.relationship('User', backref='atomized_snippets')
+    template = db.relationship('ContentAtomicTemplate', backref='snippets')
+
+    # Source type constants
+    SOURCE_MANUAL = 'manual'
+    SOURCE_EPISODE = 'episode'
+    SOURCE_TRANSCRIPT = 'transcript'
+    SOURCE_BLOG = 'blog'
+    SOURCE_NOTES = 'notes'
+
+    SOURCE_TYPES = [
+        (SOURCE_MANUAL, 'Manual Input'),
+        (SOURCE_EPISODE, 'Episode Guide'),
+        (SOURCE_TRANSCRIPT, 'Transcript'),
+        (SOURCE_BLOG, 'Blog Post'),
+        (SOURCE_NOTES, 'Notes'),
+    ]
+
+    # Status constants
+    STATUS_DRAFT = 'draft'
+    STATUS_APPROVED = 'approved'
+    STATUS_SCHEDULED = 'scheduled'
+    STATUS_PUBLISHED = 'published'
+    STATUS_ARCHIVED = 'archived'
+
+    STATUSES = [
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_PUBLISHED, 'Published'),
+        (STATUS_ARCHIVED, 'Archived'),
+    ]
+
+    @property
+    def final_content(self):
+        """Return edited content if available, otherwise generated."""
+        return self.edited_content or self.generated_content
+
+    @property
+    def is_over_limit(self):
+        """Check if content exceeds platform limit."""
+        limit = ContentAtomicTemplate.get_platform_limit(self.platform)
+        if not limit:
+            return False
+        return len(self.final_content) > limit
+
+    @property
+    def platform_display(self):
+        """Get display name for platform."""
+        return ContentAtomicTemplate.get_platform_display(self.platform)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'source_type': self.source_type,
+            'source_id': self.source_id,
+            'source_title': self.source_title,
+            'template_id': self.template_id,
+            'platform': self.platform,
+            'platform_display': self.platform_display,
+            'source_content': self.source_content,
+            'generated_content': self.generated_content,
+            'edited_content': self.edited_content,
+            'final_content': self.final_content,
+            'character_count': self.character_count,
+            'word_count': self.word_count,
+            'hashtags': self.hashtags,
+            'ai_model': self.ai_model,
+            'status': self.status,
+            'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
+            'published_date': self.published_date.isoformat() if self.published_date else None,
+            'published_url': self.published_url,
+            'rating': self.rating,
+            'is_over_limit': self.is_over_limit,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class SocialConnection(db.Model):
+    """OAuth connection to a social media platform for posting.
+
+    Stores encrypted OAuth tokens per-user per-platform.
+    Currently supports Twitter/X.
+    """
+    __tablename__ = 'social_connections'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Platform identification
+    platform = db.Column(db.String(50), nullable=False, index=True)
+    # Currently: 'twitter'
+
+    # Account info (for display)
+    platform_user_id = db.Column(db.String(100), nullable=True)  # Platform's user ID
+    platform_username = db.Column(db.String(100), nullable=True)  # @handle or display name
+
+    # Encrypted credentials (Fernet encrypted JSON blob)
+    # Contains: access_token, refresh_token, expires_at, etc.
+    encrypted_credentials = db.Column(db.Text, nullable=False)
+
+    # Token metadata (unencrypted for queries)
+    token_expires_at = db.Column(db.DateTime, nullable=True)
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)  # Last posting error if any
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    user = db.relationship('User', backref='social_connections')
+
+    # Platform constants
+    PLATFORM_TWITTER = 'twitter'
+
+    PLATFORMS = [
+        (PLATFORM_TWITTER, 'Twitter/X'),
+    ]
+
+    # Unique constraint: one connection per user per platform
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'platform', name='unique_user_platform'),
+    )
+
+    @classmethod
+    def get_platform_display(cls, platform):
+        """Get display name for a platform."""
+        for p, name in cls.PLATFORMS:
+            if p == platform:
+                return name
+        return platform.title()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'platform': self.platform,
+            'platform_display': self.get_platform_display(self.platform),
+            'platform_user_id': self.platform_user_id,
+            'platform_username': self.platform_username,
+            'is_active': self.is_active,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
+            'last_error': self.last_error,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class SocialPostLog(db.Model):
+    """Log of social media posts for audit trail and debugging.
+
+    Records every post attempt with success/failure status.
+    """
+    __tablename__ = 'social_post_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Links
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    snippet_id = db.Column(db.Integer, db.ForeignKey('content_atomic_snippets.id'), nullable=True, index=True)
+    connection_id = db.Column(db.Integer, db.ForeignKey('social_connections.id'), nullable=True)
+
+    # Post details
+    platform = db.Column(db.String(50), nullable=False, index=True)
+    content_posted = db.Column(db.Text, nullable=False)  # Actual content sent
+
+    # Result
+    success = db.Column(db.Boolean, default=False)
+    platform_post_id = db.Column(db.String(100), nullable=True)  # ID returned by platform (tweet ID)
+    platform_post_url = db.Column(db.Text, nullable=True)  # URL to the post
+    error_message = db.Column(db.Text, nullable=True)
+
+    # Timing
+    posted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    response_time_ms = db.Column(db.Integer, nullable=True)
+
+    # Relationships
+    user = db.relationship('User', backref='social_post_logs')
+    snippet = db.relationship('ContentAtomicSnippet', backref='post_logs')
+    connection = db.relationship('SocialConnection', backref='post_logs')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'snippet_id': self.snippet_id,
+            'connection_id': self.connection_id,
+            'platform': self.platform,
+            'platform_display': SocialConnection.get_platform_display(self.platform),
+            'content_posted': self.content_posted,
+            'success': self.success,
+            'platform_post_id': self.platform_post_id,
+            'platform_post_url': self.platform_post_url,
+            'error_message': self.error_message,
+            'posted_at': self.posted_at.isoformat() if self.posted_at else None,
+            'response_time_ms': self.response_time_ms,
+        }

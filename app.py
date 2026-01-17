@@ -107,6 +107,8 @@ def create_app(config_class=None):
     from routes.calendar import calendar_bp
     from routes.settings import settings_bp
     from routes.revenue import revenue_bp
+    from routes.content_atomizer import atomizer_bp
+    from routes.social import social_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -124,6 +126,8 @@ def create_app(config_class=None):
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
     app.register_blueprint(settings_bp, url_prefix='/settings')
     app.register_blueprint(revenue_bp, url_prefix='/revenue')
+    app.register_blueprint(atomizer_bp, url_prefix='/atomizer')
+    app.register_blueprint(social_bp, url_prefix='/social')
 
     return app
 

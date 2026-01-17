@@ -140,21 +140,34 @@
                     </a>
                     {% endif %}
 
-                    <!-- Business Dropdown -->
+                    <!-- Monetization Dropdown -->
                     <div class="relative" x-data="{ open: false }" @click.away="open = false">
                         <button @click="open = !open"
-                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'revenue' in current_endpoint or 'collabs' in current_endpoint or 'templates' in current_endpoint or 'media_kit' in current_endpoint or 'calendar' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
-                            Business
+                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'revenue' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                            Monetization
                             <svg class="w-4 h-4" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
                         <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
                             class="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-surface-200 py-1 z-50">
-                            <a href="{{ url_for('calendar.view') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'calendar' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Calendar</a>
                             <a href="{{ url_for('pipeline.list_deals') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'pipeline' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Pipeline</a>
                             <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Affiliates</a>
                             <a href="{{ url_for('revenue.dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'revenue' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Revenue</a>
+                        </div>
+                    </div>
+
+                    <!-- Creator Hub Dropdown -->
+                    <div class="relative" x-data="{ open: false }" @click.away="open = false">
+                        <button @click="open = !open"
+                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('atomizer' in current_endpoint or 'social' in current_endpoint or 'collabs' in current_endpoint or 'calendar' in current_endpoint or 'media_kit' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                            Creator Hub
+                            <svg class="w-4 h-4" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute left-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-surface-200 py-1 z-50">
+                            <a href="{{ url_for('atomizer.list_snippets') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'atomizer' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Content Atomizer</a>
+                            <a href="{{ url_for('social.connections') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'social' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Social Connections</a>
                             <a href="{{ url_for('collabs.list_collabs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'collabs' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Collabs</a>
-                            <a href="{{ url_for('templates.list_templates') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Templates</a>
+                            <a href="{{ url_for('calendar.view') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'calendar' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Calendar</a>
                             <a href="{{ url_for('media_kit.edit_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'media_kit' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Media Kit</a>
                         </div>
                     </div>
@@ -162,14 +175,15 @@
                     <!-- CRM Dropdown -->
                     <div class="relative" x-data="{ open: false }" @click.away="open = false">
                         <button @click="open = !open"
-                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('contacts' in current_endpoint or 'companies' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('contacts' in current_endpoint or 'companies' in current_endpoint or 'templates' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                             CRM
                             <svg class="w-4 h-4" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
                         <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-surface-200 py-1 z-50">
+                            class="absolute left-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-surface-200 py-1 z-50">
                             <a href="{{ url_for('contacts.list_contacts') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'contacts' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Contacts</a>
                             <a href="{{ url_for('companies.list_companies') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'companies' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Companies</a>
+                            <a href="{{ url_for('templates.list_templates') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Outreach Templates</a>
                         </div>
                     </div>
 
@@ -225,17 +239,22 @@
                 <a href="{{ url_for('podcasts.list_podcasts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Podcasts</a>
                 {% endif %}
                 <hr class="my-2 border-surface-200">
-                <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
-                <a href="{{ url_for('calendar.view') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Calendar</a>
+                <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Monetization</p>
                 <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
                 <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Affiliates</a>
                 <a href="{{ url_for('revenue.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
+                <hr class="my-2 border-surface-200">
+                <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Creator Hub</p>
+                <a href="{{ url_for('atomizer.list_snippets') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Content Atomizer</a>
+                <a href="{{ url_for('social.connections') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Social Connections</a>
                 <a href="{{ url_for('collabs.list_collabs') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Collabs</a>
-                <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
+                <a href="{{ url_for('calendar.view') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Calendar</a>
+                <a href="{{ url_for('media_kit.edit_profile') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Media Kit</a>
                 <hr class="my-2 border-surface-200">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">CRM</p>
                 <a href="{{ url_for('contacts.list_contacts') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Contacts</a>
                 <a href="{{ url_for('companies.list_companies') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Companies</a>
+                <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Outreach Templates</a>
             </div>
         </div>
     </nav>
