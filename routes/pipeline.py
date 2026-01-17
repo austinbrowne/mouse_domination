@@ -1,10 +1,10 @@
+from datetime import date, datetime, timezone
 from flask_login import login_required, current_user
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, abort, jsonify
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from models import SalesPipeline, Company, Contact, AffiliateRevenue
-from datetime import date
+from models import SalesPipeline, Company, Contact, AffiliateRevenue, DealDeliverable
 from extensions import db
 from constants import DEAL_STATUS_CHOICES, PAYMENT_STATUS_CHOICES, DEFAULT_PAGE_SIZE
 from services.options import get_choices_for_type, get_valid_values_for_type
@@ -307,3 +307,234 @@ def mark_paid(deal):
         return 'Deal marked as paid. Revenue entry created.'
 
     return 'Deal marked as paid.'
+
+
+# ---- Deal Deliverables Routes ----
+
+@pipeline_bp.route('/<int:id>/deliverables')
+@login_required
+def list_deliverables(id):
+    """List and manage deliverables for a deal."""
+    deal = SalesPipeline.query.options(
+        joinedload(SalesPipeline.company),
+        joinedload(SalesPipeline.contact),
+        joinedload(SalesPipeline.deliverables_list)
+    ).get_or_404(id)
+
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    # Calculate stats
+    total_deliverables = len(deal.deliverables_list)
+    completed = sum(1 for d in deal.deliverables_list if d.status in ('delivered', 'verified'))
+    overdue = sum(1 for d in deal.deliverables_list if d.is_overdue)
+
+    # Total metrics
+    total_impressions = sum(d.impressions or 0 for d in deal.deliverables_list)
+    total_engagement = sum(d.engagement or 0 for d in deal.deliverables_list)
+    total_clicks = sum(d.clicks or 0 for d in deal.deliverables_list)
+
+    return render_template('pipeline/deliverables.html',
+        deal=deal,
+        deliverables=deal.deliverables_list,
+        total_deliverables=total_deliverables,
+        completed=completed,
+        overdue=overdue,
+        total_impressions=total_impressions,
+        total_engagement=total_engagement,
+        total_clicks=total_clicks,
+        deliverable_types=DealDeliverable.DELIVERABLE_TYPES,
+        statuses=DealDeliverable.STATUSES,
+    )
+
+
+@pipeline_bp.route('/<int:id>/deliverables/add', methods=['GET', 'POST'])
+@login_required
+def add_deliverable(id):
+    """Add a new deliverable to a deal."""
+    deal = SalesPipeline.query.get_or_404(id)
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    if request.method == 'POST':
+        try:
+            form = FormData(request.form)
+
+            deliverable_type = form.choice('deliverable_type',
+                [t[0] for t in DealDeliverable.DELIVERABLE_TYPES],
+                default=DealDeliverable.TYPE_OTHER)
+
+            deliverable = DealDeliverable(
+                deal_id=deal.id,
+                deliverable_type=deliverable_type,
+                description=form.optional('description'),
+                due_date=form.date('due_date'),
+                platform_post_url=form.optional('platform_post_url'),
+                status=form.choice('status',
+                    [s[0] for s in DealDeliverable.STATUSES],
+                    default=DealDeliverable.STATUS_PENDING),
+                notes=form.optional('notes'),
+            )
+
+            db.session.add(deliverable)
+            db.session.commit()
+            flash('Deliverable added successfully.', 'success')
+            return redirect(url_for('pipeline.list_deliverables', id=deal.id))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            flash('Database error occurred. Please try again.', 'error')
+
+    return render_template('pipeline/deliverable_form.html',
+        deal=deal,
+        deliverable=None,
+        deliverable_types=DealDeliverable.DELIVERABLE_TYPES,
+        statuses=DealDeliverable.STATUSES,
+    )
+
+
+@pipeline_bp.route('/<int:id>/deliverables/<int:deliverable_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_deliverable(id, deliverable_id):
+    """Edit an existing deliverable."""
+    deal = SalesPipeline.query.get_or_404(id)
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    deliverable = DealDeliverable.query.filter_by(id=deliverable_id, deal_id=deal.id).first_or_404()
+
+    if request.method == 'POST':
+        try:
+            form = FormData(request.form)
+
+            deliverable.deliverable_type = form.choice('deliverable_type',
+                [t[0] for t in DealDeliverable.DELIVERABLE_TYPES],
+                default=DealDeliverable.TYPE_OTHER)
+            deliverable.description = form.optional('description')
+            deliverable.due_date = form.date('due_date')
+            deliverable.completed_date = form.date('completed_date')
+            deliverable.platform_post_url = form.optional('platform_post_url')
+            deliverable.platform_post_id = form.optional('platform_post_id')
+            deliverable.impressions = form.integer('impressions')
+            deliverable.reach = form.integer('reach')
+            deliverable.engagement = form.integer('engagement')
+            deliverable.clicks = form.integer('clicks')
+            deliverable.conversions = form.integer('conversions')
+            deliverable.status = form.choice('status',
+                [s[0] for s in DealDeliverable.STATUSES],
+                default=DealDeliverable.STATUS_PENDING)
+            deliverable.notes = form.optional('notes')
+
+            # Auto-set completed_date if status changed to delivered/verified
+            if deliverable.status in ('delivered', 'verified') and not deliverable.completed_date:
+                deliverable.completed_date = date.today()
+
+            db.session.commit()
+            flash('Deliverable updated successfully.', 'success')
+            return redirect(url_for('pipeline.list_deliverables', id=deal.id))
+
+        except ValidationError as e:
+            flash(f'{e.field}: {e.message}', 'error')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Database operation', e)
+            flash('Database error occurred. Please try again.', 'error')
+
+    return render_template('pipeline/deliverable_form.html',
+        deal=deal,
+        deliverable=deliverable,
+        deliverable_types=DealDeliverable.DELIVERABLE_TYPES,
+        statuses=DealDeliverable.STATUSES,
+    )
+
+
+@pipeline_bp.route('/<int:id>/deliverables/<int:deliverable_id>/delete', methods=['POST'])
+@login_required
+def delete_deliverable(id, deliverable_id):
+    """Delete a deliverable."""
+    deal = SalesPipeline.query.get_or_404(id)
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    try:
+        deliverable = DealDeliverable.query.filter_by(id=deliverable_id, deal_id=deal.id).first_or_404()
+        db.session.delete(deliverable)
+        db.session.commit()
+        flash('Deliverable deleted.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        flash('Database error occurred. Please try again.', 'error')
+
+    return redirect(url_for('pipeline.list_deliverables', id=deal.id))
+
+
+@pipeline_bp.route('/<int:id>/deliverables/<int:deliverable_id>/mark-delivered', methods=['POST'])
+@login_required
+def mark_delivered(id, deliverable_id):
+    """Quick action to mark a deliverable as delivered."""
+    deal = SalesPipeline.query.get_or_404(id)
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    try:
+        deliverable = DealDeliverable.query.filter_by(id=deliverable_id, deal_id=deal.id).first_or_404()
+        deliverable.status = DealDeliverable.STATUS_DELIVERED
+        deliverable.completed_date = date.today()
+        db.session.commit()
+        flash('Deliverable marked as delivered.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Database operation', e)
+        flash('Database error occurred. Please try again.', 'error')
+
+    return redirect(url_for('pipeline.list_deliverables', id=deal.id))
+
+
+@pipeline_bp.route('/<int:id>/generate-report', methods=['POST'])
+@login_required
+def generate_report(id):
+    """Generate a proof-of-performance report for a deal."""
+    deal = SalesPipeline.query.options(
+        joinedload(SalesPipeline.deliverables_list)
+    ).get_or_404(id)
+
+    if deal.user_id != current_user.id:
+        abort(403)
+
+    try:
+        # Aggregate metrics from all deliverables
+        total_impressions = sum(d.impressions or 0 for d in deal.deliverables_list)
+        total_reach = sum(d.reach or 0 for d in deal.deliverables_list)
+        total_engagement = sum(d.engagement or 0 for d in deal.deliverables_list)
+        total_clicks = sum(d.clicks or 0 for d in deal.deliverables_list)
+        total_conversions = sum(d.conversions or 0 for d in deal.deliverables_list)
+
+        # Count deliverables by status
+        delivered_count = sum(1 for d in deal.deliverables_list if d.status in ('delivered', 'verified'))
+        total_count = len(deal.deliverables_list)
+
+        # Build report
+        deal.performance_report = {
+            'total_impressions': total_impressions,
+            'total_reach': total_reach,
+            'total_engagement': total_engagement,
+            'total_clicks': total_clicks,
+            'total_conversions': total_conversions,
+            'deliverables_completed': delivered_count,
+            'deliverables_total': total_count,
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+        }
+        deal.report_generated_at = datetime.now(timezone.utc)
+
+        db.session.commit()
+        flash('Performance report generated successfully.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Generate report', e)
+        flash('Error generating report. Please try again.', 'error')
+
+    return redirect(url_for('pipeline.list_deliverables', id=deal.id))

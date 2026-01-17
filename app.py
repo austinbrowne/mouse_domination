@@ -106,6 +106,7 @@ def create_app(config_class=None):
     from routes.media_kit import media_kit_bp
     from routes.calendar import calendar_bp
     from routes.settings import settings_bp
+    from routes.revenue import revenue_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -122,6 +123,7 @@ def create_app(config_class=None):
     app.register_blueprint(media_kit_bp, url_prefix='/media-kit')
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
     app.register_blueprint(settings_bp, url_prefix='/settings')
+    app.register_blueprint(revenue_bp, url_prefix='/revenue')
 
     return app
 

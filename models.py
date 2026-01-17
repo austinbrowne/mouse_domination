@@ -633,6 +633,12 @@ class SalesPipeline(db.Model):
     # Payment: pending, invoiced, paid
     payment_date = db.Column(db.Date, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+
+    # Performance tracking for proof-of-delivery reports
+    performance_report = db.Column(db.JSON, nullable=True)
+    # Format: {"total_impressions": X, "total_engagement": Y, "total_clicks": Z, "generated_at": "ISO date"}
+    report_generated_at = db.Column(db.DateTime, nullable=True)
+
     follow_up_needed = db.Column(db.Boolean, default=False, index=True)
     follow_up_date = db.Column(db.Date, nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -660,6 +666,9 @@ class SalesPipeline(db.Model):
             'deliverable_date': self.deliverable_date.isoformat() if self.deliverable_date else None,
             'payment_status': self.payment_status,
             'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'performance_report': self.performance_report,
+            'report_generated_at': self.report_generated_at.isoformat() if self.report_generated_at else None,
+            'deliverables_count': len(self.deliverables_list) if self.deliverables_list else 0,
             'notes': self.notes,
             'follow_up_needed': self.follow_up_needed,
             'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None,
@@ -1307,6 +1316,221 @@ class DiscordImportLog(db.Model):
     __table_args__ = (
         db.UniqueConstraint('guide_id', 'discord_message_id', name='unique_guide_message'),
     )
+
+
+# ---- Creator Hub: Unified Revenue & Sponsor Deliverables ----
+
+class RevenueEntry(db.Model):
+    """Unified income tracking across all revenue streams.
+
+    Consolidates income from:
+    - Sponsorships (links to SalesPipeline)
+    - Affiliates (links to AffiliateRevenue)
+    - Platform payouts (YouTube, TikTok, etc.)
+    - Digital products (courses, merch, etc.)
+    - Memberships (Patreon, YouTube Members, etc.)
+    """
+    __tablename__ = 'revenue_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Source categorization
+    source_type = db.Column(db.String(50), nullable=False, index=True)
+    # Types: sponsorship, affiliate, platform, product, membership, other
+    source_name = db.Column(db.String(255), nullable=False)  # "Amazon Associates", "YouTube AdSense"
+
+    # Links to existing models (optional)
+    affiliate_revenue_id = db.Column(db.Integer, db.ForeignKey('affiliate_revenue.id'), nullable=True, index=True)
+    pipeline_deal_id = db.Column(db.Integer, db.ForeignKey('sales_pipeline.id'), nullable=True, index=True)
+
+    # Financial
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    currency = db.Column(db.String(3), default='USD')
+
+    # Timing
+    date_earned = db.Column(db.Date, nullable=False, index=True)
+    date_received = db.Column(db.Date, nullable=True)  # When payment actually arrived
+
+    # Metadata
+    notes = db.Column(db.Text, nullable=True)
+    receipt_path = db.Column(db.String(500), nullable=True)  # Document upload
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    user = db.relationship('User', backref='revenue_entries')
+    affiliate_revenue = db.relationship('AffiliateRevenue', backref='revenue_entry')
+    pipeline_deal = db.relationship('SalesPipeline', backref='revenue_entries')
+
+    # Source type constants
+    SOURCE_SPONSORSHIP = 'sponsorship'
+    SOURCE_AFFILIATE = 'affiliate'
+    SOURCE_PLATFORM = 'platform'
+    SOURCE_PRODUCT = 'product'
+    SOURCE_MEMBERSHIP = 'membership'
+    SOURCE_OTHER = 'other'
+
+    SOURCE_TYPES = [
+        (SOURCE_SPONSORSHIP, 'Sponsorship'),
+        (SOURCE_AFFILIATE, 'Affiliate'),
+        (SOURCE_PLATFORM, 'Platform Payout'),
+        (SOURCE_PRODUCT, 'Digital Product'),
+        (SOURCE_MEMBERSHIP, 'Membership'),
+        (SOURCE_OTHER, 'Other'),
+    ]
+
+    @property
+    def month_year(self):
+        """Return formatted month/year for grouping."""
+        if not self.date_earned:
+            return None
+        months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return f"{months[self.date_earned.month]} {self.date_earned.year}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'source_type': self.source_type,
+            'source_name': self.source_name,
+            'affiliate_revenue_id': self.affiliate_revenue_id,
+            'pipeline_deal_id': self.pipeline_deal_id,
+            'amount': float(self.amount) if self.amount else 0,
+            'currency': self.currency,
+            'date_earned': self.date_earned.isoformat() if self.date_earned else None,
+            'date_received': self.date_received.isoformat() if self.date_received else None,
+            'month_year': self.month_year,
+            'notes': self.notes,
+            'receipt_path': self.receipt_path,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class DealDeliverable(db.Model):
+    """Individual deliverables within a sponsor deal.
+
+    Tracks what was promised, when it's due, and proof of delivery.
+    Used to generate proof-of-performance reports for sponsors.
+    """
+    __tablename__ = 'deal_deliverables'
+
+    id = db.Column(db.Integer, primary_key=True)
+    deal_id = db.Column(db.Integer, db.ForeignKey('sales_pipeline.id'), nullable=False, index=True)
+
+    # Deliverable details
+    deliverable_type = db.Column(db.String(50), nullable=False, index=True)
+    # Types: youtube_video, youtube_short, instagram_post, instagram_story, instagram_reel,
+    #        tiktok_video, twitter_post, podcast_ad, podcast_episode, blog_post, other
+    description = db.Column(db.Text, nullable=True)
+
+    # Timeline
+    due_date = db.Column(db.Date, nullable=True, index=True)
+    completed_date = db.Column(db.Date, nullable=True)
+
+    # Link to actual published content
+    platform_post_url = db.Column(db.Text, nullable=True)
+    platform_post_id = db.Column(db.String(255), nullable=True)
+
+    # Performance metrics (for proof-of-performance reports)
+    impressions = db.Column(db.Integer, nullable=True)
+    reach = db.Column(db.Integer, nullable=True)
+    engagement = db.Column(db.Integer, nullable=True)  # likes + comments + shares
+    clicks = db.Column(db.Integer, nullable=True)
+    conversions = db.Column(db.Integer, nullable=True)
+
+    # Status tracking
+    status = db.Column(db.String(20), default='pending', index=True)
+    # Status: pending, scheduled, delivered, verified
+
+    notes = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    deal = db.relationship('SalesPipeline', backref=db.backref('deliverables_list',
+                           cascade='all, delete-orphan', order_by='DealDeliverable.due_date'))
+
+    # Deliverable type constants
+    TYPE_YOUTUBE_VIDEO = 'youtube_video'
+    TYPE_YOUTUBE_SHORT = 'youtube_short'
+    TYPE_INSTAGRAM_POST = 'instagram_post'
+    TYPE_INSTAGRAM_STORY = 'instagram_story'
+    TYPE_INSTAGRAM_REEL = 'instagram_reel'
+    TYPE_TIKTOK_VIDEO = 'tiktok_video'
+    TYPE_TWITTER_POST = 'twitter_post'
+    TYPE_PODCAST_AD = 'podcast_ad'
+    TYPE_PODCAST_EPISODE = 'podcast_episode'
+    TYPE_BLOG_POST = 'blog_post'
+    TYPE_OTHER = 'other'
+
+    DELIVERABLE_TYPES = [
+        (TYPE_YOUTUBE_VIDEO, 'YouTube Video'),
+        (TYPE_YOUTUBE_SHORT, 'YouTube Short'),
+        (TYPE_INSTAGRAM_POST, 'Instagram Post'),
+        (TYPE_INSTAGRAM_STORY, 'Instagram Story'),
+        (TYPE_INSTAGRAM_REEL, 'Instagram Reel'),
+        (TYPE_TIKTOK_VIDEO, 'TikTok Video'),
+        (TYPE_TWITTER_POST, 'Twitter/X Post'),
+        (TYPE_PODCAST_AD, 'Podcast Ad Read'),
+        (TYPE_PODCAST_EPISODE, 'Podcast Episode'),
+        (TYPE_BLOG_POST, 'Blog Post'),
+        (TYPE_OTHER, 'Other'),
+    ]
+
+    # Status constants
+    STATUS_PENDING = 'pending'
+    STATUS_SCHEDULED = 'scheduled'
+    STATUS_DELIVERED = 'delivered'
+    STATUS_VERIFIED = 'verified'
+
+    STATUSES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_DELIVERED, 'Delivered'),
+        (STATUS_VERIFIED, 'Verified'),
+    ]
+
+    @property
+    def is_overdue(self):
+        """Check if deliverable is past due date and not completed."""
+        if self.status in (self.STATUS_DELIVERED, self.STATUS_VERIFIED):
+            return False
+        if not self.due_date:
+            return False
+        return date.today() > self.due_date
+
+    @property
+    def total_engagement(self):
+        """Calculate total engagement metrics."""
+        return (self.impressions or 0) + (self.engagement or 0) + (self.clicks or 0)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'deal_id': self.deal_id,
+            'deliverable_type': self.deliverable_type,
+            'description': self.description,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'completed_date': self.completed_date.isoformat() if self.completed_date else None,
+            'platform_post_url': self.platform_post_url,
+            'platform_post_id': self.platform_post_id,
+            'impressions': self.impressions,
+            'reach': self.reach,
+            'engagement': self.engagement,
+            'clicks': self.clicks,
+            'conversions': self.conversions,
+            'total_engagement': self.total_engagement,
+            'status': self.status,
+            'is_overdue': self.is_overdue,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class Podcast(db.Model):

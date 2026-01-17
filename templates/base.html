@@ -143,7 +143,7 @@
                     <!-- Business Dropdown -->
                     <div class="relative" x-data="{ open: false }" @click.away="open = false">
                         <button @click="open = !open"
-                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'collabs' in current_endpoint or 'templates' in current_endpoint or 'media_kit' in current_endpoint or 'calendar' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                            class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('pipeline' in current_endpoint or 'affiliates' in current_endpoint or 'revenue' in current_endpoint or 'collabs' in current_endpoint or 'templates' in current_endpoint or 'media_kit' in current_endpoint or 'calendar' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                             Business
                             <svg class="w-4 h-4" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
@@ -152,6 +152,7 @@
                             <a href="{{ url_for('calendar.view') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'calendar' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Calendar</a>
                             <a href="{{ url_for('pipeline.list_deals') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'pipeline' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Pipeline</a>
                             <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'affiliates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Affiliates</a>
+                            <a href="{{ url_for('revenue.dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'revenue' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Revenue</a>
                             <a href="{{ url_for('collabs.list_collabs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'collabs' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Collabs</a>
                             <a href="{{ url_for('templates.list_templates') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'templates' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Templates</a>
                             <a href="{{ url_for('media_kit.edit_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {% if current_endpoint and 'media_kit' in current_endpoint %}bg-primary-50 text-primary-700{% endif %}">Media Kit</a>
@@ -228,6 +229,7 @@
                 <a href="{{ url_for('calendar.view') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Calendar</a>
                 <a href="{{ url_for('pipeline.list_deals') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Pipeline</a>
                 <a href="{{ url_for('affiliates.list_revenue') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Affiliates</a>
+                <a href="{{ url_for('revenue.dashboard') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Revenue</a>
                 <a href="{{ url_for('collabs.list_collabs') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Collabs</a>
                 <a href="{{ url_for('templates.list_templates') }}" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-surface-100">Templates</a>
                 <hr class="my-2 border-surface-200">
