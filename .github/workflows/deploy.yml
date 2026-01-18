@@ -58,24 +58,27 @@ jobs:
 
             cd /opt/apps/infra
 
-            # Check if migrations are needed by comparing DB version to code
+            # Rebuild container FIRST so migration check uses new code
+            echo "🐳 Rebuilding container with new code..."
+            docker compose build mouse-domination
+
+            # Now check migrations in the NEW container (before starting)
             echo "🔍 Checking migration status..."
-            DB_VERSION=$(docker compose exec -T mouse-domination flask db current 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "none")
-            CODE_HEAD=$(docker compose exec -T mouse-domination flask db heads 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "unknown")
+            DB_VERSION=$(docker compose run --rm -T mouse-domination flask db current 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "none")
+            CODE_HEAD=$(docker compose run --rm -T mouse-domination flask db heads 2>/dev/null | grep -oE '^[a-zA-Z0-9]+' | head -1 || echo "unknown")
 
             echo "   Database version: $DB_VERSION"
             echo "   Code head:        $CODE_HEAD"
 
             if [[ "$DB_VERSION" != "$CODE_HEAD" ]]; then
               echo "🗄️ Running database migrations..."
-              docker compose exec -T mouse-domination flask db upgrade
+              docker compose run --rm -T mouse-domination flask db upgrade
               echo "✅ Migrations complete"
             else
               echo "✅ Database is up to date"
             fi
 
-            echo "🐳 Rebuilding and restarting..."
-            docker compose build mouse-domination
+            echo "🚀 Starting updated container..."
             docker compose up -d mouse-domination
 
             echo "🔍 Verifying..."
