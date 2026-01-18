@@ -8,7 +8,10 @@ A creator-focused CRM for managing brand relationships, inventory tracking, cont
 - **Inventory Tracking** - Manage review units, personal purchases, listing status, and P/L calculations
 - **Content Pipeline** - Track sponsorship deals through production stages
 - **Collaboration Management** - Manage brand collaborations from pitch to completion
-- **Episode Guide (MouseCast)** - Podcast episode planning with timestamps, links, and poll questions
+- **Multi-Podcast Support** - Manage multiple podcasts with role-based access (owner/editor/viewer)
+- **Episode Guide** - Podcast episode planning with timestamps, links, and poll questions
+- **Content Atomizer** - AI-powered content repurposing for social media
+- **Social Media Posting** - Twitter/X integration with scheduling
 - **Outreach Templates** - Reusable email templates with variable substitution
 - **Revenue Analytics** - Dashboard with affiliate revenue tracking and monthly trends
 - **Multi-User Support** - User registration with admin approval workflow
@@ -154,7 +157,7 @@ The Episode Guide feature supports importing topics from Discord. Community memb
 
 ### In-App Configuration
 
-1. Go to **Episode Guide** > **Templates**
+1. Go to **Podcasts** > Select a podcast > **Templates**
 2. Edit a template (or create one)
 3. Scroll to **Discord Community Topic Sourcing**
 4. Enter:
@@ -286,14 +289,17 @@ mouse_domination/
 │   ├── collabs.py        # Collaborations
 │   ├── pipeline.py       # Sponsorship pipeline
 │   ├── templates.py      # Outreach templates
-│   └── episode_guide.py  # MouseCast episode planning
-├── templates/             # Jinja2 templates
+│   ├── podcasts.py       # Multi-podcast hub + episodes
+│   ├── content_atomizer.py # AI content repurposing
+│   ├── social.py         # Social media posting
+│   └── revenue.py        # Revenue dashboards
+├── templates/             # Jinja2 templates (21 subdirectories)
 │   ├── admin/            # User management
 │   ├── auth/             # Login, register, pending
 │   ├── inventory/        # Inventory CRUD
 │   ├── contacts/         # Contact CRUD
 │   ├── companies/        # Company CRUD
-│   ├── episode_guide/    # MouseCast templates
+│   ├── podcasts/         # Podcast management + episodes
 │   └── ...
 ├── utils/                # Utility functions
 ├── scripts/              # Migration and utility scripts
@@ -381,11 +387,15 @@ All routes except `/auth/*` and `/health` require authentication.
 | `GET /inventory` | Inventory list |
 | `GET /contacts` | Contact list |
 | `GET /companies` | Company list |
-| `GET /guide` | Episode guide list |
+| `GET /podcasts` | Podcast hub |
+| `GET /podcasts/<id>/episodes` | Episode guides |
 | `GET /collabs` | Collaborations |
 | `GET /pipeline` | Sponsorship pipeline |
 | `GET /templates` | Outreach templates |
 | `GET /affiliates` | Affiliate revenue |
+| `GET /revenue` | Revenue dashboards |
+| `GET /atomizer` | Content atomizer |
+| `GET /social` | Social media connections |
 
 ## License
 
