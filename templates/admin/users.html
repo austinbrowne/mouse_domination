@@ -49,18 +49,18 @@
         </form>
     </div>
 
-    {% if pending %}
+    {% if pending.items %}
     <div class="bg-white rounded-xl shadow-sm border border-surface-200 mb-6">
         <div class="px-6 py-4 border-b border-surface-200 bg-amber-50">
             <h2 class="font-semibold text-amber-800 flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                Pending Approval ({{ pending|length }})
+                Pending Approval ({{ pending.total }})
             </h2>
         </div>
         <div class="divide-y divide-surface-100">
-            {% for user in pending %}
+            {% for user in pending.items %}
             <div class="px-6 py-4 flex items-center justify-between">
                 <div>
                     <div class="font-medium text-gray-900 flex items-center gap-2">
@@ -105,6 +105,19 @@
             </div>
             {% endfor %}
         </div>
+        {% if pending.pages > 1 %}
+        <div class="px-6 py-3 border-t border-surface-200 flex justify-center gap-2">
+            {% if pending.has_prev %}
+            <a href="{{ url_for('admin.list_users', pending_page=pending.prev_num, approved_page=approved.page, search=search, status=status_filter) }}"
+               class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Previous</a>
+            {% endif %}
+            <span class="px-3 py-1 text-sm text-gray-600">Page {{ pending.page }} of {{ pending.pages }}</span>
+            {% if pending.has_next %}
+            <a href="{{ url_for('admin.list_users', pending_page=pending.next_num, approved_page=approved.page, search=search, status=status_filter) }}"
+               class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Next</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -114,12 +127,12 @@
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                Approved Users ({{ approved|length }})
+                Approved Users ({{ approved.total }})
             </h2>
         </div>
-        {% if approved %}
+        {% if approved.items %}
         <div class="divide-y divide-surface-100">
-            {% for user in approved %}
+            {% for user in approved.items %}
             <div class="px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
@@ -176,6 +189,19 @@
             </div>
             {% endfor %}
         </div>
+        {% if approved.pages > 1 %}
+        <div class="px-6 py-3 border-t border-surface-200 flex justify-center gap-2">
+            {% if approved.has_prev %}
+            <a href="{{ url_for('admin.list_users', pending_page=pending.page, approved_page=approved.prev_num, search=search, status=status_filter) }}"
+               class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Previous</a>
+            {% endif %}
+            <span class="px-3 py-1 text-sm text-gray-600">Page {{ approved.page }} of {{ approved.pages }}</span>
+            {% if approved.has_next %}
+            <a href="{{ url_for('admin.list_users', pending_page=pending.page, approved_page=approved.next_num, search=search, status=status_filter) }}"
+               class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Next</a>
+            {% endif %}
+        </div>
+        {% endif %}
         {% else %}
         <div class="px-6 py-12 text-center text-gray-500">
             No approved users yet.
