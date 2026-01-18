@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
-from sqlalchemy import or_, exists
+from sqlalchemy import or_, exists, func, case
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from models import (
@@ -114,11 +114,17 @@ def list_guides():
             for item in items:
                 matching_items.setdefault(item.guide_id, []).append(item)
 
-    # Stats
-    total = EpisodeGuide.query.count()
-    drafts = EpisodeGuide.query.filter_by(status='draft').count()
-    completed = EpisodeGuide.query.filter_by(status='completed').count()
-    stats = {'total': total, 'drafts': drafts, 'completed': completed}
+    # Stats - combined into single query for performance
+    stats_result = db.session.query(
+        func.count(EpisodeGuide.id).label('total'),
+        func.sum(case((EpisodeGuide.status == 'draft', 1), else_=0)).label('drafts'),
+        func.sum(case((EpisodeGuide.status == 'completed', 1), else_=0)).label('completed'),
+    ).first()
+    stats = {
+        'total': stats_result.total or 0,
+        'drafts': stats_result.drafts or 0,
+        'completed': stats_result.completed or 0
+    }
 
     # Check if this is an AJAX request for just the table
     if request.args.get('ajax') == '1':

@@ -39,6 +39,9 @@ def list_users():
     """List all users with pending/approved status."""
     search = request.args.get('search', '').strip()
     status_filter = request.args.get('status', 'all')
+    pending_page = request.args.get('pending_page', 1, type=int)
+    approved_page = request.args.get('approved_page', 1, type=int)
+    per_page = 25
 
     # Base queries
     pending_query = User.query.filter_by(is_approved=False)
@@ -61,10 +64,14 @@ def list_users():
         pending_query = pending_query.filter(db.false())
     elif status_filter == 'admin':
         pending_query = pending_query.filter(db.false())
-        approved_query = approved_query.filter(User.is_admin == True)
+        approved_query = approved_query.filter(User.is_admin.is_(True))
 
-    pending = pending_query.order_by(User.created_at.desc()).all()
-    approved = approved_query.order_by(User.email).all()
+    pending = pending_query.order_by(User.created_at.desc()).paginate(
+        page=pending_page, per_page=per_page, error_out=False
+    )
+    approved = approved_query.order_by(User.email).paginate(
+        page=approved_page, per_page=per_page, error_out=False
+    )
 
     return render_template('admin/users.html',
                            pending=pending,
