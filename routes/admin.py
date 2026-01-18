@@ -1,11 +1,12 @@
 from functools import wraps
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, request
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, current_app
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from extensions import db
 from models import User, CustomOption, AuditLog
 from constants import BUILTIN_CHOICES, OPTION_TYPE_LABELS
 from services.options import get_all_custom_options, get_option_types
+from utils.logging import log_exception
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -101,8 +102,9 @@ def approve_user(id):
             )
             db.session.commit()
             flash(f'{user.email} has been approved.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Approve user', e, user_id=id)
         flash('An error occurred. Please try again.', 'error')
     return redirect(url_for('admin.list_users'))
 
@@ -132,8 +134,9 @@ def reject_user(id):
             )
             db.session.commit()
             flash(f'{email} has been rejected and removed.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Reject user', e, user_id=id)
         flash('An error occurred. Please try again.', 'error')
     return redirect(url_for('admin.list_users'))
 
@@ -161,8 +164,9 @@ def toggle_admin(id):
             db.session.commit()
             status = 'granted' if user.is_admin else 'revoked'
             flash(f'Admin privileges {status} for {user.email}.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Toggle admin', e, user_id=id)
         flash('An error occurred. Please try again.', 'error')
     return redirect(url_for('admin.list_users'))
 
@@ -225,8 +229,9 @@ def create_option():
     except IntegrityError:
         db.session.rollback()
         flash(f'An option with value "{value}" already exists for this type.', 'error')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Create option', e, option_type=option_type)
         flash('An error occurred. Please try again.', 'error')
 
     return redirect(url_for('admin.list_options'))
@@ -243,8 +248,9 @@ def delete_option(id):
         db.session.delete(option)
         db.session.commit()
         flash(f'Custom option "{label}" deleted.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Delete option', e, option_id=id)
         flash('An error occurred. Please try again.', 'error')
     return redirect(url_for('admin.list_options'))
 

@@ -1,10 +1,11 @@
 import io
 import base64
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 from extensions import db
 from routes.auth import validate_password_strength
+from utils.logging import log_exception
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -33,8 +34,9 @@ def update_profile():
         current_user.name = name if name else None
         db.session.commit()
         flash('Profile updated successfully.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Update profile', e, user_id=current_user.id)
         flash('An error occurred. Please try again.', 'error')
 
     return redirect(url_for('settings.index'))
@@ -74,8 +76,9 @@ def change_password():
         current_user.set_password(new_password)
         db.session.commit()
         flash('Password changed successfully.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Change password', e, user_id=current_user.id)
         flash('An error occurred. Please try again.', 'error')
 
     return redirect(url_for('settings.index'))

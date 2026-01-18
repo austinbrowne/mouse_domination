@@ -15,6 +15,7 @@ from constants import (
     PASSWORD_SPECIAL_CHARS,
     MAX_FAILED_LOGIN_ATTEMPTS,
 )
+from utils.logging import log_exception
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -264,8 +265,9 @@ def register():
             flash('Account created. Please check your email to verify your address, then wait for admin approval.', 'success')
             return redirect(url_for('auth.pending'))
 
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'User registration', e)
             flash('An error occurred. Please try again.', 'error')
             return render_template('auth/register.html')
 
@@ -348,8 +350,9 @@ def reset_password(token):
             flash('Your password has been reset. You can now log in.', 'success')
             return redirect(url_for('auth.login'))
 
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
+            log_exception(current_app.logger, 'Password reset', e)
             flash('An error occurred. Please try again.', 'error')
             return render_template('auth/reset_password.html', token=token)
 
@@ -374,8 +377,9 @@ def verify_email(token):
         user.mark_email_verified()
         db.session.commit()
         flash('Email verified successfully! Your account is pending admin approval.', 'success')
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        log_exception(current_app.logger, 'Email verification', e)
         flash('An error occurred. Please try again.', 'error')
 
     return redirect(url_for('auth.login'))
