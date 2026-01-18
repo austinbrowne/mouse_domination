@@ -463,6 +463,8 @@ def export_pdf(profile):
             headers={'Content-Disposition': f'attachment; filename=media-kit-{profile.display_name.lower().replace(" ", "-")}.pdf'}
         )
     except Exception as e:
+        # WeasyPrint can raise various exceptions (CSS/font/image loading errors)
+        # Broad catch is intentional to gracefully degrade to HTML export
         log_exception(current_app.logger, 'PDF generation', e)
         flash('Error generating PDF. Please try HTML export instead.', 'error')
         return redirect(url_for('media_kit.preview'))
