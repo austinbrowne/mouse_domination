@@ -120,7 +120,7 @@
 
         {% if template %}
         <!-- Discord Integration -->
-        <div class="bg-white rounded-xl border border-surface-200 p-6" x-data="discordConfig({{ template.id }})">
+        <div class="bg-white rounded-xl border border-surface-200 p-6" x-data="discordConfig({{ podcast.id }}, {{ template.id }})">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -318,8 +318,9 @@
 
 {% block scripts %}
 <script>
-function discordConfig(templateId) {
+function discordConfig(podcastId, templateId) {
     return {
+        podcastId: podcastId,
         templateId: templateId,
         integration: null,
         emojiMappings: [],
@@ -347,7 +348,7 @@ function discordConfig(templateId) {
 
         async loadIntegration() {
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord`);
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord`);
                 const data = await response.json();
                 if (data.success) {
                     if (data.integration) {
@@ -374,7 +375,7 @@ function discordConfig(templateId) {
 
         async loadSections() {
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings`);
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord/emoji-mappings`);
                 const data = await response.json();
                 if (data.success) {
                     this.sections = data.sections || {};
@@ -391,7 +392,7 @@ function discordConfig(templateId) {
             this.success = null;
 
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -422,7 +423,7 @@ function discordConfig(templateId) {
             this.success = null;
 
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord/test`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord/test`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -448,7 +449,7 @@ function discordConfig(templateId) {
             if (!confirm('Remove Discord integration? This will delete all emoji mappings.')) return;
 
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord/delete`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord/delete`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
@@ -484,7 +485,7 @@ function discordConfig(templateId) {
             if (!this.newMapping.emoji || !this.newMapping.section_key) return;
 
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord/emoji-mappings`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -508,7 +509,7 @@ function discordConfig(templateId) {
 
         async deleteMapping(mappingId) {
             try {
-                const response = await fetch(`/guide/templates/${this.templateId}/discord/emoji-mappings/${mappingId}`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/templates/${this.templateId}/discord/emoji-mappings/${mappingId}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content

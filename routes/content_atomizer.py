@@ -21,6 +21,7 @@ from services.content_atomizer import (
 from utils.validation import ValidationError
 from utils.routes import FormData
 from utils.logging import log_exception
+from utils.podcast_access import get_user_podcasts
 
 atomizer_bp = Blueprint('atomizer', __name__)
 
@@ -161,12 +162,14 @@ def generate_snippet():
             log_exception(current_app.logger, 'Generate snippet', e)
             flash('Database error occurred. Please try again.', 'error')
 
-    # Get episodes for dropdown
-    episodes = EpisodeGuide.query.filter(
-        EpisodeGuide.podcast.has(
-            EpisodeGuide.podcast.property.mapper.class_.members.any(user_id=current_user.id)
-        )
-    ).order_by(EpisodeGuide.created_at.desc()).limit(50).all()
+    # Get episodes for dropdown (from podcasts user has access to)
+    user_podcasts = get_user_podcasts()
+    podcast_ids = [p.id for p in user_podcasts]
+    episodes = []
+    if podcast_ids:
+        episodes = EpisodeGuide.query.filter(
+            EpisodeGuide.podcast_id.in_(podcast_ids)
+        ).order_by(EpisodeGuide.created_at.desc()).limit(50).all()
 
     # Get user's templates
     templates = ContentAtomicTemplate.query.filter_by(

@@ -135,7 +135,7 @@
                     </a>
                     {% if ENABLE_EPISODE_GUIDE %}
                     <a href="{{ url_for('podcasts.list_podcasts') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and ('podcasts' in current_endpoint or 'episode_guide' in current_endpoint) %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
+                       class="px-3 py-2 rounded-lg text-sm font-medium {% if current_endpoint and 'podcasts' in current_endpoint %}bg-primary-50 text-primary-700{% else %}text-gray-600 hover:bg-surface-100 hover:text-gray-900{% endif %}">
                         Podcasts
                     </a>
                     {% endif %}

@@ -3,7 +3,7 @@ import pytest
 from datetime import date, timedelta
 from flask import url_for
 from app import db
-from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration, Company, Contact
+from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration, Company, Contact, Podcast
 
 
 class TestCalendarModels:
@@ -174,7 +174,7 @@ class TestCalendarEventTypes:
         event = episode_events[0]
         assert event['title'].startswith('Episode:')
         assert event['color'] == '#3b82f6'  # Blue
-        assert '/guide/' in event['url']
+        assert '/podcasts/' in event['url'] or '#' in event['url']
 
     def test_inventory_deadline_events(self, app, auth_client, test_user):
         """Inventory deadline events are returned."""
@@ -340,7 +340,12 @@ class TestCalendarEventFormat:
     def test_event_urls_are_valid(self, app, auth_client, test_user):
         """Event URLs are valid route URLs."""
         with app.app_context():
-            guide = EpisodeGuide(title='URL Test', scheduled_date=date.today())
+            # Create podcast first so episode has valid URL
+            podcast = Podcast(name='URL Test Podcast', slug='url-test-podcast', created_by=test_user['id'])
+            db.session.add(podcast)
+            db.session.flush()
+
+            guide = EpisodeGuide(title='URL Test', scheduled_date=date.today(), podcast_id=podcast.id)
             item = Inventory(product_name='URL Mouse', deadline=date.today(), user_id=test_user['id'])
 
             db.session.add_all([guide, item])

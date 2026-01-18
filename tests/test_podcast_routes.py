@@ -170,46 +170,6 @@ class TestPodcastEpisodeItems:
         assert len(data['items']) == 2
 
 
-class TestEpisodeGuideItems:
-    """Tests for the legacy /guide endpoint (used by edit page)."""
-
-    def test_add_item_title_only_guide_route(self, auth_client, app, podcast_episode):
-        """Test adding item with just title via /guide route."""
-        response = auth_client.post(
-            f'/guide/{podcast_episode["id"]}/items',
-            json={
-                'section': 'introduction',
-                'title': 'Test Item Via Guide Route'
-            },
-            content_type='application/json'
-        )
-
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-        assert data['item']['title'] == 'Test Item Via Guide Route'
-        assert data['item']['links'] == []
-
-    def test_add_item_with_null_links_guide_route(self, auth_client, app, podcast_episode):
-        """Test adding item with null links via /guide route (regression test)."""
-        import json
-        response = auth_client.post(
-            f'/guide/{podcast_episode["id"]}/items',
-            data=json.dumps({
-                'section': 'introduction',
-                'title': 'Test Null Links Guide Route',
-                'links': None
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-        assert data['item']['title'] == 'Test Null Links Guide Route'
-        assert data['item']['links'] == []
-
-
 class TestPodcastAccess:
     """Tests for podcast access control."""
 

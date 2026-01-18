@@ -820,6 +820,9 @@ class EpisodeGuide(db.Model):
     new_poll = db.Column(db.String(500), nullable=True)  # Title
     new_poll_link = db.Column(db.String(500), nullable=True)
 
+    # Episode URL (YouTube, Spotify, etc.) - for sharing/atomizer
+    episode_url = db.Column(db.String(500), nullable=True)
+
     # Static content for this guide (overrides template if set)
     intro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
     outro_static_content = db.Column(db.JSON, nullable=True)  # ["line 1", "line 2", ...]
@@ -906,6 +909,7 @@ class EpisodeGuide(db.Model):
             'previous_poll_link': self.previous_poll_link,
             'new_poll': self.new_poll,
             'new_poll_link': self.new_poll_link,
+            'episode_url': self.episode_url,
             'intro_static_content': self.get_intro_content(),
             'outro_static_content': self.get_outro_content(),
             'custom_sections': self.custom_sections,

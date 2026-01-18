@@ -53,13 +53,18 @@ def get_events():
             episode_query = episode_query.filter(EpisodeGuide.scheduled_date <= end_date)
 
         for episode in episode_query.all():
+            # Generate URL - use podcast-scoped route if episode has a podcast
+            if episode.podcast_id:
+                url = url_for('podcasts.view_episode', podcast_id=episode.podcast_id, episode_id=episode.id)
+            else:
+                url = '#'  # Fallback for episodes without podcast (shouldn't happen)
             events.append({
                 'id': f'episode-{episode.id}',
                 'title': f'Episode: {episode.title}',
                 'date': episode.scheduled_date.isoformat(),
                 'type': 'episode',
                 'color': EVENT_COLORS['episode'],
-                'url': url_for('episode_guide.view_guide', id=episode.id),
+                'url': url,
             })
 
     # Inventory events (deadline, return_by_date)
