@@ -5,20 +5,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration
 from extensions import db
+from constants import EVENT_COLORS
 
 calendar_bp = Blueprint('calendar', __name__)
-
-# Event type colors (matching plan)
-EVENT_COLORS = {
-    'inventory_deadline': '#ef4444',     # Red
-    'inventory_return': '#f97316',       # Orange
-    'episode': '#3b82f6',                # Blue
-    'pipeline_deadline': '#22c55e',      # Green
-    'pipeline_deliverable': '#14b8a6',   # Teal
-    'pipeline_payment': '#8b5cf6',       # Purple
-    'collab': '#ec4899',                 # Pink
-    'follow_up': '#6b7280',              # Gray
-}
 
 
 @calendar_bp.route('/')

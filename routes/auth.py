@@ -6,6 +6,15 @@ from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 from extensions import db, limiter
 from models import User, LoginHistory
+from constants import (
+    RATE_LIMITS,
+    SESSION_KEY_2FA_USER_ID,
+    SESSION_KEY_2FA_REMEMBER,
+    SESSION_KEY_2FA_NEXT,
+    MIN_PASSWORD_LENGTH,
+    PASSWORD_SPECIAL_CHARS,
+    MAX_FAILED_LOGIN_ATTEMPTS,
+)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -13,15 +22,15 @@ auth_bp = Blueprint('auth', __name__)
 def validate_password_strength(password: str) -> list[str]:
     """Validate password meets security requirements."""
     errors = []
-    if len(password) < 12:
-        errors.append('Password must be at least 12 characters')
+    if len(password) < MIN_PASSWORD_LENGTH:
+        errors.append(f'Password must be at least {MIN_PASSWORD_LENGTH} characters')
     if not any(c.isupper() for c in password):
         errors.append('Password must contain at least one uppercase letter')
     if not any(c.islower() for c in password):
         errors.append('Password must contain at least one lowercase letter')
     if not any(c.isdigit() for c in password):
         errors.append('Password must contain at least one digit')
-    if not any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+    if not any(c in PASSWORD_SPECIAL_CHARS for c in password):
         errors.append('Password must contain at least one special character')
     return errors
 
@@ -33,8 +42,42 @@ def is_safe_url(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 
+def _complete_2fa_login(user, flash_message=None):
+    """Complete login after successful 2FA verification.
+
+    Handles common logic for both TOTP and recovery code verification:
+    - Clears 2FA session data
+    - Records successful login
+    - Creates login history entry
+    - Logs in the user
+    - Redirects to next page or dashboard
+    """
+    remember = session.pop(SESSION_KEY_2FA_REMEMBER, False)
+    next_page = session.pop(SESSION_KEY_2FA_NEXT, None)
+    session.pop(SESSION_KEY_2FA_USER_ID, None)
+
+    user.record_successful_login()
+    LoginHistory.record(
+        user=user,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        success=True
+    )
+    db.session.commit()
+
+    login_user(user, remember=remember)
+    session.permanent = True  # Enable session timeout
+
+    if flash_message:
+        flash(flash_message, 'info')
+
+    if next_page and is_safe_url(next_page):
+        return redirect(next_page)
+    return redirect(url_for('main.dashboard'))
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute", error_message="Too many login attempts. Please wait a minute.")
+@limiter.limit(RATE_LIMITS['login'], error_message="Too many login attempts. Please wait a minute.")
 def login():
     """Handle user login with brute force protection."""
     if current_user.is_authenticated:
@@ -83,7 +126,7 @@ def login():
             )
             db.session.commit()
 
-            remaining_attempts = max(0, 5 - user.failed_login_attempts)
+            remaining_attempts = max(0, MAX_FAILED_LOGIN_ATTEMPTS - user.failed_login_attempts)
             if remaining_attempts > 0:
                 flash(f'Invalid email or password. {remaining_attempts} attempts remaining.', 'error')
             else:
@@ -93,9 +136,9 @@ def login():
         # Check if 2FA is enabled
         if user.totp_enabled:
             # Store user info in session for 2FA verification
-            session['2fa_user_id'] = user.id
-            session['2fa_remember'] = remember
-            session['2fa_next'] = request.args.get('next')
+            session[SESSION_KEY_2FA_USER_ID] = user.id
+            session[SESSION_KEY_2FA_REMEMBER] = remember
+            session[SESSION_KEY_2FA_NEXT] = request.args.get('next')
             return redirect(url_for('auth.verify_2fa_login'))
 
         # Successful login (no 2FA)
@@ -129,17 +172,17 @@ def logout():
 
 
 @auth_bp.route('/2fa-verify', methods=['GET', 'POST'])
-@limiter.limit("10 per minute", error_message="Too many attempts. Please wait.")
+@limiter.limit(RATE_LIMITS['2fa_verify'], error_message="Too many attempts. Please wait.")
 def verify_2fa_login():
     """Verify 2FA code during login."""
-    user_id = session.get('2fa_user_id')
+    user_id = session.get(SESSION_KEY_2FA_USER_ID)
     if not user_id:
         flash('Session expired. Please log in again.', 'error')
         return redirect(url_for('auth.login'))
 
     user = User.query.get(user_id)
     if not user:
-        session.pop('2fa_user_id', None)
+        session.pop(SESSION_KEY_2FA_USER_ID, None)
         flash('Invalid session. Please log in again.', 'error')
         return redirect(url_for('auth.login'))
 
@@ -150,53 +193,17 @@ def verify_2fa_login():
         if use_recovery:
             # Try recovery code
             if user.verify_recovery_code(code):
-                # Success with recovery code
-                remember = session.pop('2fa_remember', False)
-                next_page = session.pop('2fa_next', None)
-                session.pop('2fa_user_id', None)
-
-                user.record_successful_login()
-                LoginHistory.record(
-                    user=user,
-                    ip_address=request.remote_addr,
-                    user_agent=request.headers.get('User-Agent'),
-                    success=True
+                return _complete_2fa_login(
+                    user,
+                    flash_message='Logged in with recovery code. Consider generating new recovery codes.'
                 )
-                db.session.commit()
-
-                login_user(user, remember=remember)
-                session.permanent = True  # Enable session timeout
-                flash('Logged in with recovery code. Consider generating new recovery codes.', 'info')
-
-                if next_page and is_safe_url(next_page):
-                    return redirect(next_page)
-                return redirect(url_for('main.dashboard'))
             else:
                 flash('Invalid recovery code.', 'error')
                 return render_template('auth/verify_2fa.html', use_recovery=True)
         else:
             # Try TOTP code
             if len(code) == 6 and code.isdigit() and user.verify_totp(code):
-                # Success with TOTP
-                remember = session.pop('2fa_remember', False)
-                next_page = session.pop('2fa_next', None)
-                session.pop('2fa_user_id', None)
-
-                user.record_successful_login()
-                LoginHistory.record(
-                    user=user,
-                    ip_address=request.remote_addr,
-                    user_agent=request.headers.get('User-Agent'),
-                    success=True
-                )
-                db.session.commit()
-
-                login_user(user, remember=remember)
-                session.permanent = True  # Enable session timeout
-
-                if next_page and is_safe_url(next_page):
-                    return redirect(next_page)
-                return redirect(url_for('main.dashboard'))
+                return _complete_2fa_login(user)
             else:
                 flash('Invalid code. Please try again.', 'error')
                 return render_template('auth/verify_2fa.html', use_recovery=False)
@@ -205,7 +212,7 @@ def verify_2fa_login():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
-@limiter.limit("3 per hour", error_message="Registration limit reached. Please try later.")
+@limiter.limit(RATE_LIMITS['register'], error_message="Registration limit reached. Please try later.")
 def register():
     """Handle new user registration."""
     if current_user.is_authenticated:
@@ -272,7 +279,7 @@ def pending():
 
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
-@limiter.limit("3 per hour", error_message="Too many reset requests. Please try later.")
+@limiter.limit(RATE_LIMITS['forgot_password'], error_message="Too many reset requests. Please try later.")
 def forgot_password():
     """Handle forgot password requests."""
     if current_user.is_authenticated:
@@ -303,7 +310,7 @@ def forgot_password():
 
 
 @auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
-@limiter.limit("5 per minute", error_message="Too many reset attempts. Please wait.")
+@limiter.limit(RATE_LIMITS['reset_password'], error_message="Too many reset attempts. Please wait.")
 def reset_password(token):
     """Handle password reset with token."""
     if current_user.is_authenticated:
@@ -350,7 +357,7 @@ def reset_password(token):
 
 
 @auth_bp.route('/verify-email/<token>')
-@limiter.limit("10 per minute", error_message="Too many verification attempts. Please wait.")
+@limiter.limit(RATE_LIMITS['verify_email'], error_message="Too many verification attempts. Please wait.")
 def verify_email(token):
     """Verify user's email address."""
     user = User.query.filter_by(email_verification_token=token).first()
@@ -375,7 +382,7 @@ def verify_email(token):
 
 
 @auth_bp.route('/resend-verification', methods=['GET', 'POST'])
-@limiter.limit("3 per hour", error_message="Too many verification requests. Please try later.")
+@limiter.limit(RATE_LIMITS['resend_verification'], error_message="Too many verification requests. Please try later.")
 def resend_verification():
     """Resend email verification link."""
     if current_user.is_authenticated:
