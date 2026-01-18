@@ -134,7 +134,7 @@
 <div class="space-y-6">
 {% include "podcasts/_subnav.html" %}
 </div>
-<div class="space-y-6" x-data="episodeGuideEdit({{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}', {{ guide.custom_sections | default([], true) | tojson }})">
+<div class="space-y-6" x-data="episodeGuideEdit({{ podcast.id }}, {{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}', '{{ guide.episode_url | default('', true) | e }}', {{ guide.custom_sections | default([], true) | tojson }})">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -227,6 +227,19 @@
                         class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Episode URL -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <h3 class="font-semibold text-gray-900 mb-4">Episode Link</h3>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Published URL (YouTube, Spotify, etc.)</label>
+            <input type="url" x-model="episodeUrl"
+                @blur="saveGuideMetadata()"
+                placeholder="https://youtube.com/watch?v=... or podcast link"
+                class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+            <p class="text-xs text-gray-500 mt-1">Add the episode link once published. This is used when generating social media posts.</p>
         </div>
     </div>
 
@@ -620,8 +633,9 @@
 </style>
 
 <script>
-function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink, initialCustomSections) {
+function episodeGuideEdit(podcastId, guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink, initialEpisodeUrl, initialCustomSections) {
     return {
+        podcastId: podcastId,
         guideId: guideId,
         guideTitle: initialTitle,
         episodeNumber: initialEpisodeNum,
@@ -629,6 +643,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
         previousPollLink: initialPrevPollLink,
         newPoll: initialNewPoll,
         newPollLink: initialNewPollLink,
+        episodeUrl: initialEpisodeUrl,
         editingTitle: false,
         editingEpisodeNum: false,
         editingItemId: null,
@@ -692,7 +707,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             }
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/items/move`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/items/move`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -752,7 +767,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             if (!name || !name.trim()) return;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/sections`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/sections`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -778,7 +793,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             if (!confirm('Delete this section? Any items in it must be moved or deleted first.')) return;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/sections/${sectionKey}`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/sections/${sectionKey}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
@@ -805,7 +820,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             }
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/metadata`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/metadata`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -817,7 +832,8 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                         previous_poll: this.previousPoll || null,
                         previous_poll_link: this.previousPollLink || null,
                         new_poll: this.newPoll || null,
-                        new_poll_link: this.newPollLink || null
+                        new_poll_link: this.newPollLink || null,
+                        episode_url: this.episodeUrl || null
                     })
                 });
 
@@ -859,7 +875,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                 .map(l => l.trim());
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/items/${this.editingItemId}`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/items/${this.editingItemId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -904,7 +920,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                     notes: (notes && notes.trim()) || null
                 };
 
-                const response = await fetch(`/guide/${this.guideId}/items`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/items`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -929,7 +945,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             if (!confirm('Delete this item?')) return;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/items/${itemId}`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/items/${itemId}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
@@ -951,7 +967,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
             this.discordError = null;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/discord/fetch`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/discord/fetch`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1032,7 +1048,7 @@ function episodeGuideEdit(guideId, initialTitle, initialEpisodeNum, initialPrevP
                     notes: ''
                 }));
 
-                const response = await fetch(`/guide/${this.guideId}/discord/import`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/discord/import`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

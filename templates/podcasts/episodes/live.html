@@ -49,7 +49,7 @@
 {% endmacro %}
 
 {% block content %}
-<div class="space-y-4" x-data="episodeGuideLive({{ guide.id }}, '{{ guide.status }}', '{{ guide.recording_started_at.isoformat() if guide.recording_started_at else '' }}')">
+<div class="space-y-4" x-data="episodeGuideLive({{ podcast.id }}, {{ guide.id }}, '{{ guide.status }}', '{{ guide.recording_started_at.isoformat() if guide.recording_started_at else '' }}')">
     <!-- Compact Timer Overlay -->
     <div class="fixed top-20 right-4 z-40 bg-white rounded-lg shadow-lg border border-surface-200 px-3 py-2 flex items-center gap-3">
         <!-- Recording indicator -->
@@ -315,8 +315,9 @@
 
 {% block scripts %}
 <script>
-function episodeGuideLive(guideId, initialStatus, startedAtISO) {
+function episodeGuideLive(podcastId, guideId, initialStatus, startedAtISO) {
     return {
+        podcastId: podcastId,
         guideId: guideId,
         timerRunning: initialStatus === 'recording',
         elapsedSeconds: 0,
@@ -580,7 +581,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
                 // Use client time to avoid timezone issues
                 const clientStartTime = new Date();
 
-                const response = await fetch(`/guide/${this.guideId}/start`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/start`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -616,7 +617,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
             this.timerRunning = false;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/stop`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/stop`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -628,7 +629,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
                 const data = await response.json();
                 if (data.success) {
                     localStorage.removeItem(`guide_${this.guideId}_state`);
-                    window.location.href = `/guide/${this.guideId}`;
+                    window.location.href = `/podcasts/${this.podcastId}/episodes/${this.guideId}/`;
                 }
             } catch (error) {
                 console.error('Failed to stop recording:', error);
@@ -639,7 +640,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
             if (!this.timerRunning) return;
 
             try {
-                const response = await fetch(`/guide/${this.guideId}/timestamp/${itemId}`, {
+                const response = await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/timestamp/${itemId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -662,7 +663,7 @@ function episodeGuideLive(guideId, initialStatus, startedAtISO) {
             this.discussed[itemId] = discussed;
 
             try {
-                await fetch(`/guide/${this.guideId}/items/${itemId}`, {
+                await fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/items/${itemId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',

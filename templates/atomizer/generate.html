@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Content - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('atomizer.list_snippets') }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Generate Content</h1>
+            <p class="text-sm text-gray-500 mt-1">Transform long-form content into platform-optimized posts</p>
+        </div>
+    </div>
+
+    {% if not ai_configured %}
+    <div class="flex items-center gap-3 p-4 rounded-lg bg-red-50 border border-red-200">
+        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <div>
+            <span class="text-sm font-medium text-red-800">AI API not configured.</span>
+            <span class="text-sm text-red-700">Set OPENAI_API_KEY or ANTHROPIC_API_KEY in your environment variables.</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Source Section -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6" x-data="{ sourceType: 'manual' }">
+            <h3 class="font-semibold text-gray-900 mb-4">Source Content</h3>
+
+            <!-- Source Type Toggle -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Content Source</label>
+                <div class="flex gap-2">
+                    {% for value, label in source_types %}
+                    <label class="flex-1">
+                        <input type="radio" name="source_type" value="{{ value }}"
+                            {% if value == 'manual' %}checked{% endif %}
+                            x-model="sourceType"
+                            class="sr-only peer">
+                        <div class="px-4 py-2 text-sm font-medium text-center border border-surface-200 rounded-lg cursor-pointer peer-checked:border-primary-500 peer-checked:bg-primary-50 peer-checked:text-primary-700 hover:bg-surface-50">
+                            {{ label }}
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Episode Selector (shown when source_type is episode) -->
+            <div x-show="sourceType === 'episode'" x-cloak class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Select Episode</label>
+                <select name="episode_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                    <option value="">Choose an episode...</option>
+                    {% for episode in episodes %}
+                    <option value="{{ episode.id }}">{{ episode.title or 'Untitled Episode' }} ({{ episode.created_at.strftime('%b %d, %Y') }})</option>
+                    {% endfor %}
+                </select>
+                {% if not episodes %}
+                <p class="text-xs text-gray-500 mt-1">No episodes found. Create episodes in the Episode Guide first.</p>
+                {% endif %}
+            </div>
+
+            <!-- Manual Content Input -->
+            <div x-show="sourceType === 'manual'" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Title (optional)</label>
+                    <input type="text" name="source_title" placeholder="e.g., Weekly Newsletter #42"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Content to Transform *</label>
+                    <textarea name="source_content" rows="8" placeholder="Paste your long-form content here (blog post, transcript, notes, etc.)"
+                        class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Paste your podcast transcript, blog post, video description, or any long-form content.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Platform & Settings Section -->
+        <div class="bg-white rounded-xl border border-surface-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-4">Output Settings</h3>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <!-- Platform -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Target Platform *</label>
+                    <select name="platform" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        {% for key, config in platforms.items() %}
+                        <option value="{{ key }}">{{ config.display_name }} ({{ config.max_length }} chars)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Template -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Prompt Template (optional)</label>
+                    <select name="template_id" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <option value="">Use default prompt</option>
+                        {% for template in templates %}
+                        <option value="{{ template.id }}">{{ template.name }} ({{ template.platform }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Tone -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tone</label>
+                    <select name="tone" class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
+                        <option value="">Platform default</option>
+                        {% for value, label in tones %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="mt-4 pt-4 border-t border-surface-200">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Additional Options</label>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_hashtags" value="1" checked
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include hashtags
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_emoji" value="1"
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include emojis
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" name="include_cta" value="1"
+                            class="w-4 h-4 border-surface-300 rounded text-primary-600 focus:ring-primary-500">
+                        Include call-to-action
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <a href="{{ url_for('atomizer.list_snippets') }}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            <button type="submit" {% if not ai_configured %}disabled{% endif %}
+                class="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Generate Snippet
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    // Alpine.js handles the source type toggle
+});
+</script>
+{% endblock %}

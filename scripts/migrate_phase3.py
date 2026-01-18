@@ -54,8 +54,8 @@ def migrate():
     # Create index on template name
     try:
         cursor.execute('CREATE INDEX IF NOT EXISTS ix_episode_guide_templates_name ON episode_guide_templates(name)')
-    except:
-        pass
+    except sqlite3.OperationalError:
+        pass  # Index may already exist
 
     # Add new columns to episode_guides
     columns_to_add = [

@@ -1,5 +1,6 @@
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
+from sqlalchemy import func, case
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models import Inventory, Company, CustomOption
@@ -57,8 +58,34 @@ def list_inventory():
     )
     companies = get_companies_for_dropdown()
 
-    # Calculate totals for current page
-    total_profit_loss = sum(item.profit_loss for item in pagination.items if item.sold)
+    # Calculate total P/L for all matching items using database aggregation
+    # Apply same filters as the main query
+    agg_filters = [Inventory.user_id == current_user.id]
+    if source_type and source_type in INVENTORY_SOURCE_TYPE_CHOICES:
+        agg_filters.append(Inventory.source_type == source_type)
+    if category and category in valid_categories:
+        agg_filters.append(Inventory.category == category)
+    if status and status in valid_statuses:
+        agg_filters.append(Inventory.status == status)
+    if sold == 'yes':
+        agg_filters.append(Inventory.sold.is_(True))
+    elif sold == 'no':
+        agg_filters.append(Inventory.sold.is_(False))
+    if search:
+        agg_filters.append(Inventory.product_name.ilike(f"%{search}%"))
+
+    total_profit_loss = db.session.query(
+        func.sum(
+            case(
+                (Inventory.sold.is_(True),
+                 func.coalesce(Inventory.sale_price, 0) -
+                 func.coalesce(Inventory.fees, 0) -
+                 func.coalesce(Inventory.shipping, 0) -
+                 func.coalesce(Inventory.cost, 0)),
+                else_=0
+            )
+        )
+    ).filter(*agg_filters).scalar() or 0
 
     # Check if this is an AJAX request for just the table
     if request.args.get('ajax') == '1':

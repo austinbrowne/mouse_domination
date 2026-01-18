@@ -4,7 +4,9 @@ from models import Contact, Company, Inventory, AffiliateRevenue, SalesPipeline,
 from app import db
 from sqlalchemy import func, case, and_, text
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
+from utils.logging import log_exception
 
 main_bp = Blueprint('main', __name__)
 
@@ -20,8 +22,8 @@ def health_check():
             'database': 'connected',
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
-    except Exception as e:
-        current_app.logger.error(f'Health check failed: {e}')
+    except SQLAlchemyError as e:
+        log_exception(current_app.logger, 'Health check', e)
         return jsonify({
             'status': 'unhealthy',
             'database': 'disconnected',

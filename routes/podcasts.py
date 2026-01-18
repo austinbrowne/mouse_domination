@@ -909,6 +909,403 @@ def toggle_recording(podcast_id, episode_id):
 
 
 # =============================================================================
+# Episode AJAX Endpoints (migrated from episode_guide.py)
+# =============================================================================
+
+def get_valid_sections_for_guide(guide):
+    """Get all valid section keys for a guide (builtins + custom)."""
+    valid = set(EPISODE_GUIDE_SECTION_CHOICES)
+    if guide.custom_sections:
+        for cs in guide.custom_sections:
+            if isinstance(cs, dict):
+                valid.add(cs['key'])
+            elif isinstance(cs, str):
+                valid.add(cs)
+    return valid
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/items/move', methods=['POST'])
+@login_required
+@require_podcast_access
+def move_item(podcast_id, episode_id):
+    """Move an item to a different section and/or position (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        data = request.get_json()
+        item_id = data.get('item_id')
+        target_section = data.get('target_section')
+        new_position = data.get('new_position', 0)
+
+        if not item_id:
+            return jsonify({'success': False, 'error': 'item_id is required'}), 400
+        valid_sections = get_valid_sections_for_guide(guide)
+        if target_section not in valid_sections:
+            return jsonify({'success': False, 'error': 'Invalid target section'}), 400
+        if not isinstance(new_position, int) or new_position < 0:
+            return jsonify({'success': False, 'error': 'Invalid position'}), 400
+
+        item = EpisodeGuideItem.query.filter_by(id=item_id, guide_id=episode_id).first_or_404()
+        old_section = item.section
+        old_position = item.position
+
+        if old_section != target_section:
+            # Cross-section move: update positions in both sections
+            EpisodeGuideItem.query.filter(
+                EpisodeGuideItem.guide_id == episode_id,
+                EpisodeGuideItem.section == old_section,
+                EpisodeGuideItem.position > old_position
+            ).update({EpisodeGuideItem.position: EpisodeGuideItem.position - 1}, synchronize_session=False)
+
+            EpisodeGuideItem.query.filter(
+                EpisodeGuideItem.guide_id == episode_id,
+                EpisodeGuideItem.section == target_section,
+                EpisodeGuideItem.position >= new_position
+            ).update({EpisodeGuideItem.position: EpisodeGuideItem.position + 1}, synchronize_session=False)
+
+            item.section = target_section
+            item.position = new_position
+        else:
+            # Same section reorder
+            if new_position > old_position:
+                EpisodeGuideItem.query.filter(
+                    EpisodeGuideItem.guide_id == episode_id,
+                    EpisodeGuideItem.section == old_section,
+                    EpisodeGuideItem.position > old_position,
+                    EpisodeGuideItem.position <= new_position
+                ).update({EpisodeGuideItem.position: EpisodeGuideItem.position - 1}, synchronize_session=False)
+            elif new_position < old_position:
+                EpisodeGuideItem.query.filter(
+                    EpisodeGuideItem.guide_id == episode_id,
+                    EpisodeGuideItem.section == old_section,
+                    EpisodeGuideItem.position >= new_position,
+                    EpisodeGuideItem.position < old_position
+                ).update({EpisodeGuideItem.position: EpisodeGuideItem.position + 1}, synchronize_session=False)
+
+            item.position = new_position
+
+        db.session.commit()
+        db.session.refresh(item)
+
+        return jsonify({
+            'success': True,
+            'item': item.to_dict(),
+            'old_section': old_section,
+            'new_section': target_section
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Move item', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/sections', methods=['POST'])
+@login_required
+@require_podcast_access
+def add_custom_section(podcast_id, episode_id):
+    """Add a custom section to an episode guide (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        data = request.get_json()
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'Section name is required'}), 400
+
+        # Generate a key from the name
+        key = name.lower().replace(' ', '_').replace('-', '_')
+        key = ''.join(c for c in key if c.isalnum() or c == '_')
+        base_key = key
+        counter = 1
+        existing_keys = get_valid_sections_for_guide(guide)
+        while key in existing_keys:
+            key = f"{base_key}_{counter}"
+            counter += 1
+
+        parent = data.get('parent') or None
+        color = data.get('color') or 'gray'
+
+        custom_sections = guide.custom_sections or []
+        new_section = {
+            'key': key,
+            'name': name,
+            'parent': parent,
+            'color': color,
+        }
+        custom_sections.append(new_section)
+        guide.custom_sections = custom_sections
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'section': new_section,
+            'all_sections': [{'key': s[0], 'name': s[1], 'parent': s[2]} for s in guide.get_all_sections()],
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Add custom section', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/sections/<section_key>', methods=['DELETE'])
+@login_required
+@require_podcast_access
+def delete_custom_section(podcast_id, episode_id, section_key):
+    """Delete a custom section from an episode guide (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        # Can only delete custom sections, not builtin ones
+        if section_key in EPISODE_GUIDE_SECTION_CHOICES:
+            return jsonify({'success': False, 'error': 'Cannot delete built-in sections'}), 400
+
+        # Check if section has items
+        item_count = EpisodeGuideItem.query.filter_by(guide_id=episode_id, section=section_key).count()
+        if item_count > 0:
+            return jsonify({'success': False, 'error': f'Section has {item_count} items. Move or delete them first.'}), 400
+
+        # Remove from custom_sections
+        if guide.custom_sections:
+            guide.custom_sections = [s for s in guide.custom_sections if s['key'] != section_key]
+            if not guide.custom_sections:
+                guide.custom_sections = None
+
+        db.session.commit()
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Delete custom section', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/start', methods=['POST'])
+@login_required
+@require_podcast_access
+def start_recording(podcast_id, episode_id):
+    """Start the timer / begin recording (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        guide.status = 'recording'
+        guide.recording_started_at = datetime.now(timezone.utc)
+        guide.recording_ended_at = None
+        guide.total_duration_seconds = None
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'started_at': guide.recording_started_at.isoformat(),
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Start recording', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/stop', methods=['POST'])
+@login_required
+@require_podcast_access
+def stop_recording(podcast_id, episode_id):
+    """Stop the timer / end recording (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        data = request.get_json() or {}
+
+        guide.status = 'completed'
+        guide.recording_ended_at = datetime.now(timezone.utc)
+        guide.total_duration_seconds = data.get('elapsed_seconds', 0)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'duration': guide.total_duration_seconds,
+            'formatted_duration': guide.formatted_duration,
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Stop recording', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/reopen', methods=['POST'])
+@login_required
+@require_podcast_access
+def reopen_episode(podcast_id, episode_id):
+    """Reopen a completed episode guide as a draft for further editing."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        guide.status = 'draft'
+        # Keep the recording data (timestamps, duration) intact
+
+        db.session.commit()
+        flash(f'Episode "{guide.title}" reopened as draft.', 'success')
+        return redirect(url_for('podcasts.edit_episode', podcast_id=podcast_id, episode_id=episode_id))
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Reopen episode', e)
+        flash('Database error occurred. Please try again.', 'error')
+        return redirect(url_for('podcasts.view_episode', podcast_id=podcast_id, episode_id=episode_id))
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/timestamp/<int:item_id>', methods=['POST'])
+@login_required
+@require_podcast_access
+def capture_timestamp(podcast_id, episode_id, item_id):
+    """Capture current timestamp for an item (AJAX)."""
+    # Verify episode belongs to podcast
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        item = EpisodeGuideItem.query.filter_by(id=item_id, guide_id=episode_id).first_or_404()
+        data = request.get_json() or {}
+
+        elapsed_seconds = data.get('elapsed_seconds', 0)
+        item.timestamp_seconds = int(elapsed_seconds)
+        item.discussed = True
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'timestamp_seconds': item.timestamp_seconds,
+            'timestamp_formatted': item.formatted_timestamp,
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Capture timestamp', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/static-content', methods=['PUT'])
+@login_required
+@require_podcast_access
+def update_static_content(podcast_id, episode_id):
+    """Update intro/outro static content for a guide (AJAX)."""
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        data = request.get_json()
+
+        if 'intro_static_content' in data:
+            content = data['intro_static_content']
+            if isinstance(content, list):
+                guide.intro_static_content = [line.strip() for line in content if line and line.strip()] or None
+            elif isinstance(content, str):
+                lines = [line.strip() for line in content.split('\n') if line.strip()]
+                guide.intro_static_content = lines if lines else None
+            else:
+                guide.intro_static_content = None
+
+        if 'outro_static_content' in data:
+            content = data['outro_static_content']
+            if isinstance(content, list):
+                guide.outro_static_content = [line.strip() for line in content if line and line.strip()] or None
+            elif isinstance(content, str):
+                lines = [line.strip() for line in content.split('\n') if line.strip()]
+                guide.outro_static_content = lines if lines else None
+            else:
+                guide.outro_static_content = None
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'intro_static_content': guide.get_intro_content(),
+            'outro_static_content': guide.get_outro_content(),
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Update static content', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/copy', methods=['POST'])
+@login_required
+@require_podcast_access
+def copy_episode(podcast_id, episode_id):
+    """Create new episode by copying items from an existing episode."""
+    source = EpisodeGuide.query.options(
+        joinedload(EpisodeGuide.items)
+    ).filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    try:
+        # Create new guide
+        guide = EpisodeGuide(
+            title=f"Copy of {source.title}",
+            episode_number=(source.episode_number or 0) + 1 if source.episode_number else None,
+            podcast_id=podcast_id,
+            template_id=source.template_id,
+            status='draft',
+        )
+        db.session.add(guide)
+        db.session.flush()  # Get the ID
+
+        # Copy items (reset timestamps)
+        for item in source.items:
+            new_item = EpisodeGuideItem(
+                guide_id=guide.id,
+                section=item.section,
+                title=item.title,
+                links=item.all_links.copy() if item.all_links else None,
+                notes=item.notes,
+                position=item.position,
+                timestamp_seconds=None,
+                discussed=False,
+            )
+            db.session.add(new_item)
+
+        db.session.commit()
+        flash(f'Episode copied as "{guide.title}".', 'success')
+        return redirect(url_for('podcasts.edit_episode', podcast_id=podcast_id, episode_id=guide.id))
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Copy episode', e)
+        flash('Database error occurred. Please try again.', 'error')
+        return redirect(url_for('podcasts.list_episodes', podcast_id=podcast_id))
+
+
+# =============================================================================
 # Template Routes (scoped under podcast)
 # =============================================================================
 
@@ -1070,3 +1467,508 @@ def delete_template(podcast_id, template_id):
         flash('Database error occurred. Please try again.', 'error')
 
     return redirect(url_for('podcasts.list_templates', podcast_id=podcast_id))
+
+
+# =============================================================================
+# Discord Integration Routes (migrated from episode_guide.py)
+# =============================================================================
+
+@podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord', methods=['GET', 'POST'])
+@login_required
+@require_podcast_admin
+def manage_discord_integration(podcast_id, template_id):
+    """Manage Discord integration for a template (create or update)."""
+    template = EpisodeGuideTemplate.query.filter_by(
+        id=template_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            # Get or create integration
+            integration = template.discord_integration
+            if not integration:
+                integration = DiscordIntegration(template_id=template_id)
+                db.session.add(integration)
+
+            integration.name = (data.get('name') or f"{template.name} Discord").strip()
+            integration.guild_id = (data.get('guild_id') or '').strip()
+            integration.channel_id = (data.get('channel_id') or '').strip()
+            integration.bot_token_env_var = (data.get('bot_token_env_var') or 'DISCORD_BOT_TOKEN').strip()
+            integration.is_active = data.get('is_active', True)
+
+            # Multi-channel scan mode settings
+            integration.scan_mode = data.get('scan_mode', 'single')
+            integration.scan_channel_ids = (data.get('scan_channel_ids') or '').strip()
+            integration.scan_emoji = (data.get('scan_emoji') or '').strip()
+            integration.scan_target_section = (data.get('scan_target_section') or '').strip()
+
+            if not integration.guild_id:
+                return jsonify({'success': False, 'error': 'Guild ID is required'}), 400
+
+            # Validate based on scan mode
+            if integration.scan_mode == 'single' and not integration.channel_id:
+                return jsonify({'success': False, 'error': 'Channel ID is required for single channel mode'}), 400
+            elif integration.scan_mode == 'multi':
+                if not integration.scan_channel_ids:
+                    return jsonify({'success': False, 'error': 'Channel IDs are required for multi-channel mode'}), 400
+                if not integration.scan_emoji:
+                    return jsonify({'success': False, 'error': 'Scan emoji is required for multi-channel mode'}), 400
+
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'integration': integration.to_dict()
+            })
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Manage Discord integration', e)
+            return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # GET - return current integration
+    integration = template.discord_integration
+    return jsonify({
+        'success': True,
+        'integration': integration.to_dict() if integration else None,
+        'template': {'id': template.id, 'name': template.name}
+    })
+
+
+@podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord/delete', methods=['POST'])
+@login_required
+@require_podcast_admin
+def delete_discord_integration(podcast_id, template_id):
+    """Delete Discord integration for a template."""
+    try:
+        template = EpisodeGuideTemplate.query.filter_by(
+            id=template_id,
+            podcast_id=podcast_id
+        ).first_or_404()
+        integration = template.discord_integration
+
+        if not integration:
+            return jsonify({'success': False, 'error': 'No integration found'}), 404
+
+        db.session.delete(integration)
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Delete Discord integration', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord/test', methods=['POST'])
+@login_required
+@require_podcast_admin
+def test_discord_connection(podcast_id, template_id):
+    """Test Discord connection for a template's integration."""
+    from services.discord import DiscordService
+
+    template = EpisodeGuideTemplate.query.filter_by(
+        id=template_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+    integration = template.discord_integration
+
+    if not integration:
+        return jsonify({'success': False, 'error': 'No Discord integration configured'})
+
+    service = DiscordService.from_integration(integration)
+
+    if not service.is_configured:
+        return jsonify({
+            'success': False,
+            'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+        })
+
+    result = service.get_channel_info()
+    if result.get('success'):
+        return jsonify({
+            'success': True,
+            'channel': result['channel'],
+            'message': f"Connected to #{result['channel'].get('name', 'unknown')}"
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': result.get('error', 'Connection failed')
+        })
+
+
+@podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord/emoji-mappings', methods=['GET', 'POST'])
+@login_required
+@require_podcast_admin
+def manage_emoji_mappings(podcast_id, template_id):
+    """Manage emoji-to-section mappings for a template's Discord integration."""
+    template = EpisodeGuideTemplate.query.filter_by(
+        id=template_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+    integration = template.discord_integration
+
+    if not integration:
+        return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            emoji = (data.get('emoji') or '').strip()
+            section_key = (data.get('section_key') or '').strip()
+
+            if not emoji or not section_key:
+                return jsonify({'success': False, 'error': 'Emoji and section are required'}), 400
+
+            # Validate section exists in template
+            valid_sections = list(EPISODE_GUIDE_SECTION_CHOICES)
+            if template.default_sections:
+                valid_sections.extend([s['key'] for s in template.default_sections])
+            if section_key not in valid_sections:
+                return jsonify({'success': False, 'error': 'Invalid section'}), 400
+
+            # Check for duplicate
+            existing = DiscordEmojiMapping.query.filter_by(
+                integration_id=integration.id, emoji=emoji
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'This emoji is already mapped'}), 400
+
+            # Get max display order
+            max_order = db.session.query(db.func.max(DiscordEmojiMapping.display_order)).filter_by(
+                integration_id=integration.id
+            ).scalar() or -1
+
+            mapping = DiscordEmojiMapping(
+                integration_id=integration.id,
+                emoji=emoji,
+                emoji_name=data.get('emoji_name', '').strip() or None,
+                section_key=section_key,
+                display_order=max_order + 1
+            )
+            db.session.add(mapping)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'mapping': mapping.to_dict()
+            })
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            log_exception(current_app.logger, 'Manage emoji mappings', e)
+            return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # GET - return all mappings
+    return jsonify({
+        'success': True,
+        'mappings': [m.to_dict() for m in integration.emoji_mappings],
+        'sections': EPISODE_GUIDE_SECTION_NAMES
+    })
+
+
+@podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord/emoji-mappings/<int:mapping_id>', methods=['PUT', 'DELETE'])
+@login_required
+@require_podcast_admin
+def update_or_delete_emoji_mapping(podcast_id, template_id, mapping_id):
+    """Update or delete an emoji mapping."""
+    try:
+        template = EpisodeGuideTemplate.query.filter_by(
+            id=template_id,
+            podcast_id=podcast_id
+        ).first_or_404()
+        integration = template.discord_integration
+
+        if not integration:
+            return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+        mapping = DiscordEmojiMapping.query.filter_by(
+            id=mapping_id, integration_id=integration.id
+        ).first_or_404()
+
+        if request.method == 'DELETE':
+            db.session.delete(mapping)
+            db.session.commit()
+            return jsonify({'success': True})
+
+        # PUT - Update
+        data = request.get_json()
+
+        if 'emoji' in data:
+            new_emoji = (data['emoji'] or '').strip()
+            if new_emoji and new_emoji != mapping.emoji:
+                # Check for duplicate
+                existing = DiscordEmojiMapping.query.filter(
+                    DiscordEmojiMapping.integration_id == integration.id,
+                    DiscordEmojiMapping.emoji == new_emoji,
+                    DiscordEmojiMapping.id != mapping_id
+                ).first()
+                if existing:
+                    return jsonify({'success': False, 'error': 'This emoji is already mapped'}), 400
+                mapping.emoji = new_emoji
+
+        if 'emoji_name' in data:
+            mapping.emoji_name = (data['emoji_name'] or '').strip() or None
+
+        if 'section_key' in data:
+            section_key = (data['section_key'] or '').strip()
+            if section_key:
+                valid_sections = list(EPISODE_GUIDE_SECTION_CHOICES)
+                if template.default_sections:
+                    valid_sections.extend([s['key'] for s in template.default_sections])
+                if section_key not in valid_sections:
+                    return jsonify({'success': False, 'error': 'Invalid section'}), 400
+                mapping.section_key = section_key
+
+        db.session.commit()
+        return jsonify({'success': True, 'mapping': mapping.to_dict()})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Update emoji mapping', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/discord/fetch', methods=['POST'])
+@login_required
+@require_podcast_admin
+def discord_fetch_messages(podcast_id, episode_id):
+    """Fetch messages from Discord for potential import."""
+    from services.discord import DiscordService, date_to_snowflake
+    from datetime import timedelta
+
+    guide = EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    # Get integration from guide's template
+    if not guide.template:
+        return jsonify({'success': False, 'error': 'Guide has no template assigned'}), 400
+
+    integration = guide.template.discord_integration
+    if not integration or not integration.is_active:
+        return jsonify({'success': False, 'error': 'No active Discord integration for this template'}), 400
+
+    # Find the last completed episode for this template to determine date cutoff
+    after_snowflake = None
+    last_episode_date = None
+    last_episode = EpisodeGuide.query.filter(
+        EpisodeGuide.template_id == guide.template_id,
+        EpisodeGuide.id != episode_id,
+        EpisodeGuide.status == 'completed',
+        EpisodeGuide.scheduled_date.isnot(None)
+    ).order_by(EpisodeGuide.scheduled_date.desc()).first()
+
+    if last_episode and last_episode.scheduled_date:
+        cutoff_date = last_episode.scheduled_date + timedelta(days=1)
+        after_snowflake = date_to_snowflake(cutoff_date)
+        last_episode_date = last_episode.scheduled_date.isoformat()
+
+    # Get already imported message IDs to exclude
+    imported_ids = {
+        log.discord_message_id for log in
+        DiscordImportLog.query.filter_by(guide_id=episode_id).all()
+    }
+
+    data = request.get_json() or {}
+    limit = min(data.get('limit', 50), 100)
+
+    # Check scan mode
+    scan_mode = integration.scan_mode or 'single'
+
+    if scan_mode == 'multi':
+        # Multi-channel scan mode
+        channel_ids = integration.get_scan_channel_list()
+        if not channel_ids:
+            return jsonify({'success': False, 'error': 'No channel IDs configured for multi-channel mode'}), 400
+
+        if not integration.scan_emoji:
+            return jsonify({'success': False, 'error': 'No scan emoji configured for multi-channel mode'}), 400
+
+        service = DiscordService(
+            bot_token=integration.get_bot_token(),
+            channel_id=None
+        )
+
+        if not service.bot_token:
+            return jsonify({
+                'success': False,
+                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+            }), 400
+
+        target_section = integration.scan_target_section or 'community_recap'
+
+        result = service.get_messages_multi_channel(
+            channel_ids=channel_ids,
+            target_emoji=integration.scan_emoji,
+            target_section=target_section,
+            limit_per_channel=limit,
+            exclude_message_ids=imported_ids,
+            after=after_snowflake
+        )
+
+        if not result.get('success'):
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to fetch messages')
+            }), 400
+
+        messages = result.get('messages', [])
+        for msg in messages:
+            section = msg.get('suggested_section')
+            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'sections': EPISODE_GUIDE_SECTION_NAMES,
+            'channel_name': f"{integration.name} (Multi-channel)",
+            'scan_mode': 'multi',
+            'channels_scanned': result.get('channels_scanned', 0),
+            'total_channels': result.get('total_channels', 0),
+            'errors': result.get('errors', []),
+            'last_episode_date': last_episode_date
+        })
+
+    else:
+        # Single channel mode (original behavior)
+        if not integration.emoji_mappings:
+            return jsonify({'success': False, 'error': 'No emoji mappings configured. Add them in the template settings.'}), 400
+
+        service = DiscordService.from_integration(integration)
+        if not service.is_configured:
+            return jsonify({
+                'success': False,
+                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+            }), 400
+
+        emoji_mapping = DiscordService.get_emoji_mapping_from_integration(integration)
+
+        result = service.get_messages_with_reactions(
+            emoji_mapping=emoji_mapping,
+            limit=limit,
+            exclude_message_ids=imported_ids,
+            after=after_snowflake
+        )
+
+        if not result.get('success'):
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to fetch messages')
+            }), 400
+
+        messages = result.get('messages', [])
+        for msg in messages:
+            section = msg.get('suggested_section')
+            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'sections': EPISODE_GUIDE_SECTION_NAMES,
+            'channel_name': integration.name,
+            'scan_mode': 'single',
+            'last_episode_date': last_episode_date
+        })
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/discord/import', methods=['POST'])
+@login_required
+@require_podcast_admin
+def discord_import_messages(podcast_id, episode_id):
+    """Import selected Discord messages as episode guide items."""
+    try:
+        guide = EpisodeGuide.query.filter_by(
+            id=episode_id,
+            podcast_id=podcast_id
+        ).first_or_404()
+
+        if not guide.template:
+            return jsonify({'success': False, 'error': 'Guide has no template assigned'}), 400
+
+        integration = guide.template.discord_integration
+        if not integration:
+            return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+        data = request.get_json()
+        if not data or 'items' not in data:
+            return jsonify({'success': False, 'error': 'No items provided'}), 400
+
+        valid_sections = get_valid_sections_for_guide(guide)
+        items_to_import = data['items']
+        imported = []
+
+        for item_data in items_to_import:
+            section = item_data.get('section')
+            if section not in valid_sections:
+                continue
+
+            title = (item_data.get('title') or '').strip()
+            if not title:
+                continue
+
+            discord_message_id = item_data.get('discord_message_id')
+            if not discord_message_id:
+                continue
+
+            # Check if already imported
+            existing = DiscordImportLog.query.filter_by(
+                guide_id=episode_id, discord_message_id=discord_message_id
+            ).first()
+            if existing:
+                continue
+
+            # Get max position in section
+            max_pos = db.session.query(db.func.max(EpisodeGuideItem.position)).filter_by(
+                guide_id=episode_id, section=section
+            ).scalar() or -1
+
+            # Handle links
+            links = item_data.get('links', [])
+            if isinstance(links, str):
+                links = [links] if links.strip() else []
+            links = [l.strip() for l in links if l and l.strip()] or None
+
+            # Create the item
+            item = EpisodeGuideItem(
+                guide_id=episode_id,
+                section=section,
+                title=title[:500],
+                links=links,
+                notes=item_data.get('notes', '').strip()[:1000] or None,
+                position=max_pos + 1,
+            )
+            db.session.add(item)
+            db.session.flush()
+
+            # Log the import
+            import_log = DiscordImportLog(
+                integration_id=integration.id,
+                guide_id=episode_id,
+                discord_message_id=discord_message_id,
+                item_id=item.id,
+                imported_by=current_user.id
+            )
+            db.session.add(import_log)
+
+            imported.append(item.to_dict())
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'imported': imported,
+            'count': len(imported)
+        })
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Discord import', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500

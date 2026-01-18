@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if entry else 'Add' }} Revenue Entry - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('revenue.dashboard') }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ 'Edit' if entry else 'Add' }} Revenue Entry</h1>
+            <p class="text-sm text-gray-500 mt-1">Track income from any source</p>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form method="post" class="bg-white rounded-xl border border-surface-200 p-6 space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Source Type -->
+        <div>
+            <label for="source_type" class="block text-sm font-medium text-gray-700 mb-1.5">Source Type <span class="text-red-500">*</span></label>
+            <select name="source_type" id="source_type" required
+                class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                {% for value, label in source_types %}
+                <option value="{{ value }}" {% if entry and entry.source_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Source Name -->
+        <div>
+            <label for="source_name" class="block text-sm font-medium text-gray-700 mb-1.5">Source Name <span class="text-red-500">*</span></label>
+            <input type="text" name="source_name" id="source_name" required maxlength="255"
+                value="{{ entry.source_name if entry else '' }}"
+                placeholder="e.g., Amazon Associates, YouTube AdSense, Acme Corp Sponsorship"
+                class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            <p class="text-xs text-gray-500 mt-1">The specific platform, company, or source of this income.</p>
+        </div>
+
+        <!-- Amount and Currency -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2">
+                <label for="amount" class="block text-sm font-medium text-gray-700 mb-1.5">Amount <span class="text-red-500">*</span></label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <input type="number" name="amount" id="amount" required step="0.01" min="0.01"
+                        value="{{ '%.2f'|format(entry.amount) if entry and entry.amount else '' }}"
+                        placeholder="0.00"
+                        class="w-full border border-surface-200 rounded-lg pl-7 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+            </div>
+            <div>
+                <label for="currency" class="block text-sm font-medium text-gray-700 mb-1.5">Currency</label>
+                <select name="currency" id="currency"
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <option value="USD" {% if not entry or entry.currency == 'USD' %}selected{% endif %}>USD</option>
+                    <option value="EUR" {% if entry and entry.currency == 'EUR' %}selected{% endif %}>EUR</option>
+                    <option value="GBP" {% if entry and entry.currency == 'GBP' %}selected{% endif %}>GBP</option>
+                    <option value="CAD" {% if entry and entry.currency == 'CAD' %}selected{% endif %}>CAD</option>
+                    <option value="AUD" {% if entry and entry.currency == 'AUD' %}selected{% endif %}>AUD</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Dates -->
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label for="date_earned" class="block text-sm font-medium text-gray-700 mb-1.5">Date Earned <span class="text-red-500">*</span></label>
+                <input type="date" name="date_earned" id="date_earned" required
+                    value="{{ entry.date_earned.isoformat() if entry and entry.date_earned else '' }}"
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <p class="text-xs text-gray-500 mt-1">When the income was earned (e.g., service date)</p>
+            </div>
+            <div>
+                <label for="date_received" class="block text-sm font-medium text-gray-700 mb-1.5">Date Received</label>
+                <input type="date" name="date_received" id="date_received"
+                    value="{{ entry.date_received.isoformat() if entry and entry.date_received else '' }}"
+                    class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <p class="text-xs text-gray-500 mt-1">When payment was actually received</p>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+            <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+            <textarea name="notes" id="notes" rows="3"
+                placeholder="Any additional details about this income..."
+                class="w-full border border-surface-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">{{ entry.notes if entry else '' }}</textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex items-center justify-between pt-4 border-t border-surface-200">
+            <a href="{{ url_for('revenue.dashboard') }}" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Cancel</a>
+            <button type="submit" class="bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                {{ 'Update Entry' if entry else 'Add Entry' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

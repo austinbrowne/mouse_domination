@@ -6,6 +6,8 @@ In production, configure SMTP settings in environment variables.
 """
 import os
 import logging
+import smtplib
+import socket
 from flask import current_app, url_for
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,6 @@ def send_email(to: str, subject: str, body: str, html: str = None) -> bool:
 
     # Production mode: send via SMTP
     try:
-        import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
 
@@ -71,7 +72,7 @@ def send_email(to: str, subject: str, body: str, html: str = None) -> bool:
         logger.info(f"Email sent to {to}: {subject}")
         return True
 
-    except Exception as e:
+    except (smtplib.SMTPException, socket.error, OSError) as e:
         logger.error(f"Failed to send email to {to}: {e}")
         return False
 

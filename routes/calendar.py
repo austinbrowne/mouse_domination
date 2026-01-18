@@ -2,22 +2,12 @@ from datetime import date
 from flask import Blueprint, render_template, request, jsonify, url_for
 from flask_login import login_required
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration
 from extensions import db
+from constants import EVENT_COLORS
 
 calendar_bp = Blueprint('calendar', __name__)
-
-# Event type colors (matching plan)
-EVENT_COLORS = {
-    'inventory_deadline': '#ef4444',     # Red
-    'inventory_return': '#f97316',       # Orange
-    'episode': '#3b82f6',                # Blue
-    'pipeline_deadline': '#22c55e',      # Green
-    'pipeline_deliverable': '#14b8a6',   # Teal
-    'pipeline_payment': '#8b5cf6',       # Purple
-    'collab': '#ec4899',                 # Pink
-    'follow_up': '#6b7280',              # Gray
-}
 
 
 @calendar_bp.route('/')
@@ -53,13 +43,18 @@ def get_events():
             episode_query = episode_query.filter(EpisodeGuide.scheduled_date <= end_date)
 
         for episode in episode_query.all():
+            # Generate URL - use podcast-scoped route if episode has a podcast
+            if episode.podcast_id:
+                url = url_for('podcasts.view_episode', podcast_id=episode.podcast_id, episode_id=episode.id)
+            else:
+                url = '#'  # Fallback for episodes without podcast (shouldn't happen)
             events.append({
                 'id': f'episode-{episode.id}',
                 'title': f'Episode: {episode.title}',
                 'date': episode.scheduled_date.isoformat(),
                 'type': 'episode',
                 'color': EVENT_COLORS['episode'],
-                'url': url_for('episode_guide.view_guide', id=episode.id),
+                'url': url,
             })
 
     # Inventory events (deadline, return_by_date)
@@ -102,7 +97,9 @@ def get_events():
 
     # Pipeline events (deadline, deliverable_date, payment_date)
     if not event_types or 'pipeline_deadline' in event_types:
-        pipeline_deadline_query = SalesPipeline.query.filter(SalesPipeline.deadline.isnot(None))
+        pipeline_deadline_query = SalesPipeline.query.options(
+            joinedload(SalesPipeline.company)
+        ).filter(SalesPipeline.deadline.isnot(None))
         if start_date:
             pipeline_deadline_query = pipeline_deadline_query.filter(SalesPipeline.deadline >= start_date)
         if end_date:
@@ -120,7 +117,9 @@ def get_events():
             })
 
     if not event_types or 'pipeline_deliverable' in event_types:
-        pipeline_deliverable_query = SalesPipeline.query.filter(SalesPipeline.deliverable_date.isnot(None))
+        pipeline_deliverable_query = SalesPipeline.query.options(
+            joinedload(SalesPipeline.company)
+        ).filter(SalesPipeline.deliverable_date.isnot(None))
         if start_date:
             pipeline_deliverable_query = pipeline_deliverable_query.filter(SalesPipeline.deliverable_date >= start_date)
         if end_date:
@@ -138,7 +137,9 @@ def get_events():
             })
 
     if not event_types or 'pipeline_payment' in event_types:
-        pipeline_payment_query = SalesPipeline.query.filter(SalesPipeline.payment_date.isnot(None))
+        pipeline_payment_query = SalesPipeline.query.options(
+            joinedload(SalesPipeline.company)
+        ).filter(SalesPipeline.payment_date.isnot(None))
         if start_date:
             pipeline_payment_query = pipeline_payment_query.filter(SalesPipeline.payment_date >= start_date)
         if end_date:
@@ -157,7 +158,9 @@ def get_events():
 
     # Collaboration events (scheduled_date, follow_up_date)
     if not event_types or 'collab' in event_types:
-        collab_query = Collaboration.query.filter(Collaboration.scheduled_date.isnot(None))
+        collab_query = Collaboration.query.options(
+            joinedload(Collaboration.contact)
+        ).filter(Collaboration.scheduled_date.isnot(None))
         if start_date:
             collab_query = collab_query.filter(Collaboration.scheduled_date >= start_date)
         if end_date:
@@ -177,7 +180,9 @@ def get_events():
     # Follow-up events from various models
     if not event_types or 'follow_up' in event_types:
         # Collaboration follow-ups
-        collab_followup_query = Collaboration.query.filter(Collaboration.follow_up_date.isnot(None))
+        collab_followup_query = Collaboration.query.options(
+            joinedload(Collaboration.contact)
+        ).filter(Collaboration.follow_up_date.isnot(None))
         if start_date:
             collab_followup_query = collab_followup_query.filter(Collaboration.follow_up_date >= start_date)
         if end_date:
@@ -195,7 +200,9 @@ def get_events():
             })
 
         # Pipeline follow-ups
-        pipeline_followup_query = SalesPipeline.query.filter(SalesPipeline.follow_up_date.isnot(None))
+        pipeline_followup_query = SalesPipeline.query.options(
+            joinedload(SalesPipeline.company)
+        ).filter(SalesPipeline.follow_up_date.isnot(None))
         if start_date:
             pipeline_followup_query = pipeline_followup_query.filter(SalesPipeline.follow_up_date >= start_date)
         if end_date:
