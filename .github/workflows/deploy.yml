@@ -31,7 +31,8 @@ jobs:
 
       - name: Run tests (group ${{ matrix.group }}/4)
         run: |
-          pytest --cov=. --splits 4 --group ${{ matrix.group }}
+          # --cov-fail-under=0 to skip per-group threshold (checked after combine)
+          pytest --cov=. --cov-fail-under=0 --splits 4 --group ${{ matrix.group }}
           # Rename coverage file with unique suffix for combining
           mv .coverage .coverage.${{ matrix.group }}
         env:
