@@ -1,5 +1,7 @@
 [run]
 source = .
+parallel = true
+relative_files = true
 omit =
     .venv/*
     venv/*

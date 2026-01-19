@@ -32,6 +32,8 @@ jobs:
       - name: Run tests (group ${{ matrix.group }}/4)
         run: |
           pytest --cov=. --splits 4 --group ${{ matrix.group }}
+          # Rename coverage file with unique suffix for combining
+          mv .coverage .coverage.${{ matrix.group }}
         env:
           FLASK_ENV: testing
 
@@ -39,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.group }}
-          path: .coverage
+          path: .coverage.${{ matrix.group }}
           include-hidden-files: true
 
   coverage:
@@ -64,7 +66,9 @@ jobs:
 
       - name: Combine coverage reports
         run: |
-          coverage combine coverage-*/.coverage
+          # Find all coverage data files from parallel runs
+          find coverage-* -name '.coverage*' -exec cp {} . \;
+          coverage combine
           coverage report --fail-under=50
           coverage xml
 
