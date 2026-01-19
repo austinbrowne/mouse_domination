@@ -3,18 +3,19 @@
 {% block title %}LIVE: {{ guide.title }} - {{ podcast.name }} - {{ APP_NAME }}{% endblock %}
 
 {% macro render_item(item, idx) %}
-<div class="py-1.5 px-3 flex items-center gap-2 hover:bg-surface-50 transition-all cursor-pointer"
+<div class="py-2 sm:py-1.5 px-3 flex items-start sm:items-center gap-2 sm:gap-2 hover:bg-surface-50 transition-all cursor-pointer"
      :class="focusedItemId === {{ item.id }} ? 'ring-2 ring-primary-500 ring-inset bg-primary-50' : ''"
      @click="focusedItemId = {{ item.id }}"
      data-item-id="{{ item.id }}">
-    <!-- Discussed checkbox -->
+    <!-- Discussed checkbox - larger touch target on mobile -->
     <input type="checkbox"
         :checked="discussed[{{ item.id }}]"
         @change="toggleDiscussed({{ item.id }}, $event.target.checked)"
-        class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0">
+        @click.stop
+        class="w-5 h-5 sm:w-4 sm:h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0 mt-0.5 sm:mt-0">
 
     <!-- Topic Number -->
-    <span class="text-gray-400 text-xs font-medium flex-shrink-0">{{ idx }}.</span>
+    <span class="text-gray-400 text-xs font-medium flex-shrink-0 mt-0.5 sm:mt-0">{{ idx }}.</span>
 
     <!-- Item content -->
     <div class="flex-1 min-w-0">
@@ -22,7 +23,7 @@
             {{ item.title }}
         </div>
         {% for link in item.all_links %}
-            <a href="{{ link if link.startswith('http') else 'https://' + link }}" target="_blank" class="text-xs text-primary-600 hover:underline truncate block">{{ link }}</a>
+            <a href="{{ link if link.startswith('http') else 'https://' + link }}" target="_blank" @click.stop class="text-xs text-primary-600 hover:underline truncate block">{{ link }}</a>
         {% endfor %}
         {% if item.notes %}
             <div class="text-xs text-gray-500">{{ item.notes }}</div>
@@ -37,10 +38,10 @@
             </span>
         </template>
         <template x-if="timestamps[{{ item.id }}] === null || timestamps[{{ item.id }}] === undefined">
-            <button @click="markTimestamp({{ item.id }})"
+            <button @click.stop="markTimestamp({{ item.id }})"
                 :disabled="!timerRunning"
-                :class="timerRunning ? 'bg-primary-600 hover:bg-primary-700 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
-                class="px-3 py-1 rounded font-medium text-xs transition-colors">
+                :class="timerRunning ? 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+                class="px-3 py-1.5 sm:py-1 rounded font-medium text-xs transition-colors">
                 MARK
             </button>
         </template>
@@ -51,107 +52,112 @@
 {% block content %}
 <div class="space-y-4" x-data="episodeGuideLive({{ podcast.id }}, {{ guide.id }}, '{{ guide.status }}', '{{ guide.recording_started_at.isoformat() if guide.recording_started_at else '' }}')">
     <!-- Compact Timer Overlay -->
-    <div class="fixed top-20 right-4 z-40 bg-white rounded-lg shadow-lg border border-surface-200 px-3 py-2 flex items-center gap-3">
-        <!-- Recording indicator -->
-        <template x-if="timerRunning">
-            <span class="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse flex-shrink-0"></span>
-        </template>
+    <div class="fixed top-16 sm:top-20 left-2 right-2 sm:left-auto sm:right-4 z-40 bg-white rounded-lg shadow-lg border border-surface-200 px-2 sm:px-3 py-2">
+        <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-3">
+            <!-- Recording indicator -->
+            <template x-if="timerRunning">
+                <span class="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse flex-shrink-0"></span>
+            </template>
 
-        <!-- Timer Display -->
-        <div class="font-mono font-bold text-lg" :class="timerRunning ? 'text-red-600' : 'text-gray-500'">
-            <span x-text="formatTime(elapsedSeconds)">00:00:00</span>
-        </div>
-
-        <!-- Timer Controls -->
-        <template x-if="!timerRunning && elapsedSeconds === 0">
-            <button @click="startRecording()" class="inline-flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700 font-medium text-sm">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
-                Start
-            </button>
-        </template>
-
-        <template x-if="timerRunning">
-            <button @click="stopRecording()" class="inline-flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 font-medium text-sm">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"/></svg>
-                Stop
-            </button>
-        </template>
-
-        <template x-if="!timerRunning && elapsedSeconds > 0">
-            <div class="flex gap-2">
-                <button @click="resumeTimer()" class="inline-flex items-center gap-1 bg-amber-600 text-white px-2.5 py-1.5 rounded hover:bg-amber-700 font-medium text-sm">
-                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
-                    Resume
-                </button>
-                <a href="{{ url_for('podcasts.view_episode', podcast_id=podcast.id, episode_id=guide.id) }}" class="inline-flex items-center bg-gray-600 text-white px-2.5 py-1.5 rounded hover:bg-gray-700 font-medium text-sm">
-                    View
-                </a>
+            <!-- Timer Display -->
+            <div class="font-mono font-bold text-base sm:text-lg" :class="timerRunning ? 'text-red-600' : 'text-gray-500'">
+                <span x-text="formatTime(elapsedSeconds)">00:00:00</span>
             </div>
-        </template>
 
-        <!-- Divider -->
-        <div class="w-px h-6 bg-gray-200"></div>
+            <!-- Timer Controls -->
+            <template x-if="!timerRunning && elapsedSeconds === 0">
+                <button @click="startRecording()" class="inline-flex items-center gap-1 sm:gap-1.5 bg-emerald-600 text-white px-2.5 sm:px-3 py-1.5 rounded hover:bg-emerald-700 font-medium text-xs sm:text-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                    <span class="hidden xs:inline">Start</span>
+                </button>
+            </template>
 
-        <!-- Settings toggles -->
-        <div class="flex items-center gap-2">
-            <!-- Keyboard toggle -->
-            <button @click="toggleKeyboard()"
-                    :class="keyboardEnabled ? 'text-primary-600 bg-primary-50' : 'text-gray-400 hover:text-gray-600'"
-                    class="p-1.5 rounded transition-colors"
-                    :title="keyboardEnabled ? 'Keyboard shortcuts ON' : 'Keyboard shortcuts OFF'">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5M5 12l7-7 7 7"/>
-                </svg>
-            </button>
-            <!-- Sound toggle -->
-            <button @click="toggleSound()"
-                    :class="soundEnabled ? 'text-primary-600 bg-primary-50' : 'text-gray-400 hover:text-gray-600'"
-                    class="p-1.5 rounded transition-colors"
-                    :title="soundEnabled ? 'Sound ON' : 'Sound OFF'">
-                <svg x-show="soundEnabled" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M6 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h2l4-4v14l-4-4z"/>
-                </svg>
-                <svg x-show="!soundEnabled" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
-                </svg>
-            </button>
-            <!-- Help tooltip -->
-            <div class="relative" x-data="{ showHelp: false }">
-                <button @mouseenter="showHelp = true" @mouseleave="showHelp = false"
-                        class="p-1.5 text-gray-400 hover:text-gray-600 rounded transition-colors">
+            <template x-if="timerRunning">
+                <button @click="stopRecording()" class="inline-flex items-center gap-1 sm:gap-1.5 bg-red-600 text-white px-2.5 sm:px-3 py-1.5 rounded hover:bg-red-700 font-medium text-xs sm:text-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"/></svg>
+                    <span class="hidden xs:inline">Stop</span>
+                </button>
+            </template>
+
+            <template x-if="!timerRunning && elapsedSeconds > 0">
+                <div class="flex gap-1.5 sm:gap-2">
+                    <button @click="resumeTimer()" class="inline-flex items-center gap-1 bg-amber-600 text-white px-2 sm:px-2.5 py-1.5 rounded hover:bg-amber-700 font-medium text-xs sm:text-sm">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                        <span class="hidden xs:inline">Resume</span>
+                    </button>
+                    <a href="{{ url_for('podcasts.view_episode', podcast_id=podcast.id, episode_id=guide.id) }}" class="inline-flex items-center bg-gray-600 text-white px-2 sm:px-2.5 py-1.5 rounded hover:bg-gray-700 font-medium text-xs sm:text-sm">
+                        View
+                    </a>
+                </div>
+            </template>
+
+            <!-- Divider - hidden on mobile -->
+            <div class="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+            <!-- Settings toggles -->
+            <div class="flex items-center gap-1 sm:gap-2">
+                <!-- Keyboard toggle - hidden on mobile (no keyboard) -->
+                <button @click="toggleKeyboard()"
+                        :class="keyboardEnabled ? 'text-primary-600 bg-primary-50' : 'text-gray-400 hover:text-gray-600'"
+                        class="hidden sm:block p-1.5 rounded transition-colors"
+                        :title="keyboardEnabled ? 'Keyboard shortcuts ON' : 'Keyboard shortcuts OFF'">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5M5 12l7-7 7 7"/>
                     </svg>
                 </button>
-                <div x-show="showHelp" x-cloak
-                     class="absolute right-0 top-full mt-2 w-48 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 z-50">
-                    <div class="font-semibold mb-2">Keyboard Shortcuts</div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between"><span>Space</span><span class="text-gray-400">Mark timestamp</span></div>
-                        <div class="flex justify-between"><span>↑ / ↓</span><span class="text-gray-400">Navigate</span></div>
-                        <div class="flex justify-between"><span>D</span><span class="text-gray-400">Toggle discussed</span></div>
-                        <div class="flex justify-between"><span>M</span><span class="text-gray-400">Mark + next</span></div>
-                        <div class="flex justify-between"><span>S</span><span class="text-gray-400">Start/Stop</span></div>
-                        <div class="flex justify-between"><span>Esc</span><span class="text-gray-400">Clear focus</span></div>
+                <!-- Sound toggle -->
+                <button @click="toggleSound()"
+                        :class="soundEnabled ? 'text-primary-600 bg-primary-50' : 'text-gray-400 hover:text-gray-600'"
+                        class="p-1.5 rounded transition-colors"
+                        :title="soundEnabled ? 'Sound ON' : 'Sound OFF'">
+                    <svg x-show="soundEnabled" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M6 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h2l4-4v14l-4-4z"/>
+                    </svg>
+                    <svg x-show="!soundEnabled" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                    </svg>
+                </button>
+                <!-- Help tooltip - hidden on mobile -->
+                <div class="hidden sm:block relative" x-data="{ showHelp: false }">
+                    <button @mouseenter="showHelp = true" @mouseleave="showHelp = false"
+                            class="p-1.5 text-gray-400 hover:text-gray-600 rounded transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </button>
+                    <div x-show="showHelp" x-cloak
+                         class="absolute right-0 top-full mt-2 w-48 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3 z-50">
+                        <div class="font-semibold mb-2">Keyboard Shortcuts</div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between"><span>Space</span><span class="text-gray-400">Mark timestamp</span></div>
+                            <div class="flex justify-between"><span>↑ / ↓</span><span class="text-gray-400">Navigate</span></div>
+                            <div class="flex justify-between"><span>D</span><span class="text-gray-400">Toggle discussed</span></div>
+                            <div class="flex justify-between"><span>M</span><span class="text-gray-400">Mark + next</span></div>
+                            <div class="flex justify-between"><span>S</span><span class="text-gray-400">Start/Stop</span></div>
+                            <div class="flex justify-between"><span>Esc</span><span class="text-gray-400">Clear focus</span></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Spacer for fixed timer overlay on mobile -->
+    <div class="h-12 sm:h-0"></div>
+
     <!-- Page Header -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-            <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=guide.id) }}" class="text-gray-400 hover:text-gray-600">
+    <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+            <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=guide.id) }}" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             </a>
             {% if guide.episode_number %}
-                <span class="text-gray-400 text-sm">#{{ guide.episode_number }}</span>
+                <span class="text-gray-400 text-xs sm:text-sm flex-shrink-0">#{{ guide.episode_number }}</span>
             {% endif %}
-            <h1 class="text-lg font-bold text-gray-900">{{ guide.title }}</h1>
+            <h1 class="text-base sm:text-lg font-bold text-gray-900 truncate">{{ guide.title }}</h1>
         </div>
-        <span class="text-xs text-gray-500" x-show="Object.values(timestamps).filter(t => t !== null).length > 0">
+        <span class="text-xs text-gray-500 flex-shrink-0 hidden sm:block" x-show="Object.values(timestamps).filter(t => t !== null).length > 0">
             <span x-text="Object.values(timestamps).filter(t => t !== null).length"></span> timestamps
         </span>
     </div>

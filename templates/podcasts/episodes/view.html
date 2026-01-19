@@ -7,21 +7,21 @@
     {% include "podcasts/_subnav.html" %}
 
     <!-- Header -->
-    <div class="bg-white rounded-xl border border-surface-200 p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="flex items-center gap-4">
+    <div class="bg-white rounded-xl border border-surface-200 p-4 sm:p-6">
+        <div class="flex flex-col gap-4">
+            <div class="flex items-start gap-3 sm:gap-4">
                 {% if guide.episode_number %}
-                    <span class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary-100 text-primary-700 font-bold text-xl">
+                    <span class="inline-flex items-center justify-center w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-primary-100 text-primary-700 font-bold text-base sm:text-xl flex-shrink-0">
                         #{{ guide.episode_number }}
                     </span>
                 {% endif %}
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">{{ guide.title }}</h1>
-                    <div class="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                        <span>{{ guide.created_at.strftime('%B %d, %Y') }}</span>
+                <div class="flex-1 min-w-0">
+                    <h1 class="text-lg sm:text-2xl font-bold text-gray-900">{{ guide.title }}</h1>
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mt-1">
+                        <span>{{ guide.created_at.strftime('%b %d, %Y') }}</span>
                         {% if guide.formatted_duration %}
                             <span class="flex items-center gap-1">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 {{ guide.formatted_duration }}
                             </span>
                         {% endif %}
@@ -34,10 +34,10 @@
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
                 {% if guide.status != 'completed' %}
                     <a href="{{ url_for('podcasts.live_episode', podcast_id=podcast.id, episode_id=guide.id) }}"
-                       class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium">
+                       class="inline-flex items-center gap-1.5 sm:gap-2 bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-red-700 text-xs sm:text-sm font-medium">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"/>
                         </svg>
@@ -45,7 +45,7 @@
                     </a>
                 {% endif %}
                 <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=guide.id) }}"
-                   class="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium">
+                   class="inline-flex items-center gap-1.5 sm:gap-2 bg-gray-100 text-gray-700 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-200 text-xs sm:text-sm font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Edit
                 </a>
@@ -62,18 +62,18 @@
     <!-- Stats -->
     {% set total_items = guide.items|length %}
     {% set timestamped_items = guide.items|selectattr('timestamp_seconds')|list|length %}
-    <div class="grid grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Items</p>
-            <p class="text-2xl font-bold text-gray-900 mt-1">{{ total_items }}</p>
+    <div class="grid grid-cols-3 gap-2 sm:gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Items</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{{ total_items }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamped</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ timestamped_items }}</p>
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Timed</p>
+            <p class="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{{ timestamped_items }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</p>
-            <p class="text-2xl font-bold text-primary-600 mt-1">{{ guide.formatted_duration or '--:--' }}</p>
+            <p class="text-xl sm:text-2xl font-bold text-primary-600 mt-1">{{ guide.formatted_duration or '--:--' }}</p>
         </div>
     </div>
 
@@ -106,9 +106,23 @@
 
                 <div class="divide-y divide-surface-200">
                     {% for item in section_items %}
-                        <div id="item-{{ item.id }}" class="p-4 flex items-center gap-4 scroll-mt-24">
-                            <!-- Timestamp -->
-                            <div class="flex-shrink-0 w-20 text-center">
+                        <div id="item-{{ item.id }}" class="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 scroll-mt-24">
+                            <!-- Mobile: timestamp + indicator row -->
+                            <div class="flex items-center justify-between sm:hidden">
+                                {% if item.formatted_timestamp %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-mono text-xs font-medium">
+                                        {{ item.formatted_timestamp }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-gray-300 text-xs">--:--</span>
+                                {% endif %}
+                                {% if item.discussed %}
+                                    <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                {% endif %}
+                            </div>
+
+                            <!-- Desktop: Timestamp -->
+                            <div class="hidden sm:block flex-shrink-0 w-20 text-center">
                                 {% if item.formatted_timestamp %}
                                     <span class="inline-flex items-center px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-mono text-sm font-medium">
                                         {{ item.formatted_timestamp }}
@@ -120,7 +134,7 @@
 
                             <!-- Content -->
                             <div class="flex-1 min-w-0">
-                                <div class="font-medium text-gray-900">
+                                <div class="font-medium text-gray-900 text-sm sm:text-base">
                                     {{ item.title }}
                                 </div>
                                 {% for link in item.all_links %}
@@ -131,9 +145,9 @@
                                 {% endif %}
                             </div>
 
-                            <!-- Discussed indicator -->
+                            <!-- Desktop: Discussed indicator -->
                             {% if item.discussed %}
-                                <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <svg class="hidden sm:block w-5 h-5 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                             {% endif %}
                         </div>
                     {% endfor %}
