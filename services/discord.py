@@ -348,8 +348,9 @@ class DiscordService:
                 continue
 
             channels_scanned.append(channel_id)
+            raw_messages = result.get('messages', [])
 
-            for msg in result.get('messages', []):
+            for msg in raw_messages:
                 # Skip already imported messages
                 if msg.get('id') in exclude_ids:
                     continue
@@ -370,7 +371,12 @@ class DiscordService:
                         emoji_identifier = emoji_name
 
                     # Check if this matches our target emoji
-                    if emoji_identifier == target_emoji or emoji_name == target_emoji:
+                    # Strip colons from target for comparison (users often enter :emoji: format)
+                    target_clean = target_emoji.strip(':')
+                    if (emoji_identifier == target_emoji or
+                        emoji_name == target_emoji or
+                        emoji_name == target_clean or
+                        emoji_identifier == target_clean):
                         matched = True
                         break
 

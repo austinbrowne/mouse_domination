@@ -61,6 +61,15 @@ def update_episode_metadata(podcast_id, episode_id):
         if 'new_poll_link' in data:
             guide.new_poll_link = data['new_poll_link'].strip() if data['new_poll_link'] else None
 
+        if 'scheduled_date' in data:
+            if data['scheduled_date']:
+                guide.scheduled_date = datetime.strptime(data['scheduled_date'], '%Y-%m-%d').date()
+            else:
+                guide.scheduled_date = None
+
+        if 'episode_url' in data:
+            guide.episode_url = data['episode_url'].strip() if data['episode_url'] else None
+
         db.session.commit()
         return jsonify({'success': True, 'guide': guide.to_dict()})
 

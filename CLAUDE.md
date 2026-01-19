@@ -68,6 +68,7 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 - **Database**: PostgreSQL via Docker (`docker compose -f deploy/docker-compose.dev.yml up -d`)
 - **DB credentials**: `mouse:mouse@localhost:5433/mouse_domination`
 - **To start local dev**: `source .venv/bin/activate && flask run --port 5001`
+- **After code changes**: Restart local server (`lsof -ti:5001 | xargs kill -9; flask run --port 5001`)
 
 **Note:** `app.dazztrazak.com` is the PRODUCTION URL (remote server only). Do not use for local testing.
 

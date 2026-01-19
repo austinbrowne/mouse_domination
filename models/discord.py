@@ -50,19 +50,20 @@ class DiscordIntegration(db.Model):
         return [cid.strip() for cid in self.scan_channel_ids.split(',') if cid.strip()]
 
     def to_dict(self):
+        # Unified channel_ids field for frontend
+        channel_ids = self.scan_channel_ids or self.channel_id or ''
         return {
             'id': self.id,
             'name': self.name,
             'guild_id': self.guild_id,
             'channel_id': self.channel_id,
+            'channel_ids': channel_ids,  # Unified field for frontend
             'template_id': self.template_id,
             'template_name': self.template.name if self.template else None,
             'is_active': self.is_active,
-            'scan_mode': self.scan_mode or 'single',
             'scan_channel_ids': self.scan_channel_ids,
             'scan_emoji': self.scan_emoji,
-            'scan_target_section': self.scan_target_section,
-            'emoji_mappings': [m.to_dict() for m in self.emoji_mappings],
+            'bot_token_env_var': self.bot_token_env_var,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 

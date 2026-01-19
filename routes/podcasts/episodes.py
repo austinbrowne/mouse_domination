@@ -283,7 +283,8 @@ def edit_episode(podcast_id, episode_id):
     discord_enabled = False
     if g.user_podcast_role == 'admin' and guide.template and guide.template.discord_integration:
         integration = guide.template.discord_integration
-        discord_enabled = integration.is_active and len(integration.emoji_mappings) > 0
+        # Simplified: just needs active integration with scan_emoji configured
+        discord_enabled = integration.is_active and bool(integration.scan_emoji)
 
     return render_template('podcasts/episodes/edit.html',
         podcast=podcast,

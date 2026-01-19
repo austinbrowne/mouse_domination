@@ -38,25 +38,26 @@ def manage_discord_integration(podcast_id, template_id):
 
             integration.name = (data.get('name') or f"{template.name} Discord").strip()
             integration.guild_id = (data.get('guild_id') or '').strip()
-            integration.channel_id = (data.get('channel_id') or '').strip()
             integration.bot_token_env_var = (data.get('bot_token_env_var') or 'DISCORD_BOT_TOKEN').strip()
             integration.is_active = data.get('is_active', True)
 
-            integration.scan_mode = data.get('scan_mode', 'single')
-            integration.scan_channel_ids = (data.get('scan_channel_ids') or '').strip()
+            # Unified channel_ids field (can be single or comma-separated)
+            channel_ids = (data.get('channel_ids') or '').strip()
+            integration.scan_channel_ids = channel_ids
+            # Also set channel_id to first channel for backward compatibility
+            first_channel = channel_ids.split(',')[0].strip() if channel_ids else ''
+            integration.channel_id = first_channel
+
             integration.scan_emoji = (data.get('scan_emoji') or '').strip()
-            integration.scan_target_section = (data.get('scan_target_section') or '').strip()
 
             if not integration.guild_id:
                 return jsonify({'success': False, 'error': 'Guild ID is required'}), 400
 
-            if integration.scan_mode == 'single' and not integration.channel_id:
-                return jsonify({'success': False, 'error': 'Channel ID is required for single channel mode'}), 400
-            elif integration.scan_mode == 'multi':
-                if not integration.scan_channel_ids:
-                    return jsonify({'success': False, 'error': 'Channel IDs are required for multi-channel mode'}), 400
-                if not integration.scan_emoji:
-                    return jsonify({'success': False, 'error': 'Scan emoji is required for multi-channel mode'}), 400
+            if not channel_ids:
+                return jsonify({'success': False, 'error': 'At least one Channel ID is required'}), 400
+
+            if not integration.scan_emoji:
+                return jsonify({'success': False, 'error': 'Emoji to scan for is required'}), 400
 
             db.session.commit()
 
@@ -289,123 +290,100 @@ def discord_fetch_messages(podcast_id, episode_id):
     if not integration or not integration.is_active:
         return jsonify({'success': False, 'error': 'No active Discord integration for this template'}), 400
 
+    from datetime import datetime
+
+    data = request.get_json() or {}
+    limit = min(data.get('limit', 50), 100)
+
     after_snowflake = None
     last_episode_date = None
-    last_episode = EpisodeGuide.query.filter(
-        EpisodeGuide.template_id == guide.template_id,
-        EpisodeGuide.id != episode_id,
-        EpisodeGuide.status == 'completed',
-        EpisodeGuide.scheduled_date.isnot(None)
-    ).order_by(EpisodeGuide.scheduled_date.desc()).first()
 
-    if last_episode and last_episode.scheduled_date:
-        cutoff_date = last_episode.scheduled_date + timedelta(days=1)
-        after_snowflake = date_to_snowflake(cutoff_date)
-        last_episode_date = last_episode.scheduled_date.isoformat()
+    # Check for custom date override from frontend
+    custom_after_date = data.get('after_date')
+    if custom_after_date:
+        try:
+            custom_date = datetime.strptime(custom_after_date, '%Y-%m-%d').date()
+            after_snowflake = date_to_snowflake(custom_date)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
+    else:
+        # Auto-detect from last completed episode
+        last_episode = EpisodeGuide.query.filter(
+            EpisodeGuide.template_id == guide.template_id,
+            EpisodeGuide.id != episode_id,
+            EpisodeGuide.status == 'completed',
+            EpisodeGuide.scheduled_date.isnot(None)
+        ).order_by(EpisodeGuide.scheduled_date.desc()).first()
+
+        if last_episode and last_episode.scheduled_date:
+            cutoff_date = last_episode.scheduled_date + timedelta(days=1)
+            after_snowflake = date_to_snowflake(cutoff_date)
+            last_episode_date = last_episode.scheduled_date.isoformat()
 
     imported_ids = {
         log.discord_message_id for log in
         DiscordImportLog.query.filter_by(guide_id=episode_id).all()
     }
 
-    data = request.get_json() or {}
-    limit = min(data.get('limit', 50), 100)
+    # Get channel list (unified approach)
+    channel_ids = integration.get_scan_channel_list()
+    if not channel_ids and integration.channel_id:
+        channel_ids = [integration.channel_id]
 
-    scan_mode = integration.scan_mode or 'single'
+    if not channel_ids:
+        return jsonify({'success': False, 'error': 'No channel IDs configured'}), 400
 
-    if scan_mode == 'multi':
-        channel_ids = integration.get_scan_channel_list()
-        if not channel_ids:
-            return jsonify({'success': False, 'error': 'No channel IDs configured for multi-channel mode'}), 400
+    if not integration.scan_emoji:
+        return jsonify({'success': False, 'error': 'No emoji configured. Set it in template settings.'}), 400
 
-        if not integration.scan_emoji:
-            return jsonify({'success': False, 'error': 'No scan emoji configured for multi-channel mode'}), 400
+    service = DiscordService(
+        bot_token=integration.get_bot_token(),
+        channel_id=None
+    )
 
-        service = DiscordService(
-            bot_token=integration.get_bot_token(),
-            channel_id=None
-        )
-
-        if not service.bot_token:
-            return jsonify({
-                'success': False,
-                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
-            }), 400
-
-        target_section = integration.scan_target_section or 'community_recap'
-
-        result = service.get_messages_multi_channel(
-            channel_ids=channel_ids,
-            target_emoji=integration.scan_emoji,
-            target_section=target_section,
-            limit_per_channel=limit,
-            exclude_message_ids=imported_ids,
-            after=after_snowflake
-        )
-
-        if not result.get('success'):
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Failed to fetch messages')
-            }), 400
-
-        messages = result.get('messages', [])
-        for msg in messages:
-            section = msg.get('suggested_section')
-            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
-
+    if not service.bot_token:
         return jsonify({
-            'success': True,
-            'messages': messages,
-            'sections': EPISODE_GUIDE_SECTION_NAMES,
-            'channel_name': f"{integration.name} (Multi-channel)",
-            'scan_mode': 'multi',
-            'channels_scanned': result.get('channels_scanned', 0),
-            'total_channels': result.get('total_channels', 0),
-            'errors': result.get('errors', []),
-            'last_episode_date': last_episode_date
-        })
+            'success': False,
+            'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
+        }), 400
 
-    else:
-        # Single channel mode
-        if not integration.emoji_mappings:
-            return jsonify({'success': False, 'error': 'No emoji mappings configured. Add them in the template settings.'}), 400
+    # Fetch messages with the configured emoji (no section pre-assignment)
+    result = service.get_messages_multi_channel(
+        channel_ids=channel_ids,
+        target_emoji=integration.scan_emoji,
+        target_section=None,  # No auto-assignment, user picks at import time
+        limit_per_channel=limit,
+        exclude_message_ids=imported_ids,
+        after=after_snowflake
+    )
 
-        service = DiscordService.from_integration(integration)
-        if not service.is_configured:
-            return jsonify({
-                'success': False,
-                'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
-            }), 400
-
-        emoji_mapping = DiscordService.get_emoji_mapping_from_integration(integration)
-
-        result = service.get_messages_with_reactions(
-            emoji_mapping=emoji_mapping,
-            limit=limit,
-            exclude_message_ids=imported_ids,
-            after=after_snowflake
-        )
-
-        if not result.get('success'):
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Failed to fetch messages')
-            }), 400
-
-        messages = result.get('messages', [])
-        for msg in messages:
-            section = msg.get('suggested_section')
-            msg['section_display'] = EPISODE_GUIDE_SECTION_NAMES.get(section, section)
-
+    if not result.get('success'):
         return jsonify({
-            'success': True,
-            'messages': messages,
-            'sections': EPISODE_GUIDE_SECTION_NAMES,
-            'channel_name': integration.name,
-            'scan_mode': 'single',
-            'last_episode_date': last_episode_date
-        })
+            'success': False,
+            'error': result.get('error', 'Failed to fetch messages')
+        }), 400
+
+    messages = result.get('messages', [])
+
+    # Get valid sections for this guide (for the section picker in the modal)
+    guide_sections = {}
+    if guide.template and guide.template.default_sections:
+        for section in guide.template.default_sections:
+            if isinstance(section, dict):
+                guide_sections[section['key']] = section.get('name', section['key'])
+    # Also include standard sections
+    guide_sections.update(EPISODE_GUIDE_SECTION_NAMES)
+
+    return jsonify({
+        'success': True,
+        'messages': messages,
+        'sections': guide_sections,
+        'channel_name': integration.name,
+        'channels_scanned': result.get('channels_scanned', 0),
+        'total_channels': result.get('total_channels', 0),
+        'errors': result.get('errors', []),
+        'last_episode_date': last_episode_date
+    })
 
 
 @podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/discord/import', methods=['POST'])
@@ -495,4 +473,53 @@ def discord_import_messages(podcast_id, episode_id):
     except SQLAlchemyError as e:
         db.session.rollback()
         log_exception(current_app.logger, 'Discord import', e)
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/discord/skip', methods=['POST'])
+@login_required
+@require_podcast_admin
+def discord_skip_message(podcast_id, episode_id):
+    """Mark a Discord message as skipped (don't import, don't show again)."""
+    try:
+        guide = EpisodeGuide.query.filter_by(
+            id=episode_id,
+            podcast_id=podcast_id
+        ).first_or_404()
+
+        if not guide.template:
+            return jsonify({'success': False, 'error': 'Guide has no template assigned'}), 400
+
+        integration = guide.template.discord_integration
+        if not integration:
+            return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
+
+        data = request.get_json()
+        discord_message_id = data.get('discord_message_id')
+        if not discord_message_id:
+            return jsonify({'success': False, 'error': 'No message ID provided'}), 400
+
+        # Check if already logged (imported or skipped)
+        existing = DiscordImportLog.query.filter_by(
+            guide_id=episode_id, discord_message_id=discord_message_id
+        ).first()
+        if existing:
+            return jsonify({'success': True, 'already_skipped': True})
+
+        # Create import log with item_id=None to mark as skipped
+        skip_log = DiscordImportLog(
+            integration_id=integration.id,
+            guide_id=episode_id,
+            discord_message_id=discord_message_id,
+            item_id=None,  # No item created - this was skipped
+            imported_by=current_user.id
+        )
+        db.session.add(skip_log)
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Discord skip', e)
         return jsonify({'success': False, 'error': 'Database error'}), 500
