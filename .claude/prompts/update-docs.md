@@ -11,13 +11,13 @@ Keep all project documentation accurate and up-to-date after significant changes
 | `README.md` | Project overview, setup, usage | After features/setup changes |
 | `CLAUDE.md` | AI assistant instructions | After workflow/pattern changes |
 | `.claude/CODEBASE_MAP.md` | Codebase structure for AI context | After structural changes |
-| `SPEC.md` | Product specification | After major feature additions |
+| `docs/SPEC.md` | Product specification | After major feature additions |
 
 ### Operations Docs
 | File | Purpose | Update Frequency |
 |------|---------|------------------|
 | `DEPLOYMENT.md` | Deployment procedures | After infra changes |
-| `RUNBOOK.md` | Operations runbook | After ops procedures change |
+| `docs/RUNBOOK.md` | Operations runbook | After ops procedures change |
 
 ### Developer Docs (docs/)
 | File | Purpose | Update Frequency |
@@ -90,7 +90,7 @@ After completing a feature, update these docs:
    - Update setup if new dependencies
    - Update usage examples if needed
 
-3. **SPEC.md** (if major feature)
+3. **docs/SPEC.md** (if major feature)
    - Add to feature list
    - Document user-facing behavior
 
@@ -263,7 +263,7 @@ After updating docs:
 - Social media posting with scheduling  <!-- ADD -->
 ```
 
-**SPEC.md changes:**
+**docs/SPEC.md changes:**
 ```markdown
 ## Social Media Integration
 - Connect Twitter/X accounts

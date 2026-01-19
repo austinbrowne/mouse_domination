@@ -214,9 +214,9 @@ tests/
 ```
 
 ### Phase 2 Deliverables
-- [ ] `Dockerfile`
-- [ ] `docker-compose.yml`
-- [ ] `docker-compose.prod.yml` (production overrides)
+- [ ] `deploy/Dockerfile`
+- [ ] `deploy/docker-compose.yml`
+- [ ] `deploy/docker-compose.prod.yml` (production overrides)
 - [ ] `.dockerignore`
 - [ ] Local Docker testing complete
 
@@ -272,8 +272,8 @@ volumes:
 ```
 
 ### Phase 3 Deliverables
-- [ ] `Caddyfile`
-- [ ] Updated `docker-compose.prod.yml`
+- [ ] `deploy/Caddyfile`
+- [ ] Updated `deploy/docker-compose.prod.yml`
 - [ ] SSL certificate auto-provisioning tested
 
 ---
@@ -326,7 +326,7 @@ volumes:
    cd mouse_domination
    cp .env.example .env
    # Edit .env with production values
-   docker compose -f docker-compose.prod.yml up -d
+   docker compose -f deploy/docker-compose.prod.yml up -d
    ```
 
 ### 4.2 Alternative: Railway

@@ -87,13 +87,13 @@ deploy() {
     cd "$PROJECT_DIR"
 
     log_info "Building Docker images..."
-    docker compose -f docker-compose.prod.yml build --no-cache
+    docker compose -f deploy/docker-compose.prod.yml build --no-cache
 
     log_info "Stopping existing containers..."
-    docker compose -f docker-compose.prod.yml down
+    docker compose -f deploy/docker-compose.prod.yml down
 
     log_info "Starting containers..."
-    docker compose -f docker-compose.prod.yml up -d
+    docker compose -f deploy/docker-compose.prod.yml up -d
 
     log_info "Waiting for services to be healthy..."
     sleep 10
@@ -103,24 +103,24 @@ deploy() {
         log_info "Application is healthy!"
     else
         log_warn "Health check failed. Checking logs..."
-        docker compose -f docker-compose.prod.yml logs --tail=50 app
+        docker compose -f deploy/docker-compose.prod.yml logs --tail=50 app
     fi
 }
 
 # Show status
 show_status() {
     log_info "Container status:"
-    docker compose -f docker-compose.prod.yml ps
+    docker compose -f deploy/docker-compose.prod.yml ps
     echo ""
     log_info "Recent logs:"
-    docker compose -f docker-compose.prod.yml logs --tail=20
+    docker compose -f deploy/docker-compose.prod.yml logs --tail=20
 }
 
 # Backup database
 backup_db() {
     log_info "Creating database backup..."
     BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
-    docker compose -f docker-compose.prod.yml exec -T db pg_dump -U mouse mouse_domination > "$PROJECT_DIR/backups/$BACKUP_FILE"
+    docker compose -f deploy/docker-compose.prod.yml exec -T db pg_dump -U mouse mouse_domination > "$PROJECT_DIR/backups/$BACKUP_FILE"
     log_info "Backup saved to: backups/$BACKUP_FILE"
 }
 

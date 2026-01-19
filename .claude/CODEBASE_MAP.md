@@ -233,7 +233,7 @@ pytest --tb=short         # Short tracebacks
 
 ```bash
 # Start database
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker-compose.dev.yml up -d
 
 # Run dev server
 source .venv/bin/activate

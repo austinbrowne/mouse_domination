@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BACKUP_DIR="$PROJECT_DIR/backups"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$PROJECT_DIR/deploy/docker-compose.prod.yml"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"

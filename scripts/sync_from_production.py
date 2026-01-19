@@ -4,7 +4,7 @@ Sync production PostgreSQL data to local PostgreSQL.
 
 Requires:
 - SSH access to production server
-- Local PostgreSQL running (docker compose -f docker-compose.dev.yml up -d)
+- Local PostgreSQL running (docker compose -f deploy/docker-compose.dev.yml up -d)
 
 Usage:
     python scripts/sync_from_production.py
@@ -29,7 +29,7 @@ LOCAL_DB_NAME = "mouse_domination"
 # Path to this repo's docker-compose.dev.yml
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(SCRIPT_DIR)
-LOCAL_COMPOSE_FILE = os.path.join(REPO_DIR, "docker-compose.dev.yml")
+LOCAL_COMPOSE_FILE = os.path.join(REPO_DIR, "deploy", "docker-compose.dev.yml")
 
 
 def docker_psql(sql, capture=False):
@@ -54,7 +54,7 @@ def check_local_postgres():
     )
     if "healthy" not in result.stdout.lower() and "up" not in result.stdout.lower():
         print(f"Error: Local PostgreSQL container '{LOCAL_CONTAINER}' not running.")
-        print(f"Start it with: docker compose -f docker-compose.dev.yml up -d")
+        print(f"Start it with: docker compose -f deploy/docker-compose.dev.yml up -d")
         sys.exit(1)
 
     # Test connection

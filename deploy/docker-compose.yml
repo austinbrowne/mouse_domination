@@ -5,8 +5,8 @@ services:
   # Flask application
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
       target: production
     container_name: mouse_domination_app
     restart: unless-stopped

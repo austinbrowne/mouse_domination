@@ -1,5 +1,5 @@
 # Mouse Domination CRM - Production Docker Compose with Caddy
-# Use: docker compose -f docker-compose.prod.yml up -d
+# Use (from project root): docker compose -f deploy/docker-compose.prod.yml up -d
 
 services:
   # Caddy reverse proxy with automatic HTTPS
@@ -23,8 +23,8 @@ services:
   # Flask application
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
       target: production
     container_name: mouse_domination_app
     restart: unless-stopped

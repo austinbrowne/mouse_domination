@@ -64,7 +64,7 @@ For dev/prod parity, use local PostgreSQL instead of SQLite:
 
 ```bash
 # Start local PostgreSQL
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker-compose.dev.yml up -d
 
 # Add to .env (or uncomment in .env.example)
 echo "DATABASE_URL=postgresql://mouse:mouse@localhost:5433/mouse_domination" >> .env
@@ -237,7 +237,7 @@ docker compose down -v
 docker compose up -d
 ```
 
-**Note:** The database service is named `db` in docker-compose.yml.
+**Note:** The database service is named `db` in deploy/docker-compose.yml.
 
 ### Cloudflare Tunnel
 
@@ -289,7 +289,13 @@ mouse_domination/
 │   ├── collabs.py        # Collaborations
 │   ├── pipeline.py       # Sponsorship pipeline
 │   ├── templates.py      # Outreach templates
-│   ├── podcasts.py       # Multi-podcast hub + episodes
+│   ├── podcasts/         # Multi-podcast hub (package)
+│   │   ├── core.py       # Podcast CRUD
+│   │   ├── members.py    # Member management
+│   │   ├── episodes.py   # Episode CRUD
+│   │   ├── items.py      # Episode items/sections
+│   │   ├── templates.py  # Episode templates
+│   │   └── discord.py    # Discord integration
 │   ├── content_atomizer.py # AI content repurposing
 │   ├── social.py         # Social media posting
 │   └── revenue.py        # Revenue dashboards
