@@ -162,7 +162,7 @@ class FormData:
         return {field: self.optional(field) for field in fields}
 
 
-def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None, check_user_id=False):
+def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None, check_user_id=False, check_relations=None):
     """Factory function to create a standard delete view for a model.
 
     Args:
@@ -171,6 +171,9 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
         redirect_endpoint: The endpoint to redirect to after delete (e.g., 'contacts.list_contacts')
         entity_name: Human-readable name for flash message (defaults to model class name)
         check_user_id: If True, verify entity.user_id == current_user.id before deleting
+        check_relations: Optional list of (relation_attr, display_name) tuples to check before deletion.
+                        If any relation has records, deletion is blocked.
+                        Example: [('collaborations', 'collaboration'), ('deals', 'deal')]
 
     Returns:
         A view function that handles DELETE for the model
@@ -180,7 +183,8 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
         contacts_bp.add_url_rule(
             '/<int:id>/delete',
             'delete_contact',
-            make_delete_view(Contact, 'name', 'contacts.list_contacts'),
+            make_delete_view(Contact, 'name', 'contacts.list_contacts',
+                           check_relations=[('collaborations', 'collaboration'), ('deals', 'deal')]),
             methods=['POST']
         )
     """
@@ -197,6 +201,15 @@ def make_delete_view(model_class, name_attr, redirect_endpoint, entity_name=None
             if check_user_id and getattr(entity, 'user_id', None) != current_user.id:
                 abort(403)
             name = getattr(entity, name_attr, str(id))
+
+            # Check for related records that would be orphaned
+            if check_relations:
+                for relation_attr, relation_display in check_relations:
+                    related = getattr(entity, relation_attr, None)
+                    if related and len(related) > 0:
+                        flash(f'Cannot delete "{name}": {len(related)} {relation_display}(s) still linked.', 'error')
+                        return redirect(url_for(redirect_endpoint))
+
             db.session.delete(entity)
             db.session.commit()
             flash(f'{display_name} "{name}" deleted.', 'success')

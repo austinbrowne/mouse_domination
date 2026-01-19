@@ -173,10 +173,8 @@ def new_revenue():
 @login_required
 def edit_revenue(id):
     """Edit an existing revenue entry."""
-    entry = AffiliateRevenue.query.get_or_404(id)
-    # Verify ownership
-    if entry.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    entry = AffiliateRevenue.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         try:
@@ -217,10 +215,8 @@ def edit_revenue(id):
 def delete_revenue(id):
     """Delete a revenue entry."""
     try:
-        entry = AffiliateRevenue.query.get_or_404(id)
-        # Verify ownership
-        if entry.user_id != current_user.id:
-            abort(403)
+        # Query with ownership check to prevent TOCTTOU information disclosure
+        entry = AffiliateRevenue.query.filter_by(id=id, user_id=current_user.id).first_or_404()
         db.session.delete(entry)
         db.session.commit()
         flash('Revenue entry deleted.', 'success')

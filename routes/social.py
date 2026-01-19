@@ -207,10 +207,14 @@ def post_snippet(snippet_id):
         logger.exception(f'Unexpected error posting snippet {snippet_id} for user {current_user.id}')
         flash('An unexpected error occurred.', 'error')
 
-    # Redirect back to snippet or referrer
+    # Redirect back to snippet or referrer (validate referrer to prevent open redirect)
     referrer = request.referrer
     if referrer:
-        return redirect(referrer)
+        from urllib.parse import urlparse
+        parsed = urlparse(referrer)
+        # Only allow same-host redirects
+        if parsed.netloc == '' or parsed.netloc == request.host:
+            return redirect(referrer)
     return redirect(url_for('atomizer.view_snippet', id=snippet_id))
 
 

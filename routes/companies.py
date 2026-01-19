@@ -224,6 +224,18 @@ def delete_company(id):
     try:
         company = Company.query.get_or_404(id)
         name = company.name
+
+        # Check for related records to prevent orphaned data
+        if company.contacts:
+            flash(f'Cannot delete "{name}": {len(company.contacts)} contact(s) still linked.', 'error')
+            return redirect(url_for('companies.list_companies'))
+        if company.inventory_items:
+            flash(f'Cannot delete "{name}": {len(company.inventory_items)} inventory item(s) still linked.', 'error')
+            return redirect(url_for('companies.list_companies'))
+        if company.affiliate_revenues:
+            flash(f'Cannot delete "{name}": {len(company.affiliate_revenues)} revenue record(s) still linked.', 'error')
+            return redirect(url_for('companies.list_companies'))
+
         db.session.delete(company)
         db.session.commit()
         flash(f'Company "{name}" deleted.', 'success')

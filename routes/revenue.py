@@ -265,9 +265,8 @@ def add_entry():
 @login_required
 def edit_entry(id):
     """Edit an existing revenue entry."""
-    entry = RevenueEntry.query.get_or_404(id)
-    if entry.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    entry = RevenueEntry.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         try:

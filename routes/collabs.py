@@ -148,10 +148,10 @@ def new_collab():
 @login_required
 def edit_collab(id):
     """Edit an existing collaboration."""
-    collab = Collaboration.query.options(joinedload(Collaboration.contact)).get_or_404(id)
-    # Verify ownership
-    if collab.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    collab = Collaboration.query.options(
+        joinedload(Collaboration.contact)
+    ).filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Get dynamic choices for form
     collab_type_choices = get_choices_for_type('collab_type')

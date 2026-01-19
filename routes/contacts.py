@@ -144,10 +144,11 @@ def edit_contact(id):
     return render_template('contacts/form.html', **context)
 
 
-# Use generic delete view factory
+# Use generic delete view factory with cascade protection
 contacts_bp.add_url_rule(
     '/<int:id>/delete',
     'delete_contact',
-    make_delete_view(Contact, 'name', 'contacts.list_contacts'),
+    make_delete_view(Contact, 'name', 'contacts.list_contacts',
+                    check_relations=[('collaborations', 'collaboration'), ('deals', 'deal')]),
     methods=['POST']
 )

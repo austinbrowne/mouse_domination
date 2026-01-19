@@ -426,10 +426,13 @@ def export_html(profile):
                                    testimonials=profile.testimonials,
                                    past_sponsors=past_sponsors)
 
+    # Sanitize filename to prevent header injection
+    import re
+    safe_name = re.sub(r'[^a-zA-Z0-9\-]', '', profile.display_name.lower().replace(" ", "-"))
     return Response(
         html_content,
         mimetype='text/html',
-        headers={'Content-Disposition': f'attachment; filename=media-kit-{profile.display_name.lower().replace(" ", "-")}.html'}
+        headers={'Content-Disposition': f'attachment; filename=media-kit-{safe_name}.html'}
     )
 
 
@@ -457,10 +460,13 @@ def export_pdf(profile):
     try:
         pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
 
+        # Sanitize filename to prevent header injection
+        import re
+        safe_name = re.sub(r'[^a-zA-Z0-9\-]', '', profile.display_name.lower().replace(" ", "-"))
         return Response(
             pdf_bytes,
             mimetype='application/pdf',
-            headers={'Content-Disposition': f'attachment; filename=media-kit-{profile.display_name.lower().replace(" ", "-")}.pdf'}
+            headers={'Content-Disposition': f'attachment; filename=media-kit-{safe_name}.pdf'}
         )
     except Exception as e:
         # WeasyPrint can raise various exceptions (CSS/font/image loading errors)
