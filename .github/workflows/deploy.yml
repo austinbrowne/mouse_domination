@@ -11,6 +11,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +29,44 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests with coverage
+      - name: Run tests (group ${{ matrix.group }}/4)
         run: |
-          pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=50
+          pytest --cov=. --splits 4 --group ${{ matrix.group }}
         env:
           FLASK_ENV: testing
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.group }}
+          path: .coverage
+          include-hidden-files: true
+
+  coverage:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install coverage
+        run: pip install coverage
+
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: false
+
+      - name: Combine coverage reports
+        run: |
+          coverage combine coverage-*/.coverage
+          coverage report --fail-under=50
+          coverage xml
 
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request'
@@ -39,7 +76,7 @@ jobs:
           fail_ci_if_error: false
 
   deploy:
-    needs: [test]
+    needs: [coverage]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
