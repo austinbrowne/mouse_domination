@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import func, case
+from sqlalchemy import func, case, extract
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from models import Inventory, Company, CustomOption
@@ -49,8 +49,20 @@ def list_inventory():
     if search:
         query = query.filter(Inventory.product_name.ilike(f"%{search}%"))
 
-    # Paginated query - prioritize items with deadlines (nearest first), then by date acquired
+    # Custom status sort order: Reviewing, In Queue, then natural order
+    status_order = case(
+        (Inventory.status == 'reviewing', 1),
+        (Inventory.status == 'in_queue', 2),
+        (Inventory.status == 'reviewed', 3),
+        (Inventory.status == 'keeping', 4),
+        (Inventory.status == 'listed', 5),
+        (Inventory.status == 'sold', 6),
+        else_=7
+    )
+
+    # Paginated query - sort by status priority, then deadline, then date acquired
     pagination = query.order_by(
+        status_order,
         Inventory.deadline.asc().nulls_last(),
         Inventory.date_acquired.desc()
     ).paginate(
@@ -87,11 +99,76 @@ def list_inventory():
         )
     ).filter(*agg_filters).scalar() or 0
 
+    # Chart aggregation queries (respecting same filters)
+    # Status distribution
+    status_counts = db.session.query(
+        Inventory.status,
+        func.count(Inventory.id).label('count')
+    ).filter(*agg_filters).group_by(Inventory.status).all()
+
+    # Category distribution
+    category_counts = db.session.query(
+        Inventory.category,
+        func.count(Inventory.id).label('count')
+    ).filter(*agg_filters).group_by(Inventory.category).all()
+
+    # Source type distribution
+    source_counts = db.session.query(
+        Inventory.source_type,
+        func.count(Inventory.id).label('count')
+    ).filter(*agg_filters).group_by(Inventory.source_type).all()
+
+    # P/L by category (only sold items)
+    pl_by_category = db.session.query(
+        Inventory.category,
+        func.sum(
+            func.coalesce(Inventory.sale_price, 0) -
+            func.coalesce(Inventory.fees, 0) -
+            func.coalesce(Inventory.shipping, 0) -
+            func.coalesce(Inventory.cost, 0)
+        ).label('profit_loss')
+    ).filter(*agg_filters, Inventory.sold.is_(True)).group_by(Inventory.category).all()
+
+    # Monthly P/L trend (last 12 months, based on date_acquired for sold items)
+    monthly_pl = db.session.query(
+        extract('year', Inventory.date_acquired).label('year'),
+        extract('month', Inventory.date_acquired).label('month'),
+        func.sum(
+            func.coalesce(Inventory.sale_price, 0) -
+            func.coalesce(Inventory.fees, 0) -
+            func.coalesce(Inventory.shipping, 0) -
+            func.coalesce(Inventory.cost, 0)
+        ).label('profit_loss')
+    ).filter(
+        Inventory.user_id == current_user.id,
+        Inventory.sold.is_(True),
+        Inventory.date_acquired.isnot(None)
+    ).group_by(
+        extract('year', Inventory.date_acquired),
+        extract('month', Inventory.date_acquired)
+    ).order_by(
+        extract('year', Inventory.date_acquired),
+        extract('month', Inventory.date_acquired)
+    ).limit(12).all()
+
+    # Build chart data dictionary
+    chart_data = {
+        'status': {row.status: row.count for row in status_counts},
+        'category': {row.category: row.count for row in category_counts},
+        'source_type': {row.source_type: row.count for row in source_counts},
+        'pl_by_category': {row.category: float(row.profit_loss or 0) for row in pl_by_category},
+        'monthly_pl': [
+            {'year': int(row.year), 'month': int(row.month), 'profit_loss': float(row.profit_loss or 0)}
+            for row in monthly_pl
+        ],
+    }
+
     # Check if this is an AJAX request for just the table
     if request.args.get('ajax') == '1':
         return render_template('inventory/_table.html',
             items=pagination.items,
             total_profit_loss=total_profit_loss,
+            chart_data=chart_data,
         )
 
     return render_template('inventory/list.html',
@@ -104,6 +181,7 @@ def list_inventory():
         current_sold=sold,
         search=search,
         total_profit_loss=total_profit_loss,
+        chart_data=chart_data,
     )
 
 

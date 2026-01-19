@@ -19,8 +19,8 @@
         </a>
     </div>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
+    <!-- Filters (Sticky) -->
+    <div class="bg-white rounded-xl border border-surface-200 p-4 sticky top-16 z-30 shadow-sm">
         <div class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[200px]">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
@@ -106,6 +106,73 @@
         </div>
     </div>
 
+    <!-- Analytics Panel (Collapsible) -->
+    <div class="bg-white rounded-xl border border-surface-200 overflow-hidden"
+         x-data="{ expanded: localStorage.getItem('inventoryAnalyticsExpanded') === 'true' }"
+         x-init="$watch('expanded', val => localStorage.setItem('inventoryAnalyticsExpanded', val))">
+
+        <!-- Toggle Header -->
+        <button @click="expanded = !expanded"
+                class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface-50 transition-colors">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span class="font-semibold text-gray-900">Analytics</span>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <!-- Charts Grid -->
+        <div x-show="expanded" x-collapse>
+            <div class="px-6 pb-6 border-t border-surface-200 pt-4">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Status Pipeline -->
+                    <div class="bg-surface-50 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Status Pipeline</h4>
+                        <div class="h-48">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Category Breakdown -->
+                    <div class="bg-surface-50 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">By Category</h4>
+                        <div class="h-48">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- P/L by Category -->
+                    <div class="bg-surface-50 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Profit/Loss by Category</h4>
+                        <div class="h-48">
+                            <canvas id="plByCategoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Source Type -->
+                    <div class="bg-surface-50 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Source Type</h4>
+                        <div class="h-48">
+                            <canvas id="sourceTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Trend (full width) -->
+                <div class="mt-6 bg-surface-50 rounded-lg p-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Monthly P/L Trend</h4>
+                    <div class="h-48">
+                        <canvas id="monthlyPlChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Results Container -->
     <div id="results-container" :class="{ 'opacity-50': loading }">
         {% include "inventory/_table.html" %}
@@ -157,6 +224,13 @@
                     if (stats) {
                         this.itemCount = parseInt(stats.dataset.count) || 0;
                         this.profitLoss = parseFloat(stats.dataset.profitLoss) || 0;
+                    }
+
+                    // Update charts with new data
+                    const chartDataEl = document.getElementById('chart-data-json');
+                    if (chartDataEl && typeof initInventoryCharts === 'function') {
+                        const newChartData = JSON.parse(chartDataEl.textContent);
+                        initInventoryCharts(newChartData);
                     }
 
                     // Update URL without reload (for bookmarking/sharing)
@@ -256,5 +330,176 @@
             }
         }
     }
+
+// Load Chart.js dynamically
+    const chartScript = document.createElement('script');
+    chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    chartScript.onload = () => {
+        const chartData = {{ chart_data|tojson }};
+        initInventoryCharts(chartData);
+    };
+    document.head.appendChild(chartScript);
+
+    // Chart.js initialization
+    const chartColors = {
+        status: {
+            'in_queue': '#f59e0b',
+            'reviewing': '#3b82f6',
+            'reviewed': '#8b5cf6',
+            'keeping': '#6b7280',
+            'listed': '#f97316',
+            'sold': '#10b981',
+        },
+        category: ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e', '#6366f1', '#ec4899'],
+        sourceType: {
+            'review_unit': '#3b82f6',
+            'personal_purchase': '#8b5cf6',
+        },
+        profit: '#10b981',
+        loss: '#ef4444',
+    };
+
+    const inventoryCharts = {};
+
+    function initInventoryCharts(data) {
+        // Destroy existing charts
+        Object.values(inventoryCharts).forEach(chart => chart.destroy());
+
+        // Status Pipeline (Horizontal Bar)
+        const statusLabels = ['In Queue', 'Reviewing', 'Reviewed', 'Keeping', 'Listed', 'Sold'];
+        const statusKeys = ['in_queue', 'reviewing', 'reviewed', 'keeping', 'listed', 'sold'];
+        const statusCtx = document.getElementById('statusChart');
+        if (statusCtx) {
+            inventoryCharts.status = new Chart(statusCtx, {
+                type: 'bar',
+                data: {
+                    labels: statusLabels,
+                    datasets: [{
+                        data: statusKeys.map(k => data.status[k] || 0),
+                        backgroundColor: statusKeys.map(k => chartColors.status[k]),
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { display: false }, ticks: { precision: 0 } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Category Doughnut
+        const categoryLabels = Object.keys(data.category || {}).map(k => k.charAt(0).toUpperCase() + k.slice(1));
+        const categoryValues = Object.values(data.category || {});
+        const categoryCtx = document.getElementById('categoryChart');
+        if (categoryCtx && categoryLabels.length > 0) {
+            inventoryCharts.category = new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryLabels,
+                    datasets: [{
+                        data: categoryValues,
+                        backgroundColor: chartColors.category.slice(0, categoryLabels.length),
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // P/L by Category (Bar with pos/neg colors)
+        const plCategories = Object.keys(data.pl_by_category || {});
+        const plValues = Object.values(data.pl_by_category || {});
+        const plCtx = document.getElementById('plByCategoryChart');
+        if (plCtx) {
+            inventoryCharts.plByCategory = new Chart(plCtx, {
+                type: 'bar',
+                data: {
+                    labels: plCategories.map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+                    datasets: [{
+                        label: 'P/L',
+                        data: plValues,
+                        backgroundColor: plValues.map(v => v >= 0 ? chartColors.profit : chartColors.loss),
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => '$' + v } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Source Type Pie
+        const sourceCtx = document.getElementById('sourceTypeChart');
+        if (sourceCtx) {
+            inventoryCharts.sourceType = new Chart(sourceCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Review Unit', 'Personal Purchase'],
+                    datasets: [{
+                        data: [data.source_type?.review_unit || 0, data.source_type?.personal_purchase || 0],
+                        backgroundColor: [chartColors.sourceType.review_unit, chartColors.sourceType.personal_purchase],
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // Monthly P/L Trend (Line)
+        const monthlyData = data.monthly_pl || [];
+        const monthLabels = monthlyData.map(d => {
+            const date = new Date(d.year, d.month - 1);
+            return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        });
+        const monthlyCtx = document.getElementById('monthlyPlChart');
+        if (monthlyCtx) {
+            inventoryCharts.monthlyPl = new Chart(monthlyCtx, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'P/L',
+                        data: monthlyData.map(d => d.profit_loss),
+                        borderColor: '#0ea5e9',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { callback: v => '$' + v } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+
 </script>
 {% endblock %}

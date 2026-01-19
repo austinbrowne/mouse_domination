@@ -122,3 +122,8 @@
 
 {# Summary stats for AJAX updates #}
 <div id="inventory-stats" class="hidden" data-count="{{ items|length }}" data-profit-loss="{{ total_profit_loss }}"></div>
+
+{# Chart data for AJAX updates #}
+{% if chart_data %}
+<script type="application/json" id="chart-data-json">{{ chart_data|tojson }}</script>
+{% endif %}
