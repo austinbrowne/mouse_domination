@@ -40,7 +40,7 @@ def create_app(config_class=None):
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
-    login_manager.session_protection = 'strong'
+    login_manager.session_protection = 'basic'  # 'strong' can cause issues in Docker/proxy setups
 
     @login_manager.user_loader
     def load_user(user_id):

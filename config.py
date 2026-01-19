@@ -72,6 +72,12 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2)  # Sessions expire after 2 hours of inactivity
     SESSION_REFRESH_EACH_REQUEST = True  # Refresh session on each request (sliding window)
 
+    # Remember me cookie settings (Flask-Login)
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)  # "Remember me" lasts 30 days
+    REMEMBER_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+
     # Backup settings
     BACKUP_DIR = BASE_DIR / 'backups'
     BACKUP_RETENTION_DAYS = 30

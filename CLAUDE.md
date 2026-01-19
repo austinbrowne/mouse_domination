@@ -173,6 +173,7 @@ When creating new user-scoped records, always set `user_id=current_user.id`.
 - Deploy or merge without explicit human approval
 - Modify dependency lock files without approval
 - Ignore edge cases (null, empty, boundaries)
+- **NEVER push to remote** without explicit user sign-off (main branch deploys directly to production)
 
 
 ---
