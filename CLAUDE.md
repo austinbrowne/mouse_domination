@@ -65,7 +65,7 @@ The goal is a productive working relationship, not a comfortable one. Uncomforta
 
 - **Local URL**: http://127.0.0.1:5001
 - **Server**: Flask development server (`flask run --port 5001`)
-- **Database**: PostgreSQL via Docker (`docker compose -f docker-compose.dev.yml up -d`)
+- **Database**: PostgreSQL via Docker (`docker compose -f deploy/docker-compose.dev.yml up -d`)
 - **DB credentials**: `mouse:mouse@localhost:5433/mouse_domination`
 - **To start local dev**: `source .venv/bin/activate && flask run --port 5001`
 

@@ -1,8 +1,8 @@
 # Local development database only
 # Flask runs natively (not in Docker) for faster iteration
 #
-# Usage:
-#   docker compose -f docker-compose.dev.yml up -d
+# Usage (run from project root):
+#   docker compose -f deploy/docker-compose.dev.yml up -d
 #   flask run --port 5001
 
 services:

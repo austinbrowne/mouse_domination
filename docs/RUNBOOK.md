@@ -100,14 +100,14 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
 - **Directory**: `/Users/austin/Git_Repos/mouse_domination`
 - **Python**: 3.14 (in `.venv`)
 - **URL**: http://127.0.0.1:5001
-- **Database**: PostgreSQL via `docker-compose.dev.yml` (port 5433)
+- **Database**: PostgreSQL via `deploy/docker-compose.dev.yml` (port 5433)
 
 ### Running Services
 
 | Environment | Service | Port | Command |
 |-------------|---------|------|---------|
 | Local | Flask Dev Server | 5001 | `flask run --port 5001` |
-| Local | PostgreSQL | 5433 | `docker compose -f docker-compose.dev.yml up -d` |
+| Local | PostgreSQL | 5433 | `docker compose -f deploy/docker-compose.dev.yml up -d` |
 | Production | Docker/Gunicorn | 5000 | Managed by Docker Compose |
 | Production | PostgreSQL | 5432 | Managed by Docker Compose |
 
@@ -125,7 +125,7 @@ A comprehensive reference for operating, developing, and troubleshooting the Mou
 **Local Development:**
 ```bash
 # Start PostgreSQL (if not running)
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker-compose.dev.yml up -d
 
 # Start Flask dev server
 source .venv/bin/activate
@@ -352,7 +352,7 @@ docker compose restart mouse-domination
 
 **Local (PostgreSQL):**
 ```bash
-docker compose -f docker-compose.dev.yml exec db pg_dump -U mouse mouse_domination > backup.sql
+docker compose -f deploy/docker-compose.dev.yml exec db pg_dump -U mouse mouse_domination > backup.sql
 ```
 
 **Production:**
@@ -459,7 +459,7 @@ cd /Users/austin/Git_Repos/mouse_domination
 source .venv/bin/activate
 
 # Start local PostgreSQL (first time or after reboot)
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker-compose.dev.yml up -d
 ```
 
 ### Run Development Server
@@ -565,7 +565,7 @@ lsof -i:5001
 pkill -f "flask run.*5001"
 
 # Check PostgreSQL is running
-docker compose -f docker-compose.dev.yml ps
+docker compose -f deploy/docker-compose.dev.yml ps
 ```
 
 ### Database Errors

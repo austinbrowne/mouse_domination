@@ -94,8 +94,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/mouse_domination
-ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+ExecStart=/usr/bin/docker compose -f deploy/docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f deploy/docker-compose.prod.yml down
 TimeoutStartSec=0
 
 [Install]
@@ -115,7 +115,7 @@ echo "3. Update the DOMAIN in .env for your domain"
 echo "4. Run: cd /opt/mouse_domination && ./scripts/deploy.sh"
 echo ""
 echo "Useful commands:"
-echo "  docker compose -f docker-compose.prod.yml logs -f    # View logs"
-echo "  docker compose -f docker-compose.prod.yml ps         # Check status"
+echo "  docker compose -f deploy/docker-compose.prod.yml logs -f    # View logs"
+echo "  docker compose -f deploy/docker-compose.prod.yml ps         # Check status"
 echo "  ./scripts/deploy.sh --backup                         # Backup database"
 echo ""
