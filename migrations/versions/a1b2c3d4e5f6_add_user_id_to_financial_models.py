@@ -76,14 +76,18 @@ def upgrade():
 
     if admin_id:
         # Update all existing records to belong to admin user
+        # Use parameterized queries to prevent SQL injection
         connection.execute(
-            sa.text(f"UPDATE affiliate_revenue SET user_id = {admin_id} WHERE user_id IS NULL")
+            sa.text("UPDATE affiliate_revenue SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": admin_id}
         )
         connection.execute(
-            sa.text(f"UPDATE collaborations SET user_id = {admin_id} WHERE user_id IS NULL")
+            sa.text("UPDATE collaborations SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": admin_id}
         )
         connection.execute(
-            sa.text(f"UPDATE sales_pipeline SET user_id = {admin_id} WHERE user_id IS NULL")
+            sa.text("UPDATE sales_pipeline SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": admin_id}
         )
 
 
