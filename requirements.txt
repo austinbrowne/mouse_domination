@@ -22,6 +22,7 @@ openpyxl>=3.1.0
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
+pytest-split>=0.8.0
 
 # Utilities
 python-dotenv>=1.0.0
