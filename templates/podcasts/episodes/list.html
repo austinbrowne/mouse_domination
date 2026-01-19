@@ -10,71 +10,73 @@
     <!-- Upcoming Episode Widget -->
     {% if upcoming_episode %}
     <div class="bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200 overflow-hidden" x-data="{ showItems: false }">
-        <div class="px-6 py-4 border-b border-primary-200/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white">
-                        Up Next
-                    </span>
-                    <h3 class="font-semibold text-gray-900">
-                        {% if upcoming_episode.episode_number %}Ep {{ upcoming_episode.episode_number }}: {% endif %}{{ upcoming_episode.title }}
-                    </h3>
+        <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-primary-200/50 flex flex-col gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="flex items-start sm:items-center gap-2 flex-wrap">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white flex-shrink-0">
+                            Up Next
+                        </span>
+                        <h3 class="font-semibold text-gray-900 text-sm sm:text-base">
+                            {% if upcoming_episode.episode_number %}Ep {{ upcoming_episode.episode_number }}: {% endif %}{{ upcoming_episode.title }}
+                        </h3>
+                    </div>
+                    <p class="text-xs sm:text-sm text-gray-600 mt-0.5">
+                        {% if upcoming_episode.scheduled_date %}
+                            {{ upcoming_episode.scheduled_date.strftime('%b %d, %Y') }}
+                        {% else %}
+                            No date scheduled
+                        {% endif %}
+                    </p>
                 </div>
-                <p class="text-sm text-gray-600 mt-0.5">
-                    {% if upcoming_episode.scheduled_date %}
-                        {{ upcoming_episode.scheduled_date.strftime('%A, %B %d, %Y') }}
-                    {% else %}
-                        No date scheduled
-                    {% endif %}
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-white border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                    </svg>
-                    Edit
-                </a>
-                <a href="{{ url_for('podcasts.live_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    Go Live
-                </a>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ url_for('podcasts.edit_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-primary-700 bg-white border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Edit
+                    </a>
+                    <a href="{{ url_for('podcasts.live_episode', podcast_id=podcast.id, episode_id=upcoming_episode.id) }}"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Live
+                    </a>
+                </div>
             </div>
         </div>
 
-        <div class="p-6">
+        <div class="p-4 sm:p-6">
             <!-- Quick Add Form -->
-            <form id="quick-add-form" class="mb-6">
+            <form id="quick-add-form" class="mb-4 sm:mb-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <div class="flex-1">
-                        <input type="text" id="quick-add-title" name="title" placeholder="Add a topic or item..." required
-                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                <div class="flex flex-col gap-2 sm:gap-3">
+                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <div class="flex-1">
+                            <input type="text" id="quick-add-title" name="title" placeholder="Add a topic or item..." required
+                                   class="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-sm sm:text-base">
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="quick-add-section" name="section"
+                                    class="flex-1 sm:w-40 px-3 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-sm">
+                                {% for key, name, parent in upcoming_sections or [] %}
+                                    <option value="{{ key }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" id="quick-add-btn"
+                                    class="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                <span class="hidden sm:inline">Add</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="sm:w-48">
-                        <select id="quick-add-section" name="section"
-                                class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
-                            {% for key, name, parent in upcoming_sections or [] %}
-                                <option value="{{ key }}">{{ name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" id="quick-add-btn"
-                            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Add
-                    </button>
-                </div>
-                <div class="mt-2">
                     <input type="text" id="quick-add-link" name="link" placeholder="Link (optional)"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-sm">
+                           class="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-sm">
                 </div>
             </form>
 
@@ -143,25 +145,25 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
+    <div class="grid grid-cols-3 gap-2 sm:gap-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
-            <p class="text-2xl font-bold text-amber-600 mt-1" x-text="draftsCount">{{ stats.drafts }}</p>
+            <p class="text-xl sm:text-2xl font-bold text-amber-600 mt-1" x-text="draftsCount">{{ stats.drafts }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1" x-text="completedCount">{{ stats.completed }}</p>
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Done</p>
+            <p class="text-xl sm:text-2xl font-bold text-emerald-600 mt-1" x-text="completedCount">{{ stats.completed }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-surface-200 p-4">
+        <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
-            <p class="text-2xl font-bold text-gray-900 mt-1" x-text="totalCount">{{ stats.total }}</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900 mt-1" x-text="totalCount">{{ stats.total }}</p>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl border border-surface-200 p-4">
-        <div class="flex flex-wrap gap-3 items-end">
-            <div class="flex-1 min-w-[180px]">
+    <div class="bg-white rounded-xl border border-surface-200 p-3 sm:p-4">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div class="flex-1 min-w-0">
                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Search</label>
                 <div class="relative">
                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,26 +180,26 @@
                 </div>
             </div>
 
-            <!-- Status Dropdown -->
-            <div class="relative" x-data="{ open: false }" @click.away="open = false">
-                <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
-                <button type="button" @click="open = !open"
-                    class="flex items-center justify-between gap-2 min-w-[130px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
-                    <span x-text="statusLabel"></span>
-                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open" x-transition class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
-                    <button type="button" @click="status = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === '' }">All Status</button>
-                    <button type="button" @click="status = 'draft'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'draft' }">Draft</button>
-                    <button type="button" @click="status = 'recording'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'recording' }">Recording</button>
-                    <button type="button" @click="status = 'completed'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'completed' }">Completed</button>
+            <div class="flex gap-2 sm:gap-3 items-end">
+                <!-- Status Dropdown -->
+                <div class="relative flex-1 sm:flex-initial" x-data="{ open: false }" @click.away="open = false">
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                    <button type="button" @click="open = !open"
+                        class="flex items-center justify-between gap-2 w-full sm:min-w-[130px] border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-surface-50 focus:ring-2 focus:ring-primary-500">
+                        <span x-text="statusLabel"></span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-transition class="absolute z-20 mt-1 w-full bg-white border border-surface-200 rounded-lg shadow-lg py-1">
+                        <button type="button" @click="status = ''; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === '' }">All Status</button>
+                        <button type="button" @click="status = 'draft'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'draft' }">Draft</button>
+                        <button type="button" @click="status = 'recording'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'recording' }">Recording</button>
+                        <button type="button" @click="status = 'completed'; open = false; applyFilters()" class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700" :class="{ 'bg-primary-50 text-primary-700': status === 'completed' }">Completed</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="flex items-end">
-                <button type="button" @click="clearFilters()" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm">Clear</button>
+                <button type="button" @click="clearFilters()" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm flex-shrink-0">Clear</button>
             </div>
         </div>
     </div>
