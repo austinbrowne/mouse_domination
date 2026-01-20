@@ -3,45 +3,52 @@
 {% macro pagination(pagination, endpoint, extra_params=None) %}
 {% if pagination.pages > 1 %}
 {% set params = extra_params or {} %}
-<nav class="pagination-nav" aria-label="Page navigation">
-    <ul class="pagination">
+<nav class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6" aria-label="Page navigation">
+    <div class="flex items-center gap-1">
+        {# Previous button #}
         {% if pagination.has_prev %}
-        <li class="page-item">
-            <a class="page-link" href="{{ url_for(endpoint, page=pagination.page - 1, **params) }}">&laquo; Previous</a>
-        </li>
+        <a href="{{ url_for(endpoint, page=pagination.page - 1, **params) }}"
+           class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            &laquo; Previous
+        </a>
         {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&laquo; Previous</span>
-        </li>
+        <span class="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+            &laquo; Previous
+        </span>
         {% endif %}
 
-        {% for p in range(1, pagination.pages + 1) %}
-            {% if p == pagination.page %}
-            <li class="page-item active">
-                <span class="page-link">{{ p }}</span>
-            </li>
-            {% elif p == 1 or p == pagination.pages or (p >= pagination.page - 2 and p <= pagination.page + 2) %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for(endpoint, page=p, **params) }}">{{ p }}</a>
-            </li>
-            {% elif p == pagination.page - 3 or p == pagination.page + 3 %}
-            <li class="page-item disabled">
-                <span class="page-link">...</span>
-            </li>
-            {% endif %}
-        {% endfor %}
+        {# Page numbers #}
+        <div class="hidden sm:flex items-center gap-1">
+            {% for p in range(1, pagination.pages + 1) %}
+                {% if p == pagination.page %}
+                <span class="px-3 py-2 text-sm font-medium text-white bg-primary-600 border border-primary-600 rounded-lg">
+                    {{ p }}
+                </span>
+                {% elif p == 1 or p == pagination.pages or (p >= pagination.page - 2 and p <= pagination.page + 2) %}
+                <a href="{{ url_for(endpoint, page=p, **params) }}"
+                   class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    {{ p }}
+                </a>
+                {% elif p == pagination.page - 3 or p == pagination.page + 3 %}
+                <span class="px-2 py-2 text-sm text-gray-500">...</span>
+                {% endif %}
+            {% endfor %}
+        </div>
 
+        {# Next button #}
         {% if pagination.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="{{ url_for(endpoint, page=pagination.page + 1, **params) }}">Next &raquo;</a>
-        </li>
+        <a href="{{ url_for(endpoint, page=pagination.page + 1, **params) }}"
+           class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+            Next &raquo;
+        </a>
         {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">Next &raquo;</span>
-        </li>
+        <span class="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+            Next &raquo;
+        </span>
         {% endif %}
-    </ul>
-    <div class="pagination-info">
+    </div>
+
+    <div class="text-sm text-gray-500">
         Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} -
         {{ min(pagination.page * pagination.per_page, pagination.total) }} of {{ pagination.total }}
     </div>

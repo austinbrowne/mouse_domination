@@ -5,7 +5,7 @@ from app import db
 from sqlalchemy import func, case, and_, text
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from utils.logging import log_exception
 
 main_bp = Blueprint('main', __name__)
@@ -123,14 +123,18 @@ def dashboard():
     # Build lookup dict
     revenue_lookup = {(row.year, row.month): float(row.total) for row in monthly_data}
 
-    # Generate last 12 months labels and values
+    # Generate last 12 months labels and values using proper month arithmetic
     monthly_revenue = []
+    today = date.today()
     for i in range(11, -1, -1):
-        target_date = datetime.now() - timedelta(days=i*30)
-        month = target_date.month
-        year = target_date.year
+        # Calculate months ago properly (handles year boundaries)
+        month = today.month - i
+        year = today.year
+        while month <= 0:
+            month += 12
+            year -= 1
         revenue = revenue_lookup.get((year, month), 0)
-        month_name = target_date.strftime('%b')
+        month_name = date(year, month, 1).strftime('%b')
         monthly_revenue.append({'month': f"{month_name} {year}", 'revenue': revenue})
 
     # Total revenue from all sources
