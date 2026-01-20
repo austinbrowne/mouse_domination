@@ -119,7 +119,7 @@ def test_discord_connection(podcast_id, template_id):
     integration = template.discord_integration
 
     if not integration:
-        return jsonify({'success': False, 'error': 'No Discord integration configured'})
+        return jsonify({'success': False, 'error': 'No Discord integration configured'}), 400
 
     service = DiscordService.from_integration(integration)
 
@@ -127,7 +127,7 @@ def test_discord_connection(podcast_id, template_id):
         return jsonify({
             'success': False,
             'error': f'Discord not configured. Check {integration.bot_token_env_var} environment variable.'
-        })
+        }), 400
 
     result = service.get_channel_info()
     if result.get('success'):
@@ -140,7 +140,7 @@ def test_discord_connection(podcast_id, template_id):
         return jsonify({
             'success': False,
             'error': result.get('error', 'Connection failed')
-        })
+        }), 502  # Bad Gateway - external service failed
 
 
 @podcast_bp.route('/<int:podcast_id>/templates/<int:template_id>/discord/emoji-mappings', methods=['GET', 'POST'])
