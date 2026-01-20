@@ -232,7 +232,7 @@ class TestCalendarEventTypes:
         assert len(return_events) == 1
         assert return_events[0]['color'] == '#f97316'  # Orange
 
-    def test_pipeline_events(self, app, auth_client):
+    def test_pipeline_events(self, app, auth_client, test_user):
         """Pipeline events are returned with correct colors."""
         with app.app_context():
             company = Company(name='Pipeline Test Co')
@@ -240,6 +240,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             deal = SalesPipeline(
+                user_id=test_user['id'],
                 company_id=company.id,
                 deal_type='sponsored_video',
                 deadline=date.today(),
@@ -268,7 +269,7 @@ class TestCalendarEventTypes:
         assert len(payment_events) == 1
         assert payment_events[0]['color'] == '#8b5cf6'  # Purple
 
-    def test_collab_events(self, app, auth_client):
+    def test_collab_events(self, app, auth_client, test_user):
         """Collaboration events are returned."""
         with app.app_context():
             contact = Contact(name='Collab Test Contact')
@@ -276,6 +277,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             collab = Collaboration(
+                user_id=test_user['id'],
                 contact_id=contact.id,
                 collab_type='review',
                 scheduled_date=date.today()
@@ -290,7 +292,7 @@ class TestCalendarEventTypes:
         assert len(collab_events) == 1
         assert collab_events[0]['color'] == '#ec4899'  # Pink
 
-    def test_follow_up_events(self, app, auth_client):
+    def test_follow_up_events(self, app, auth_client, test_user):
         """Follow-up events are returned."""
         with app.app_context():
             contact = Contact(name='Follow-up Test Contact')
@@ -298,6 +300,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             collab = Collaboration(
+                user_id=test_user['id'],
                 contact_id=contact.id,
                 collab_type='review',
                 follow_up_date=date.today()
@@ -539,16 +542,24 @@ class TestCalendarUserIsolation:
             db.session.commit()
             other_user_id = other_user.id
 
+            # Create contacts for the collaborations
+            my_contact = Contact(name='My Collab Contact')
+            other_contact = Contact(name='Other Collab Contact')
+            db.session.add_all([my_contact, other_contact])
+            db.session.commit()
+
             # Create collaboration for current user
             my_collab = Collaboration(
-                title='My Collab',
-                deadline=date.today(),
+                contact_id=my_contact.id,
+                collab_type='review',
+                scheduled_date=date.today(),
                 user_id=test_user['id']
             )
             # Create collaboration for other user
             other_collab = Collaboration(
-                title='Other Collab',
-                deadline=date.today(),
+                contact_id=other_contact.id,
+                collab_type='review',
+                scheduled_date=date.today(),
                 user_id=other_user_id
             )
             db.session.add_all([my_collab, other_collab])
@@ -558,10 +569,10 @@ class TestCalendarUserIsolation:
         data = response.get_json()
 
         # Should only see own collaborations
-        collab_events = [e for e in data['events'] if e['type'] == 'collab_deadline']
+        collab_events = [e for e in data['events'] if e['type'] == 'collab']
         titles = [e['title'] for e in collab_events]
-        assert any('My Collab' in t for t in titles)
-        assert not any('Other Collab' in t for t in titles)
+        assert any('My Collab Contact' in t for t in titles)
+        assert not any('Other Collab Contact' in t for t in titles)
 
     def test_cannot_see_other_users_follow_ups(self, app, auth_client, test_user):
         """Calendar API doesn't leak follow-up dates from other users."""

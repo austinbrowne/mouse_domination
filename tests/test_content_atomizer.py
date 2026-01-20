@@ -521,10 +521,10 @@ class TestSnippetEditRoute:
         response = auth_client.get('/atomizer/99999/edit')
         assert response.status_code == 404
 
-    def test_edit_other_user_403(self, auth_client, other_user_snippet):
-        """Test editing another user's snippet returns 403."""
+    def test_edit_other_user_404(self, auth_client, other_user_snippet):
+        """Test editing another user's snippet returns 404 (doesn't leak existence)."""
         response = auth_client.get(f'/atomizer/{other_user_snippet["id"]}/edit')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_edit_success(self, auth_client, app, snippet):
         """Test editing a snippet."""
