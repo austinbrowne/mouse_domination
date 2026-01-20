@@ -213,7 +213,7 @@ def verify_2fa_login():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
-@limiter.limit(RATE_LIMITS['register'], error_message="Registration limit reached. Please try later.")
+@limiter.limit(RATE_LIMITS['register'], methods=['POST'], error_message="Registration limit reached. Please try later.")
 def register():
     """Handle new user registration."""
     if current_user.is_authenticated:
