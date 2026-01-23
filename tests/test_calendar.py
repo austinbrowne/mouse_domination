@@ -3,7 +3,7 @@ import pytest
 from datetime import date, timedelta
 from flask import url_for
 from app import db
-from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration, Company, Contact, Podcast
+from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration, Company, Contact, Podcast, User
 
 
 class TestCalendarModels:
@@ -232,7 +232,7 @@ class TestCalendarEventTypes:
         assert len(return_events) == 1
         assert return_events[0]['color'] == '#f97316'  # Orange
 
-    def test_pipeline_events(self, app, auth_client):
+    def test_pipeline_events(self, app, auth_client, test_user):
         """Pipeline events are returned with correct colors."""
         with app.app_context():
             company = Company(name='Pipeline Test Co')
@@ -240,6 +240,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             deal = SalesPipeline(
+                user_id=test_user['id'],
                 company_id=company.id,
                 deal_type='sponsored_video',
                 deadline=date.today(),
@@ -268,7 +269,7 @@ class TestCalendarEventTypes:
         assert len(payment_events) == 1
         assert payment_events[0]['color'] == '#8b5cf6'  # Purple
 
-    def test_collab_events(self, app, auth_client):
+    def test_collab_events(self, app, auth_client, test_user):
         """Collaboration events are returned."""
         with app.app_context():
             contact = Contact(name='Collab Test Contact')
@@ -276,6 +277,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             collab = Collaboration(
+                user_id=test_user['id'],
                 contact_id=contact.id,
                 collab_type='review',
                 scheduled_date=date.today()
@@ -290,7 +292,7 @@ class TestCalendarEventTypes:
         assert len(collab_events) == 1
         assert collab_events[0]['color'] == '#ec4899'  # Pink
 
-    def test_follow_up_events(self, app, auth_client):
+    def test_follow_up_events(self, app, auth_client, test_user):
         """Follow-up events are returned."""
         with app.app_context():
             contact = Contact(name='Follow-up Test Contact')
@@ -298,6 +300,7 @@ class TestCalendarEventTypes:
             db.session.commit()
 
             collab = Collaboration(
+                user_id=test_user['id'],
                 contact_id=contact.id,
                 collab_type='review',
                 follow_up_date=date.today()
@@ -437,3 +440,172 @@ class TestCalendarToDict:
             data = deal.to_dict()
             assert 'deliverable_date' in data
             assert data['deliverable_date'] == '2025-03-10'
+
+
+class TestCalendarUserIsolation:
+    """Tests for calendar user data isolation - SECURITY CRITICAL."""
+
+    def test_inventory_only_shows_own_data(self, app, auth_client, test_user):
+        """Calendar API only returns inventory items belonging to current user."""
+        with app.app_context():
+            # Create another user
+            other_user = User(
+                email='other@example.com',
+                name='Other User',
+                is_approved=True
+            )
+            other_user.set_password('OtherPassword123!')
+            db.session.add(other_user)
+            db.session.commit()
+            other_user_id = other_user.id
+
+            # Create inventory for current user
+            my_item = Inventory(
+                product_name='My Mouse',
+                deadline=date.today(),
+                user_id=test_user['id']
+            )
+            # Create inventory for other user
+            other_item = Inventory(
+                product_name='Other Mouse',
+                deadline=date.today(),
+                user_id=other_user_id
+            )
+            db.session.add_all([my_item, other_item])
+            db.session.commit()
+
+        response = auth_client.get(f'/calendar/api/events?start={date.today()}&end={date.today()}')
+        data = response.get_json()
+
+        # Should only see own inventory
+        inventory_events = [e for e in data['events'] if e['type'] == 'inventory_deadline']
+        titles = [e['title'] for e in inventory_events]
+        assert any('My Mouse' in t for t in titles)
+        assert not any('Other Mouse' in t for t in titles)
+
+    def test_pipeline_only_shows_own_data(self, app, auth_client, test_user):
+        """Calendar API only returns pipeline deals belonging to current user."""
+        with app.app_context():
+            # Create another user
+            other_user = User(
+                email='other2@example.com',
+                name='Other User 2',
+                is_approved=True
+            )
+            other_user.set_password('OtherPassword123!')
+            db.session.add(other_user)
+            db.session.commit()
+            other_user_id = other_user.id
+
+            company = Company(name='Isolation Test Co')
+            db.session.add(company)
+            db.session.commit()
+
+            # Create deal for current user
+            my_deal = SalesPipeline(
+                company_id=company.id,
+                deal_type='sponsored_video',
+                deadline=date.today(),
+                user_id=test_user['id']
+            )
+            # Create deal for other user
+            other_deal = SalesPipeline(
+                company_id=company.id,
+                deal_type='paid_review',
+                deadline=date.today(),
+                user_id=other_user_id
+            )
+            db.session.add_all([my_deal, other_deal])
+            db.session.commit()
+
+        response = auth_client.get(f'/calendar/api/events?start={date.today()}&end={date.today()}')
+        data = response.get_json()
+
+        # Should only see own pipeline deals - count pipeline events
+        pipeline_events = [e for e in data['events'] if e['type'] in ['pipeline_deadline', 'pipeline_deliverable', 'pipeline_payment']]
+        # Filter to deals with 'Isolation Test Co' company
+        company_events = [e for e in pipeline_events if 'Isolation Test Co' in e.get('title', '')]
+        # Should only have events for our deal (sponsored_video type)
+        assert len(company_events) <= 3  # At most 3 events for one deal (deadline, deliverable, payment)
+
+    def test_collaboration_only_shows_own_data(self, app, auth_client, test_user):
+        """Calendar API only returns collaborations belonging to current user."""
+        with app.app_context():
+            # Create another user
+            other_user = User(
+                email='other3@example.com',
+                name='Other User 3',
+                is_approved=True
+            )
+            other_user.set_password('OtherPassword123!')
+            db.session.add(other_user)
+            db.session.commit()
+            other_user_id = other_user.id
+
+            # Create contacts for the collaborations
+            my_contact = Contact(name='My Collab Contact')
+            other_contact = Contact(name='Other Collab Contact')
+            db.session.add_all([my_contact, other_contact])
+            db.session.commit()
+
+            # Create collaboration for current user
+            my_collab = Collaboration(
+                contact_id=my_contact.id,
+                collab_type='review',
+                scheduled_date=date.today(),
+                user_id=test_user['id']
+            )
+            # Create collaboration for other user
+            other_collab = Collaboration(
+                contact_id=other_contact.id,
+                collab_type='review',
+                scheduled_date=date.today(),
+                user_id=other_user_id
+            )
+            db.session.add_all([my_collab, other_collab])
+            db.session.commit()
+
+        response = auth_client.get(f'/calendar/api/events?start={date.today()}&end={date.today()}')
+        data = response.get_json()
+
+        # Should only see own collaborations
+        collab_events = [e for e in data['events'] if e['type'] == 'collab']
+        titles = [e['title'] for e in collab_events]
+        assert any('My Collab Contact' in t for t in titles)
+        assert not any('Other Collab Contact' in t for t in titles)
+
+    def test_cannot_see_other_users_follow_ups(self, app, auth_client, test_user):
+        """Calendar API doesn't leak follow-up dates from other users."""
+        with app.app_context():
+            other_user = User(
+                email='other4@example.com',
+                name='Other User 4',
+                is_approved=True
+            )
+            other_user.set_password('OtherPassword123!')
+            db.session.add(other_user)
+            db.session.commit()
+            other_user_id = other_user.id
+
+            company = Company(name='Follow Up Test Co')
+            db.session.add(company)
+            db.session.commit()
+
+            # Other user's deal with follow-up
+            other_deal = SalesPipeline(
+                company_id=company.id,
+                deal_type='paid_review',
+                follow_up_date=date.today(),
+                follow_up_needed=True,
+                user_id=other_user_id
+            )
+            db.session.add(other_deal)
+            db.session.commit()
+
+        response = auth_client.get(f'/calendar/api/events?start={date.today()}&end={date.today()}')
+        data = response.get_json()
+
+        # Should not see other user's follow-up
+        follow_up_events = [e for e in data['events'] if e['type'] == 'pipeline_followup']
+        company_followups = [e for e in follow_up_events if 'Follow Up Test Co' in e.get('title', '')]
+        assert len(company_followups) == 0

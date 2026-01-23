@@ -191,12 +191,10 @@ def generate_snippet():
 @login_required
 def view_snippet(id):
     """View a single snippet."""
+    # Query with ownership check to prevent TOCTTOU information disclosure
     snippet = ContentAtomicSnippet.query.options(
         joinedload(ContentAtomicSnippet.template)
-    ).get_or_404(id)
-
-    if snippet.user_id != current_user.id:
-        abort(403)
+    ).filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Check if user has Twitter connected (for posting)
     twitter_connection = None
@@ -218,9 +216,8 @@ def view_snippet(id):
 @login_required
 def edit_snippet(id):
     """Edit a generated snippet."""
-    snippet = ContentAtomicSnippet.query.get_or_404(id)
-    if snippet.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    snippet = ContentAtomicSnippet.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         try:
@@ -286,9 +283,8 @@ def edit_snippet(id):
 @login_required
 def regenerate_snippet(id):
     """Regenerate content for an existing snippet."""
-    snippet = ContentAtomicSnippet.query.get_or_404(id)
-    if snippet.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    snippet = ContentAtomicSnippet.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     try:
         service = ContentAtomizerService()

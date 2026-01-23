@@ -3,7 +3,7 @@
 {% block title %}Settings - {{ APP_NAME }}{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto py-6 px-4">
+<div class="max-w-2xl mx-auto py-6 px-4" x-data="{ showDisable2faModal: false }">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
         <p class="text-sm text-gray-500 mt-1">Manage your profile and security settings</p>
@@ -142,7 +142,7 @@
                         <p class="text-sm text-gray-500">Your account is protected with two-factor authentication</p>
                     </div>
                 </div>
-                <button type="button" onclick="document.getElementById('disable-2fa-modal').classList.remove('hidden')"
+                <button type="button" @click="showDisable2faModal = true"
                         class="px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition">
                     Disable 2FA
                 </button>
@@ -227,8 +227,8 @@
 
 <!-- Disable 2FA Modal -->
 {% if current_user.totp_enabled %}
-<div id="disable-2fa-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+<div x-show="showDisable2faModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click.self="showDisable2faModal = false">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
         <div class="px-6 py-4 border-b border-surface-200 bg-red-50">
             <h3 class="font-semibold text-red-900">Disable Two-Factor Authentication</h3>
         </div>
@@ -243,7 +243,7 @@
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500">
             </div>
             <div class="flex gap-3">
-                <button type="button" onclick="document.getElementById('disable-2fa-modal').classList.add('hidden')"
+                <button type="button" @click="showDisable2faModal = false"
                         class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                     Cancel
                 </button>

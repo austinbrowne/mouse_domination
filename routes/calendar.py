@@ -1,6 +1,6 @@
 from datetime import date
 from flask import Blueprint, render_template, request, jsonify, url_for
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from models import EpisodeGuide, Inventory, SalesPipeline, Collaboration
@@ -60,6 +60,7 @@ def get_events():
     # Inventory events (deadline, return_by_date)
     if not event_types or 'inventory_deadline' in event_types:
         inv_deadline_query = Inventory.query.filter(
+            Inventory.user_id == current_user.id,
             Inventory.deadline.isnot(None),
             Inventory.status != 'reviewed'  # Hide deadline for reviewed items
         )
@@ -79,7 +80,10 @@ def get_events():
             })
 
     if not event_types or 'inventory_return' in event_types:
-        inv_return_query = Inventory.query.filter(Inventory.return_by_date.isnot(None))
+        inv_return_query = Inventory.query.filter(
+            Inventory.user_id == current_user.id,
+            Inventory.return_by_date.isnot(None)
+        )
         if start_date:
             inv_return_query = inv_return_query.filter(Inventory.return_by_date >= start_date)
         if end_date:
@@ -99,7 +103,10 @@ def get_events():
     if not event_types or 'pipeline_deadline' in event_types:
         pipeline_deadline_query = SalesPipeline.query.options(
             joinedload(SalesPipeline.company)
-        ).filter(SalesPipeline.deadline.isnot(None))
+        ).filter(
+            SalesPipeline.user_id == current_user.id,
+            SalesPipeline.deadline.isnot(None)
+        )
         if start_date:
             pipeline_deadline_query = pipeline_deadline_query.filter(SalesPipeline.deadline >= start_date)
         if end_date:
@@ -119,7 +126,10 @@ def get_events():
     if not event_types or 'pipeline_deliverable' in event_types:
         pipeline_deliverable_query = SalesPipeline.query.options(
             joinedload(SalesPipeline.company)
-        ).filter(SalesPipeline.deliverable_date.isnot(None))
+        ).filter(
+            SalesPipeline.user_id == current_user.id,
+            SalesPipeline.deliverable_date.isnot(None)
+        )
         if start_date:
             pipeline_deliverable_query = pipeline_deliverable_query.filter(SalesPipeline.deliverable_date >= start_date)
         if end_date:
@@ -139,7 +149,10 @@ def get_events():
     if not event_types or 'pipeline_payment' in event_types:
         pipeline_payment_query = SalesPipeline.query.options(
             joinedload(SalesPipeline.company)
-        ).filter(SalesPipeline.payment_date.isnot(None))
+        ).filter(
+            SalesPipeline.user_id == current_user.id,
+            SalesPipeline.payment_date.isnot(None)
+        )
         if start_date:
             pipeline_payment_query = pipeline_payment_query.filter(SalesPipeline.payment_date >= start_date)
         if end_date:
@@ -160,7 +173,10 @@ def get_events():
     if not event_types or 'collab' in event_types:
         collab_query = Collaboration.query.options(
             joinedload(Collaboration.contact)
-        ).filter(Collaboration.scheduled_date.isnot(None))
+        ).filter(
+            Collaboration.user_id == current_user.id,
+            Collaboration.scheduled_date.isnot(None)
+        )
         if start_date:
             collab_query = collab_query.filter(Collaboration.scheduled_date >= start_date)
         if end_date:
@@ -182,7 +198,10 @@ def get_events():
         # Collaboration follow-ups
         collab_followup_query = Collaboration.query.options(
             joinedload(Collaboration.contact)
-        ).filter(Collaboration.follow_up_date.isnot(None))
+        ).filter(
+            Collaboration.user_id == current_user.id,
+            Collaboration.follow_up_date.isnot(None)
+        )
         if start_date:
             collab_followup_query = collab_followup_query.filter(Collaboration.follow_up_date >= start_date)
         if end_date:
@@ -202,7 +221,10 @@ def get_events():
         # Pipeline follow-ups
         pipeline_followup_query = SalesPipeline.query.options(
             joinedload(SalesPipeline.company)
-        ).filter(SalesPipeline.follow_up_date.isnot(None))
+        ).filter(
+            SalesPipeline.user_id == current_user.id,
+            SalesPipeline.follow_up_date.isnot(None)
+        )
         if start_date:
             pipeline_followup_query = pipeline_followup_query.filter(SalesPipeline.follow_up_date >= start_date)
         if end_date:

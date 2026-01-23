@@ -216,3 +216,76 @@ class TestRevenueAuth:
         response = client.post(f'/affiliates/{revenue_entry["id"]}/delete')
         assert response.status_code == 302
         assert '/auth/login' in response.location
+
+
+class TestAffiliatesExportCSV:
+    """Tests for affiliate revenue CSV export."""
+
+    def test_export_requires_auth(self, client):
+        """Test CSV export requires authentication."""
+        response = client.get('/affiliates/export/csv')
+        assert response.status_code == 302
+        assert '/auth/login' in response.location
+
+    def test_export_csv_empty(self, auth_client):
+        """Test exporting empty CSV returns valid response."""
+        response = auth_client.get('/affiliates/export/csv')
+        assert response.status_code == 200
+        assert response.content_type == 'text/csv; charset=utf-8'
+
+    def test_export_csv_with_data(self, auth_client, revenue_entry):
+        """Test exporting CSV with data includes entries."""
+        response = auth_client.get('/affiliates/export/csv')
+        assert response.status_code == 200
+        assert response.content_type == 'text/csv; charset=utf-8'
+        # Check the data includes our entry
+        data = response.data.decode('utf-8')
+        assert 'Affiliate Test Co' in data
+
+    def test_export_csv_has_headers(self, auth_client):
+        """Test exported CSV has proper headers."""
+        response = auth_client.get('/affiliates/export/csv')
+        assert response.status_code == 200
+        data = response.data.decode('utf-8')
+        lines = data.split('\n')
+        # First line should have headers
+        assert 'company' in lines[0].lower() or 'Company' in lines[0]
+
+    def test_export_csv_only_own_data(self, app, auth_client, revenue_entry, test_user):
+        """Test CSV export only includes current user's data."""
+        from models import User
+
+        with app.app_context():
+            # Create another user with revenue
+            other_user = User(
+                email='other@example.com',
+                name='Other User',
+                is_approved=True
+            )
+            other_user.set_password('OtherPassword123!')
+            db.session.add(other_user)
+            db.session.commit()
+            other_user_id = other_user.id
+
+            other_company = Company(name='Other Co', affiliate_status='yes')
+            db.session.add(other_company)
+            db.session.commit()
+
+            other_entry = AffiliateRevenue(
+                user_id=other_user_id,
+                company_id=other_company.id,
+                year=2024,
+                month=2,
+                revenue=999.99
+            )
+            db.session.add(other_entry)
+            db.session.commit()
+
+        response = auth_client.get('/affiliates/export/csv')
+        data = response.data.decode('utf-8')
+
+        # Should have own data
+        assert 'Affiliate Test Co' in data
+        # Should NOT have other user's data
+        assert 'Other Co' not in data
+        assert '999.99' not in data

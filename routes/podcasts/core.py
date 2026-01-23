@@ -1,8 +1,9 @@
 """Podcast CRUD operations: list, create, settings, delete."""
 import re
+import secrets
 from flask import render_template, request, redirect, url_for, flash, g, current_app
 from flask_login import login_required, current_user
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from extensions import db
 from models import Podcast, PodcastMember
@@ -14,12 +15,13 @@ from utils.podcast_access import get_user_podcasts, get_user_role, require_podca
 from . import podcast_bp
 
 
-def generate_unique_slug(name, exclude_id=None):
+def generate_unique_slug(name, exclude_id=None, add_random=False):
     """Generate a unique slug from podcast name.
 
     Args:
         name: Podcast name to convert.
         exclude_id: Podcast ID to exclude from uniqueness check (for editing).
+        add_random: If True, add random suffix to handle race conditions.
 
     Returns:
         Unique slug string.
@@ -30,6 +32,10 @@ def generate_unique_slug(name, exclude_id=None):
 
     if not slug:
         slug = 'podcast'
+
+    # Add random suffix for race condition handling
+    if add_random:
+        slug = f"{slug}-{secrets.token_hex(3)}"
 
     base_slug = slug
     counter = 1
@@ -74,31 +80,41 @@ def new_podcast():
             website_url = form.optional('website_url')
             rss_feed_url = form.optional('rss_feed_url')
 
-            slug = generate_unique_slug(name)
+            # Retry with random suffix on slug collision (race condition handling)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    slug = generate_unique_slug(name, add_random=(attempt > 0))
 
-            podcast = Podcast(
-                name=name,
-                slug=slug,
-                description=description,
-                website_url=website_url,
-                rss_feed_url=rss_feed_url,
-                created_by=current_user.id,
-                is_active=True,
-            )
-            db.session.add(podcast)
-            db.session.flush()
+                    podcast = Podcast(
+                        name=name,
+                        slug=slug,
+                        description=description,
+                        website_url=website_url,
+                        rss_feed_url=rss_feed_url,
+                        created_by=current_user.id,
+                        is_active=True,
+                    )
+                    db.session.add(podcast)
+                    db.session.flush()
 
-            member = PodcastMember(
-                podcast_id=podcast.id,
-                user_id=current_user.id,
-                role='admin',
-                added_by=current_user.id,
-            )
-            db.session.add(member)
-            db.session.commit()
+                    member = PodcastMember(
+                        podcast_id=podcast.id,
+                        user_id=current_user.id,
+                        role='admin',
+                        added_by=current_user.id,
+                    )
+                    db.session.add(member)
+                    db.session.commit()
 
-            flash(f'Podcast "{podcast.name}" created.', 'success')
-            return redirect(url_for('podcasts.view_podcast', podcast_id=podcast.id))
+                    flash(f'Podcast "{podcast.name}" created.', 'success')
+                    return redirect(url_for('podcasts.view_podcast', podcast_id=podcast.id))
+
+                except IntegrityError:
+                    db.session.rollback()
+                    if attempt == max_retries - 1:
+                        raise  # Re-raise on final attempt
+                    # Continue to next attempt with random suffix
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')

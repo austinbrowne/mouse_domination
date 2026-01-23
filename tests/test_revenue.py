@@ -578,9 +578,9 @@ class TestRevenueEditEntry:
             db.session.commit()
             entry_id = entry.id
 
-        # Try to edit with test_user's client
+        # Try to edit with test_user's client - returns 404 (doesn't leak existence)
         response = auth_client.get(f'/revenue/{entry_id}/edit')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
 
 class TestRevenueDeleteEntry:

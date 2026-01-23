@@ -352,10 +352,10 @@ class TestListDeliverables:
         response = auth_client.get('/pipeline/99999/deliverables')
         assert response.status_code == 404
 
-    def test_list_other_user_deal_403(self, auth_client, other_user_deal):
-        """Test listing another user's deal returns 403."""
+    def test_list_other_user_deal_404(self, auth_client, other_user_deal):
+        """Test listing another user's deal returns 404 (doesn't leak existence)."""
         response = auth_client.get(f'/pipeline/{other_user_deal["id"]}/deliverables')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_list_shows_stats(self, auth_client, deal, multiple_deliverables):
         """Test list shows statistics."""
@@ -387,10 +387,10 @@ class TestAddDeliverable:
         assert response.status_code == 200
         assert b'deliverable_type' in response.data.lower() or b'type' in response.data.lower()
 
-    def test_add_form_other_user_403(self, auth_client, other_user_deal):
-        """Test add form for another user's deal returns 403."""
+    def test_add_form_other_user_404(self, auth_client, other_user_deal):
+        """Test add form for another user's deal returns 404 (doesn't leak existence)."""
         response = auth_client.get(f'/pipeline/{other_user_deal["id"]}/deliverables/add')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_add_deliverable_success(self, auth_client, app, deal):
         """Test adding a new deliverable."""
@@ -465,10 +465,10 @@ class TestEditDeliverable:
         response = auth_client.get(f'/pipeline/{deal["id"]}/deliverables/99999/edit')
         assert response.status_code == 404
 
-    def test_edit_other_user_deal_403(self, auth_client, other_user_deal):
-        """Test editing deliverable on another user's deal returns 403."""
+    def test_edit_other_user_deal_404(self, auth_client, other_user_deal):
+        """Test editing deliverable on another user's deal returns 404 (doesn't leak existence)."""
         response = auth_client.get(f'/pipeline/{other_user_deal["id"]}/deliverables/1/edit')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_edit_deliverable_success(self, auth_client, app, deal, deliverable):
         """Test editing an existing deliverable."""
@@ -551,10 +551,10 @@ class TestDeleteDeliverable:
         response = auth_client.post(f'/pipeline/{deal["id"]}/deliverables/99999/delete')
         assert response.status_code == 404
 
-    def test_delete_other_user_403(self, auth_client, other_user_deal):
-        """Test deleting deliverable on another user's deal returns 403."""
+    def test_delete_other_user_404(self, auth_client, other_user_deal):
+        """Test deleting deliverable on another user's deal returns 404 (doesn't leak existence)."""
         response = auth_client.post(f'/pipeline/{other_user_deal["id"]}/deliverables/1/delete')
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_delete_redirects_to_list(self, auth_client, deal, deliverable):
         """Test delete redirects to deliverables list."""

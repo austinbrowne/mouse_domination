@@ -152,13 +152,11 @@ def new_deal():
 @login_required
 def edit_deal(id):
     """Edit an existing deal."""
+    # Query with ownership check to prevent TOCTTOU information disclosure
     deal = SalesPipeline.query.options(
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact)
-    ).get_or_404(id)
-    # Verify ownership
-    if deal.user_id != current_user.id:
-        abort(403)
+    ).filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Get dynamic choices for form
     deal_type_choices = get_choices_for_type('deal_type')
@@ -315,14 +313,12 @@ def mark_paid(deal):
 @login_required
 def list_deliverables(id):
     """List and manage deliverables for a deal."""
+    # Query with ownership check to prevent TOCTTOU information disclosure
     deal = SalesPipeline.query.options(
         joinedload(SalesPipeline.company),
         joinedload(SalesPipeline.contact),
         joinedload(SalesPipeline.deliverables_list)
-    ).get_or_404(id)
-
-    if deal.user_id != current_user.id:
-        abort(403)
+    ).filter_by(id=id, user_id=current_user.id).first_or_404()
 
     # Calculate stats
     total_deliverables = len(deal.deliverables_list)
@@ -352,9 +348,8 @@ def list_deliverables(id):
 @login_required
 def add_deliverable(id):
     """Add a new deliverable to a deal."""
-    deal = SalesPipeline.query.get_or_404(id)
-    if deal.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    deal = SalesPipeline.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     if request.method == 'POST':
         try:
@@ -400,10 +395,8 @@ def add_deliverable(id):
 @login_required
 def edit_deliverable(id, deliverable_id):
     """Edit an existing deliverable."""
-    deal = SalesPipeline.query.get_or_404(id)
-    if deal.user_id != current_user.id:
-        abort(403)
-
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    deal = SalesPipeline.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     deliverable = DealDeliverable.query.filter_by(id=deliverable_id, deal_id=deal.id).first_or_404()
 
     if request.method == 'POST':
@@ -455,9 +448,8 @@ def edit_deliverable(id, deliverable_id):
 @login_required
 def delete_deliverable(id, deliverable_id):
     """Delete a deliverable."""
-    deal = SalesPipeline.query.get_or_404(id)
-    if deal.user_id != current_user.id:
-        abort(403)
+    # Query with ownership check to prevent TOCTTOU information disclosure
+    deal = SalesPipeline.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     try:
         deliverable = DealDeliverable.query.filter_by(id=deliverable_id, deal_id=deal.id).first_or_404()

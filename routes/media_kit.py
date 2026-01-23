@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 from markupsafe import escape
 from models import CreatorProfile, RateCard, Testimonial, Company
 from extensions import db
-from utils.validation import ValidationError
+from utils.validation import ValidationError, validate_email, validate_url
 from utils.routes import FormData
 from utils.logging import log_exception
 from utils.queries import get_companies_for_dropdown
@@ -183,6 +183,10 @@ def save_profile():
                 delete_old_photo(profile.photo_url)
             photo_url = None
 
+        # Validate email and URL formats
+        contact_email = validate_email(form.optional('contact_email'), 'Contact Email')
+        website_url = validate_url(form.optional('website_url'), 'Website URL')
+
         if profile:
             # Update existing profile
             profile.display_name = form.required('display_name')
@@ -190,8 +194,8 @@ def save_profile():
             profile.bio = form.optional('bio')
             profile.photo_url = photo_url
             profile.location = form.optional('location')
-            profile.contact_email = form.optional('contact_email')
-            profile.website_url = form.optional('website_url')
+            profile.contact_email = contact_email
+            profile.website_url = website_url
             profile.social_links = social_links if social_links else None
             profile.platform_stats = platform_stats if platform_stats else None
             profile.audience_demographics = audience_demographics if any(audience_demographics.values()) else None
@@ -205,8 +209,8 @@ def save_profile():
                 bio=form.optional('bio'),
                 photo_url=photo_url,
                 location=form.optional('location'),
-                contact_email=form.optional('contact_email'),
-                website_url=form.optional('website_url'),
+                contact_email=contact_email,
+                website_url=website_url,
                 social_links=social_links if social_links else None,
                 platform_stats=platform_stats if platform_stats else None,
                 audience_demographics=audience_demographics if any(audience_demographics.values()) else None,
@@ -426,10 +430,13 @@ def export_html(profile):
                                    testimonials=profile.testimonials,
                                    past_sponsors=past_sponsors)
 
+    # Sanitize filename to prevent header injection
+    import re
+    safe_name = re.sub(r'[^a-zA-Z0-9\-]', '', profile.display_name.lower().replace(" ", "-"))
     return Response(
         html_content,
         mimetype='text/html',
-        headers={'Content-Disposition': f'attachment; filename=media-kit-{profile.display_name.lower().replace(" ", "-")}.html'}
+        headers={'Content-Disposition': f'attachment; filename=media-kit-{safe_name}.html'}
     )
 
 
@@ -457,10 +464,13 @@ def export_pdf(profile):
     try:
         pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
 
+        # Sanitize filename to prevent header injection
+        import re
+        safe_name = re.sub(r'[^a-zA-Z0-9\-]', '', profile.display_name.lower().replace(" ", "-"))
         return Response(
             pdf_bytes,
             mimetype='application/pdf',
-            headers={'Content-Disposition': f'attachment; filename=media-kit-{profile.display_name.lower().replace(" ", "-")}.pdf'}
+            headers={'Content-Disposition': f'attachment; filename=media-kit-{safe_name}.pdf'}
         )
     except Exception as e:
         # WeasyPrint can raise various exceptions (CSS/font/image loading errors)
