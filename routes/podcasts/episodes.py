@@ -114,6 +114,7 @@ def list_episodes(podcast_id):
             search=search,
             matching_items=matching_items,
             stats=stats,
+            user_role=g.user_podcast_role,
         )
 
     today = date.today()

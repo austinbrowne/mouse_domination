@@ -1,11 +1,12 @@
 {# Podcast sub-navigation - include on all podcast-scoped pages #}
 {% set active_tab = request.endpoint %}
-{% set is_episode_page = 'episode' in active_tab %}
+{# Only consider it a "single episode page" if we're editing/viewing/live-ing an individual episode, not the list #}
+{% set is_single_episode_page = active_tab in ['podcasts.edit_episode', 'podcasts.view_episode', 'podcasts.live_episode'] %}
 <nav class="bg-white border-b border-gray-200 mb-6 overflow-x-auto">
     <div class="flex items-center justify-between min-w-max">
         <div class="flex items-center gap-2 flex-shrink-0">
-            {# Back arrow: go to episodes list if on episode page, otherwise podcasts list #}
-            <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) if is_episode_page else url_for('podcasts.list_podcasts') }}" class="text-gray-400 hover:text-gray-600">
+            {# Back arrow: go to episodes list if on single episode page, otherwise podcasts list #}
+            <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) if is_single_episode_page else url_for('podcasts.list_podcasts') }}" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
