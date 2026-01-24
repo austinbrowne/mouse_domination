@@ -36,6 +36,10 @@ def create_app(config_class=None):
     login_manager.init_app(app)
     limiter.init_app(app)
 
+    # Initialize Google OAuth
+    from services.google_oauth import init_google_oauth
+    init_google_oauth(app)
+
     # Configure Flask-Login
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
@@ -82,7 +86,8 @@ def create_app(config_class=None):
                 "style-src 'self' 'unsafe-inline' cdn.tailwindcss.com fonts.googleapis.com; "
                 "font-src 'self' fonts.gstatic.com; "
                 "img-src 'self' data: https:; "
-                "connect-src 'self'"
+                "connect-src 'self' accounts.google.com; "
+                "form-action 'self' accounts.google.com"
             )
         return response
 
@@ -108,9 +113,11 @@ def create_app(config_class=None):
     from routes.revenue import revenue_bp
     from routes.content_atomizer import atomizer_bp
     from routes.social import social_bp
+    from routes.google_auth import google_auth_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(google_auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(contacts_bp, url_prefix='/contacts')
     app.register_blueprint(companies_bp, url_prefix='/companies')

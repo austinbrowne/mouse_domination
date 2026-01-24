@@ -116,6 +116,16 @@ def login():
             flash(f'Account locked. Try again in {int(remaining) + 1} minutes.', 'error')
             return render_template('auth/login.html')
 
+        # Check if user has a password (Google-only users won't)
+        if not user.has_password():
+            if user.has_google_linked():
+                flash('This account uses Google login. Please sign in with Google.', 'info')
+                return redirect(url_for('auth.login'))
+            else:
+                # Edge case: no password and no Google - should not happen
+                flash('Account has no login method configured. Contact support.', 'error')
+                return render_template('auth/login.html')
+
         # Verify password
         if not user.check_password(password):
             user.record_failed_login()

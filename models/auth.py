@@ -40,6 +40,11 @@ class User(db.Model):
     is_approved = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
 
+    # OAuth fields
+    google_id = db.Column(db.String(255), unique=True, nullable=True, index=True)
+    google_linked_at = db.Column(db.DateTime, nullable=True)
+    auth_provider = db.Column(db.String(20), nullable=True)  # 'local', 'google'
+
     # Relationships
     inventory_items = db.relationship('Inventory', back_populates='user', lazy='dynamic')
 
@@ -219,6 +224,34 @@ class User(db.Model):
             return True
         return False
 
+    # OAuth helper methods
+    def has_password(self) -> bool:
+        """Check if user has a local password set."""
+        return bool(self.password_hash)
+
+    def has_google_linked(self) -> bool:
+        """Check if user has Google account linked."""
+        return bool(self.google_id)
+
+    def can_use_local_login(self) -> bool:
+        """Check if user can log in with email/password."""
+        return self.has_password()
+
+    def link_google(self, google_id: str) -> None:
+        """Link a Google account to this user."""
+        self.google_id = google_id
+        self.google_linked_at = datetime.now(timezone.utc)
+
+    def unlink_google(self) -> bool:
+        """Unlink Google account. Returns False if user would have no login method."""
+        if not self.has_password():
+            return False  # Can't unlink if no password
+        self.google_id = None
+        self.google_linked_at = None
+        if self.auth_provider == 'google':
+            self.auth_provider = 'local'
+        return True
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -226,6 +259,8 @@ class User(db.Model):
             'name': self.name,
             'is_approved': self.is_approved,
             'is_admin': self.is_admin,
+            'has_google': self.has_google_linked(),
+            'has_password': self.has_password(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
         }
@@ -268,6 +303,10 @@ class AuditLog(db.Model):
     ACTION_LOGIN_SUCCESS = 'login_success'
     ACTION_LOGIN_FAILED = 'login_failed'
     ACTION_ACCOUNT_LOCKED = 'account_locked'
+    ACTION_GOOGLE_LOGIN = 'google_login'
+    ACTION_GOOGLE_SIGNUP = 'google_signup'
+    ACTION_GOOGLE_ACCOUNT_LINKED = 'google_account_linked'
+    ACTION_GOOGLE_ACCOUNT_UNLINKED = 'google_account_unlinked'
 
     @classmethod
     def log(cls, action: str, actor=None, target_type: str = None,

@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 from extensions import db
+from models import AuditLog
 from routes.auth import validate_password_strength
 from utils.logging import log_exception
 
@@ -181,4 +182,69 @@ def disable_2fa():
     current_user.disable_totp()
     db.session.commit()
     flash('Two-factor authentication has been disabled.', 'success')
+    return redirect(url_for('settings.index'))
+
+
+@settings_bp.route('/google/unlink', methods=['POST'])
+@login_required
+def unlink_google():
+    """Unlink Google account from user."""
+    if not current_user.has_google_linked():
+        flash('No Google account linked.', 'info')
+        return redirect(url_for('settings.index'))
+
+    if not current_user.has_password():
+        flash('Cannot unlink Google without a password set. Set a password first.', 'error')
+        return redirect(url_for('settings.index'))
+
+    try:
+        current_user.unlink_google()
+        AuditLog.log(
+            action=AuditLog.ACTION_GOOGLE_ACCOUNT_UNLINKED,
+            actor=current_user,
+            details='Unlinked Google account from user',
+            ip_address=request.remote_addr
+        )
+        db.session.commit()
+        flash('Google account unlinked.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Unlink Google', e, user_id=current_user.id)
+        flash('An error occurred. Please try again.', 'error')
+
+    return redirect(url_for('settings.index'))
+
+
+@settings_bp.route('/password/set', methods=['POST'])
+@login_required
+def set_password():
+    """Set password for users who don't have one (Google-only users)."""
+    if current_user.has_password():
+        flash('You already have a password. Use change password instead.', 'info')
+        return redirect(url_for('settings.index'))
+
+    new_password = request.form.get('new_password', '')
+    confirm_password = request.form.get('confirm_password', '')
+
+    if new_password != confirm_password:
+        flash('Passwords do not match.', 'error')
+        return redirect(url_for('settings.index'))
+
+    password_errors = validate_password_strength(new_password)
+    if password_errors:
+        for error in password_errors:
+            flash(error, 'error')
+        return redirect(url_for('settings.index'))
+
+    try:
+        current_user.set_password(new_password)
+        if current_user.auth_provider == 'google':
+            current_user.auth_provider = 'local'  # Now has both methods
+        db.session.commit()
+        flash('Password set successfully. You can now log in with email and password.', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        log_exception(current_app.logger, 'Set password', e, user_id=current_user.id)
+        flash('An error occurred. Please try again.', 'error')
+
     return redirect(url_for('settings.index'))
