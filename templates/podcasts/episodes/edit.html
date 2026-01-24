@@ -713,8 +713,8 @@
 </style>
 
 <script>
-function episodeGuideEdit(podcastId, guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink, initialEpisodeUrl, initialCustomSections, initialScheduledDate) {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('episodeGuideEdit', (podcastId, guideId, initialTitle, initialEpisodeNum, initialPrevPoll, initialPrevPollLink, initialNewPoll, initialNewPollLink, initialEpisodeUrl, initialCustomSections, initialScheduledDate) => ({
         podcastId: podcastId,
         guideId: guideId,
         guideTitle: initialTitle,
@@ -1219,7 +1219,7 @@ function episodeGuideEdit(podcastId, guideId, initialTitle, initialEpisodeNum, i
                 body: JSON.stringify({ discord_message_id: msgId })
             }).catch(err => console.error('Skip failed:', err));
         }
-    };
-}
+    }));
+});
 </script>
 {% endblock %}
