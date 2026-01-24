@@ -215,6 +215,7 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
                     <input type="text" x-model="previousPoll"
                         @blur="saveGuideMetadata()"
+                        @change="saveGuideMetadata()"
                         placeholder="What was last week's poll question?"
                         class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                 </div>
@@ -222,6 +223,7 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Link</label>
                     <input type="text" x-model="previousPollLink"
                         @blur="saveGuideMetadata()"
+                        @change="saveGuideMetadata()"
                         placeholder="https://x.com/... or poll results link"
                         class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                 </div>
@@ -233,6 +235,7 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
                     <input type="text" x-model="newPoll"
                         @blur="saveGuideMetadata()"
+                        @change="saveGuideMetadata()"
                         placeholder="What's this week's poll question?"
                         class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                 </div>
@@ -240,6 +243,7 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Link</label>
                     <input type="text" x-model="newPollLink"
                         @blur="saveGuideMetadata()"
+                        @change="saveGuideMetadata()"
                         placeholder="https://x.com/... or new poll link"
                         class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
                 </div>
@@ -254,6 +258,7 @@
             <label class="block text-xs font-medium text-gray-500 mb-1">Published URL (YouTube, Spotify, etc.)</label>
             <input type="url" x-model="episodeUrl"
                 @blur="saveGuideMetadata()"
+                @change="saveGuideMetadata()"
                 placeholder="https://youtube.com/watch?v=... or podcast link"
                 class="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500">
             <p class="text-xs text-gray-500 mt-1">Add the episode link once published. This is used when generating social media posts.</p>

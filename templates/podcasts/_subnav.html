@@ -1,9 +1,11 @@
 {# Podcast sub-navigation - include on all podcast-scoped pages #}
+{% set active_tab = request.endpoint %}
+{% set is_episode_page = 'episode' in active_tab %}
 <nav class="bg-white border-b border-gray-200 mb-6 overflow-x-auto">
     <div class="flex items-center justify-between min-w-max">
         <div class="flex items-center gap-2 flex-shrink-0">
-            {# Podcast name with optional back to list #}
-            <a href="{{ url_for('podcasts.list_podcasts') }}" class="text-gray-400 hover:text-gray-600">
+            {# Back arrow: go to episodes list if on episode page, otherwise podcasts list #}
+            <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) if is_episode_page else url_for('podcasts.list_podcasts') }}" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
@@ -11,7 +13,6 @@
             <h2 class="text-lg font-semibold text-gray-900 whitespace-nowrap">{{ podcast.name }}</h2>
         </div>
         <div class="flex items-center gap-1 flex-shrink-0">
-            {% set active_tab = request.endpoint %}
 
             <a href="{{ url_for('podcasts.list_episodes', podcast_id=podcast.id) }}"
                class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
