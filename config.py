@@ -104,6 +104,11 @@ class Config:
     # CSS build mode: 'cdn' for Tailwind CDN (dev), 'static' for pre-built CSS (prod)
     CSS_BUILD_MODE = os.environ.get('CSS_BUILD_MODE', 'cdn')
 
+    # Google OAuth settings
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+    GOOGLE_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""
