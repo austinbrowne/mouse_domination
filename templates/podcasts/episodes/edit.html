@@ -134,7 +134,7 @@
 <div class="space-y-6">
 {% include "podcasts/_subnav.html" %}
 </div>
-<div class="space-y-6" x-data="episodeGuideEdit({{ podcast.id }}, {{ guide.id }}, '{{ guide.title | e }}', {{ guide.episode_number or 'null' }}, '{{ guide.previous_poll | default('', true) | e }}', '{{ guide.previous_poll_link | default('', true) | e }}', '{{ guide.new_poll | default('', true) | e }}', '{{ guide.new_poll_link | default('', true) | e }}', '{{ guide.episode_url | default('', true) | e }}', {{ guide.custom_sections | default([], true) | tojson }}, '{{ guide.scheduled_date.isoformat() if guide.scheduled_date else '' }}')">
+<div class="space-y-6" x-data="episodeGuideEdit({{ podcast.id }}, {{ guide.id }}, {{ guide.title | tojson }}, {{ guide.episode_number or 'null' }}, {{ (guide.previous_poll or '') | tojson }}, {{ (guide.previous_poll_link or '') | tojson }}, {{ (guide.new_poll or '') | tojson }}, {{ (guide.new_poll_link or '') | tojson }}, {{ (guide.episode_url or '') | tojson }}, {{ guide.custom_sections | default([], true) | tojson }}, {{ (guide.scheduled_date.isoformat() if guide.scheduled_date else '') | tojson }})">
     <!-- Header -->
     <div class="flex flex-col gap-4">
         <div class="flex items-start gap-3">
