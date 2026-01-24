@@ -15,6 +15,7 @@ A creator-focused CRM for managing brand relationships, inventory tracking, cont
 - **Outreach Templates** - Reusable email templates with variable substitution
 - **Revenue Analytics** - Dashboard with affiliate revenue tracking and monthly trends
 - **Multi-User Support** - User registration with admin approval workflow
+- **Google OAuth** - Sign in with Google as alternative to email/password
 
 ## Tech Stack
 
@@ -99,6 +100,8 @@ Key environment variables:
 | `SECRET_KEY` | Flask secret key (generate for production) | Yes |
 | `FLASK_ENV` | Environment (development/production) | Yes |
 | `DATABASE_URL` | Database connection string | No (defaults to SQLite) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | No |
 | `YOUTUBE_API_KEY` | YouTube Data API key | No |
 | `YOUTUBE_CHANNEL_ID` | Your YouTube channel ID | No |
 | `DISCORD_BOT_TOKEN` | Discord bot token for community topic sourcing | No |
@@ -113,10 +116,27 @@ python -c "import secrets; print(secrets.token_hex(32))"
 The app uses Flask-Login with the following security features:
 
 - **Argon2id** password hashing (OWASP recommended)
+- **Google OAuth** - Sign in with Google (skips local 2FA, uses Google's)
+- **Two-Factor Authentication (2FA)** - TOTP-based with recovery codes
 - **Rate limiting** - 5 login attempts per minute
 - **Progressive lockout** - Account locks after failed attempts (5min → 15min → 1hr → 24hr)
 - **Admin approval** - New user registrations require admin approval
 - **Session protection** - Strong session protection with secure cookies
+
+### Google OAuth Setup
+
+To enable "Sign in with Google":
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create or select a project
+3. Navigate to **APIs & Services > OAuth consent screen** and configure
+4. Navigate to **APIs & Services > Credentials > Create Credentials > OAuth client ID**
+5. Select "Web application" and add redirect URIs:
+   - Local: `http://127.0.0.1:5001/auth/google/callback`
+   - Production: `https://your-domain.com/auth/google/callback`
+6. Copy Client ID and Secret to your `.env` file
+
+The Google sign-in button only appears when `GOOGLE_CLIENT_ID` is configured.
 
 ### User Roles
 

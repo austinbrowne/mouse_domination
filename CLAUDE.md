@@ -159,6 +159,7 @@ When creating new user-scoped records, always set `user_id=current_user.id`.
 
 ## Already Implemented (Don't Re-implement)
 
+- **Google OAuth**: Full implementation in `routes/google_auth.py` (login, callback, account linking)
 - **2FA/TOTP**: Full implementation in `routes/settings.py` (setup, verify, disable, recovery codes)
 - **Rate limiting**: Auth endpoints protected via Flask-Limiter
 - **Session timeout**: 2-hour idle timeout configured
