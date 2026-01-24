@@ -84,10 +84,10 @@ def create_app(config_class=None):
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.tailwindcss.com cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' cdn.tailwindcss.com fonts.googleapis.com; "
-                "font-src 'self' fonts.gstatic.com; "
+                "font-src 'self' data: fonts.gstatic.com; "
                 "img-src 'self' data: https:; "
-                "connect-src 'self' accounts.google.com; "
-                "form-action 'self' accounts.google.com"
+                "connect-src 'self' https://accounts.google.com; "
+                "form-action 'self' https://accounts.google.com"
             )
         return response
 
