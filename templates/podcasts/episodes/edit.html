@@ -1182,9 +1182,11 @@ function episodeGuideEdit(podcastId, guideId, initialTitle, initialEpisodeNum, i
                     this.discordStats.imported += data.count || 0;
 
                     // Show completion state if all messages have been addressed
-                    if (this.discordMessages.length === 0) {
-                        this.discordComplete = true;
-                    }
+                    this.$nextTick(() => {
+                        if (this.discordMessages.length === 0) {
+                            this.discordComplete = true;
+                        }
+                    });
                 } else {
                     alert('Import failed: ' + (data.error || 'Unknown error'));
                 }
@@ -1202,9 +1204,11 @@ function episodeGuideEdit(podcastId, guideId, initialTitle, initialEpisodeNum, i
             this.discordMessages = this.discordMessages.filter(m => m.id !== msgId);
 
             // Show completion state if all messages addressed
-            if (this.discordMessages.length === 0) {
-                this.discordComplete = true;
-            }
+            this.$nextTick(() => {
+                if (this.discordMessages.length === 0) {
+                    this.discordComplete = true;
+                }
+            });
 
             // Fire and forget the API call
             fetch(`/podcasts/${this.podcastId}/episodes/${this.guideId}/discord/skip`, {
