@@ -460,7 +460,9 @@ def discord_import_messages(podcast_id, episode_id):
             )
             db.session.add(import_log)
 
-            imported.append(item.to_dict())
+            item_dict = item.to_dict()
+            item_dict['discord_message_id'] = discord_message_id
+            imported.append(item_dict)
 
         db.session.commit()
 
