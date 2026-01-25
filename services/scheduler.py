@@ -161,13 +161,3 @@ def _job_check_live_streams():
 
         except Exception as e:
             app.logger.error(f'Error in check_live_streams job: {e}')
-
-
-def get_scheduler():
-    """Get the scheduler instance."""
-    return scheduler
-
-
-def is_scheduler_running() -> bool:
-    """Check if the scheduler is running."""
-    return scheduler is not None and scheduler.running

@@ -9,6 +9,7 @@ This service handles:
 
 import os
 from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import current_app
 
 from extensions import db
@@ -46,6 +47,8 @@ class TweetSchedulerService:
         This method is called by the scheduler every few minutes.
         It checks each podcast's YouTube channel for live status and
         triggers tweets for any pending episode tweet configs.
+
+        Uses ThreadPoolExecutor for concurrent HTTP requests to YouTube.
         """
         # Get all active podcasts with YouTube channels configured
         podcasts = Podcast.query.filter(
@@ -54,21 +57,31 @@ class TweetSchedulerService:
             Podcast.youtube_channel_id != '',
         ).all()
 
+        if not podcasts:
+            return []
+
         results = []
 
-        for podcast in podcasts:
-            try:
-                result = self._check_podcast_live(podcast)
-                results.append(result)
-            except Exception as e:
-                current_app.logger.error(
-                    f'Error checking podcast {podcast.id} ({podcast.name}): {e}'
-                )
-                results.append({
-                    'podcast_id': podcast.id,
-                    'podcast_name': podcast.name,
-                    'error': str(e),
-                })
+        # Check podcasts concurrently (up to 10 at once)
+        with ThreadPoolExecutor(max_workers=min(10, len(podcasts))) as executor:
+            futures = {
+                executor.submit(self._check_podcast_live, podcast): podcast
+                for podcast in podcasts
+            }
+            for future in as_completed(futures, timeout=30):
+                podcast = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    current_app.logger.error(
+                        f'Error checking podcast {podcast.id} ({podcast.name}): {e}'
+                    )
+                    results.append({
+                        'podcast_id': podcast.id,
+                        'podcast_name': podcast.name,
+                        'error': str(e),
+                    })
 
         return results
 
@@ -119,8 +132,9 @@ class TweetSchedulerService:
                 f'Updated episode {episode.id} URL to {episode.episode_url}'
             )
 
-        # Get pending tweet configs for this episode
-        pending_tweets = EpisodeTweetConfig.query.filter(
+        # Get pending tweet configs for this episode with row-level locking
+        # to prevent race condition with user disabling their config
+        pending_tweets = EpisodeTweetConfig.query.with_for_update().filter(
             EpisodeTweetConfig.episode_id == episode.id,
             EpisodeTweetConfig.status == EpisodeTweetConfig.STATUS_PENDING,
             EpisodeTweetConfig.enabled == True,
@@ -308,7 +322,26 @@ class TweetSchedulerService:
             current_app.logger.error(f'Unexpected error generating tweet: {e}')
             return None
 
-    def create_tweet_configs_for_episode(self, episode: EpisodeGuide, generate_content: bool = True) -> list:
+    def generate_tweet_content(
+        self, config: EpisodeTweetConfig, episode: EpisodeGuide
+    ) -> str | None:
+        """
+        Generate AI-powered tweet content for a specific config.
+
+        Public wrapper for external callers (e.g., route handlers).
+
+        Args:
+            config: The tweet config to generate content for
+            episode: The episode being tweeted about
+
+        Returns:
+            Generated content string or None if generation fails
+        """
+        return self._generate_tweet_content(config, episode)
+
+    def create_tweet_configs_for_episode(
+        self, episode: EpisodeGuide, generate_content: bool = True
+    ) -> list[EpisodeTweetConfig]:
         """
         Create tweet configs for all hosts of an episode's podcast.
 
@@ -327,15 +360,24 @@ class TweetSchedulerService:
         # Get all members of the podcast
         members = PodcastMember.query.filter_by(podcast_id=episode.podcast_id).all()
 
+        if not members:
+            return []
+
+        # Batch-fetch existing configs to avoid N+1 queries
+        member_user_ids = [m.user_id for m in members]
+        existing_configs = {
+            c.user_id: c
+            for c in EpisodeTweetConfig.query.filter(
+                EpisodeTweetConfig.episode_id == episode.id,
+                EpisodeTweetConfig.user_id.in_(member_user_ids)
+            ).all()
+        }
+
         configs = []
 
         for member in members:
-            # Check if config already exists
-            existing = EpisodeTweetConfig.query.filter_by(
-                episode_id=episode.id,
-                user_id=member.user_id,
-            ).first()
-
+            # Check if config already exists (from batch query)
+            existing = existing_configs.get(member.user_id)
             if existing:
                 configs.append(existing)
                 continue
@@ -360,27 +402,3 @@ class TweetSchedulerService:
 
         db.session.commit()
         return configs
-
-    def retry_failed_tweets(self, max_retries: int = 3):
-        """
-        Retry posting failed tweets that haven't exceeded max retries.
-
-        Args:
-            max_retries: Maximum number of retry attempts
-        """
-        failed_configs = EpisodeTweetConfig.query.filter(
-            EpisodeTweetConfig.status == EpisodeTweetConfig.STATUS_FAILED,
-            EpisodeTweetConfig.retry_count < max_retries,
-            EpisodeTweetConfig.enabled == True,
-        ).all()
-
-        for config in failed_configs:
-            episode = config.episode
-            if episode and episode.episode_url:
-                # Reset to pending so it gets picked up
-                config.status = EpisodeTweetConfig.STATUS_PENDING
-                db.session.commit()
-
-                current_app.logger.info(
-                    f'Reset failed tweet config {config.id} for retry'
-                )

@@ -489,7 +489,9 @@ class TestTweetSchedulerService:
                 with patch.object(service.social_service, 'get_user_connection') as mock_conn:
                     mock_conn.return_value = SocialConnection.query.get(twitter_connection['id'])
 
-                    service._post_tweet_for_host(config, episode)
+                    # Mock AI generation to return None (simulating failure)
+                    with patch.object(service, '_generate_tweet_content', return_value=None):
+                        service._post_tweet_for_host(config, episode)
 
             # Check that the fallback content was used (title + URL)
             call_args = mock_post.call_args

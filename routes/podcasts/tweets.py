@@ -10,10 +10,10 @@ from flask import render_template, request, redirect, url_for, flash, g, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 
-from extensions import db
+from extensions import db, limiter
 from models import EpisodeGuide, EpisodeTweetConfig, SocialConnection, Podcast
 from services.tweet_scheduler import TweetSchedulerService
-from utils.podcast_access import require_podcast_access
+from utils.podcast_access import require_podcast_access, require_podcast_admin
 from utils.logging import log_exception
 
 from . import podcast_bp
@@ -132,6 +132,7 @@ def my_tweet_config(podcast_id, episode_id):
 @podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/tweets/generate', methods=['POST'])
 @login_required
 @require_podcast_access
+@limiter.limit("5 per minute")
 def generate_tweet(podcast_id, episode_id):
     """Generate AI-powered tweet content for the current user."""
     episode = EpisodeGuide.query.filter_by(
@@ -157,7 +158,7 @@ def generate_tweet(podcast_id, episode_id):
 
     try:
         scheduler_service = TweetSchedulerService()
-        content = scheduler_service._generate_tweet_content(config, episode)
+        content = scheduler_service.generate_tweet_content(config, episode)
 
         if content:
             config.generated_content = content
@@ -195,7 +196,8 @@ def generate_tweet(podcast_id, episode_id):
 
 @podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/tweets/create-all', methods=['POST'])
 @login_required
-@require_podcast_access
+@require_podcast_admin
+@limiter.limit("2 per minute")
 def create_all_tweet_configs(podcast_id, episode_id):
     """Create tweet configs for all podcast members (admin only)."""
     podcast = g.podcast
@@ -203,16 +205,6 @@ def create_all_tweet_configs(podcast_id, episode_id):
         id=episode_id,
         podcast_id=podcast_id
     ).first_or_404()
-
-    # Check if user is admin
-    member = next(
-        (m for m in podcast.members if m.user_id == current_user.id),
-        None
-    )
-    if not member or member.role != 'admin':
-        flash('Only podcast admins can create tweet configs for all members.', 'error')
-        return redirect(url_for('podcasts.episode_tweets',
-                              podcast_id=podcast_id, episode_id=episode_id))
 
     try:
         scheduler_service = TweetSchedulerService()
@@ -233,19 +225,10 @@ def create_all_tweet_configs(podcast_id, episode_id):
 
 @podcast_bp.route('/<int:podcast_id>/settings/youtube', methods=['GET', 'POST'])
 @login_required
-@require_podcast_access
+@require_podcast_admin
 def youtube_settings(podcast_id):
     """Configure YouTube channel for live detection."""
     podcast = g.podcast
-
-    # Check if user is admin
-    member = next(
-        (m for m in podcast.members if m.user_id == current_user.id),
-        None
-    )
-    if not member or member.role != 'admin':
-        flash('Only podcast admins can configure YouTube settings.', 'error')
-        return redirect(url_for('podcasts.view_podcast', podcast_id=podcast_id))
 
     if request.method == 'POST':
         try:
@@ -281,6 +264,7 @@ def youtube_settings(podcast_id):
 @podcast_bp.route('/<int:podcast_id>/settings/youtube/test', methods=['POST'])
 @login_required
 @require_podcast_access
+@limiter.limit("10 per minute")
 def test_youtube_live(podcast_id):
     """Test YouTube live detection for a podcast."""
     podcast = g.podcast
@@ -307,5 +291,5 @@ def test_youtube_live(podcast_id):
         log_exception(e, 'Failed to test YouTube live detection')
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'An error occurred while testing YouTube live detection. Please check the channel ID and try again.',
         })

@@ -190,7 +190,3 @@ class YouTubeLiveService:
                 return True
 
         return False
-
-    def get_video_url(self, video_id: str) -> str:
-        """Build a YouTube video URL from a video ID."""
-        return f'https://www.youtube.com/watch?v={video_id}'

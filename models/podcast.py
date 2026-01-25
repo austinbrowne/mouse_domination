@@ -122,7 +122,6 @@ class EpisodeTweetConfig(db.Model):
     STATUS_PENDING = 'pending'
     STATUS_POSTED = 'posted'
     STATUS_FAILED = 'failed'
-    STATUS_DISABLED = 'disabled'
 
     id = db.Column(db.Integer, primary_key=True)
     episode_id = db.Column(db.Integer, db.ForeignKey('episode_guides.id'), nullable=False, index=True)
