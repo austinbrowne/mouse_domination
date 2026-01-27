@@ -134,6 +134,12 @@ def create_app(config_class=None):
     app.register_blueprint(atomizer_bp, url_prefix='/atomizer')
     app.register_blueprint(social_bp, url_prefix='/social')
 
+    # Initialize background scheduler for tweet automation
+    # Only initialize if not in a subprocess (prevents double-init with Flask reloader)
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+        from services.scheduler import init_scheduler
+        init_scheduler(app)
+
     return app
 
 
