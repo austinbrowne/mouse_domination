@@ -29,6 +29,40 @@
                 </p>
             </div>
 
+            <!-- Title Filter -->
+            <div class="border-t border-surface-200 pt-6" x-data="{ filterEnabled: {{ 'true' if podcast.youtube_title_filter_enabled else 'false' }} }">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <label for="youtube_title_filter_enabled" class="text-sm font-medium text-gray-700">
+                            Filter by Live Stream Title
+                        </label>
+                        <p class="text-xs text-gray-500 mt-0.5">Only trigger tweets when the live stream title matches</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="youtube_title_filter_enabled" id="youtube_title_filter_enabled"
+                               class="sr-only peer"
+                               x-model="filterEnabled"
+                               {{ 'checked' if podcast.youtube_title_filter_enabled }}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                    </label>
+                </div>
+
+                <div x-show="filterEnabled" x-cloak class="mt-4">
+                    <label for="youtube_title_filter" class="block text-sm font-medium text-gray-700 mb-1">
+                        Live stream title must contain
+                    </label>
+                    <input type="text" name="youtube_title_filter" id="youtube_title_filter"
+                           value="{{ podcast.youtube_title_filter or '' }}"
+                           placeholder="e.g., Mouse Domination"
+                           maxlength="200"
+                           class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <p class="text-xs text-gray-500 mt-2">
+                        Tweets will only post when the live stream title contains this text (case-insensitive).
+                        Useful if your channel hosts multiple types of live streams.
+                    </p>
+                </div>
+            </div>
+
             <!-- How It Works -->
             <div class="bg-blue-50 rounded-lg p-4">
                 <h3 class="text-sm font-medium text-blue-800 mb-2">How Live Detection Works</h3>
@@ -53,7 +87,7 @@
             </div>
 
             <div class="flex justify-end gap-3 pt-4 border-t border-surface-200">
-                <a href="{{ url_for('podcasts.settings', podcast_id=podcast.id) }}"
+                <a href="{{ url_for('podcasts.podcast_settings', podcast_id=podcast.id) }}"
                    class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
                     Cancel
                 </a>
@@ -90,8 +124,11 @@
                                     </svg>
                                     <span class="font-medium">Channel is LIVE!</span>
                                 </div>
+                                <template x-if="result.video_title">
+                                    <p class="text-sm text-green-800 mt-2 font-medium" x-text="'Title: ' + result.video_title"></p>
+                                </template>
                                 <a :href="result.video_url" target="_blank" rel="noopener"
-                                   class="text-sm text-green-700 hover:underline mt-2 inline-block"
+                                   class="text-sm text-green-700 hover:underline mt-1 inline-block"
                                    x-text="result.video_url"></a>
                             </div>
                         </template>

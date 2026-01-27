@@ -135,6 +135,44 @@
                 <span id="generate-status" class="text-sm text-gray-500"></span>
             </div>
 
+            <!-- Manual Post Button (only show if not already posted and Twitter connected) -->
+            {% if user_twitter and config.status != 'posted' %}
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4" x-data="{ posting: false, showConfirm: false }">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-amber-800">Manual Post (Testing)</h4>
+                        <p class="text-xs text-amber-700 mt-1">Post this tweet immediately without waiting for the live stream trigger.</p>
+
+                        <!-- Confirmation dialog -->
+                        <div x-show="!showConfirm" class="mt-3">
+                            <button type="button" @click="showConfirm = true"
+                                    class="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium">
+                                Post Tweet Now
+                            </button>
+                        </div>
+
+                        <div x-show="showConfirm" x-cloak class="mt-3 p-3 bg-white rounded-lg border border-amber-300">
+                            <p class="text-sm text-gray-700 font-medium mb-3">Are you sure you want to post this tweet to Twitter right now?</p>
+                            <div class="flex gap-2">
+                                <button type="button" @click="postTweetNow()" :disabled="posting"
+                                        class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50">
+                                    <span x-show="!posting">Yes, Post Now</span>
+                                    <span x-show="posting">Posting...</span>
+                                </button>
+                                <button type="button" @click="showConfirm = false" :disabled="posting"
+                                        class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium disabled:opacity-50">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Actions -->
             <div class="flex justify-end gap-3 pt-4 border-t border-surface-200">
                 <a href="{{ url_for('podcasts.episode_tweets', podcast_id=podcast.id, episode_id=episode.id) }}"
@@ -185,6 +223,39 @@ function generateTweet() {
         btn.textContent = 'Generate with AI';
         status.textContent = 'An error occurred';
         status.classList.add('text-red-600');
+    });
+}
+
+function postTweetNow() {
+    const csrf = document.querySelector('input[name="csrf_token"]').value;
+    const component = Alpine.$data(document.querySelector('[x-data*="posting"]'));
+
+    component.posting = true;
+
+    fetch('{{ url_for("podcasts.post_tweet_now", podcast_id=podcast.id, episode_id=episode.id) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        component.posting = false;
+
+        if (data.success) {
+            // Reload page to show success
+            window.location.reload();
+        } else {
+            alert('Failed to post tweet: ' + (data.error || 'Unknown error'));
+            component.showConfirm = false;
+        }
+    })
+    .catch(error => {
+        component.posting = false;
+        alert('An error occurred while posting the tweet.');
+        component.showConfirm = false;
     });
 }
 </script>

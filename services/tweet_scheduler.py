@@ -100,6 +100,7 @@ class TweetSchedulerService:
             'podcast_name': podcast.name,
             'is_live': False,
             'video_url': None,
+            'video_title': None,
             'tweets_posted': 0,
             'errors': [],
         }
@@ -116,6 +117,23 @@ class TweetSchedulerService:
 
         result['is_live'] = True
         result['video_url'] = live_status.get('video_url')
+        result['video_title'] = live_status.get('video_title')
+
+        # Check title filter if enabled
+        if podcast.youtube_title_filter_enabled and podcast.youtube_title_filter:
+            video_title = live_status.get('video_title') or ''
+            filter_text = podcast.youtube_title_filter
+
+            # Case-insensitive substring match
+            if filter_text.lower() not in video_title.lower():
+                current_app.logger.info(
+                    f'Podcast {podcast.id} ({podcast.name}): Live stream title "{video_title}" '
+                    f'does not match filter "{filter_text}", skipping tweet'
+                )
+                result['errors'].append(
+                    f'Title filter not matched: "{video_title}" does not contain "{filter_text}"'
+                )
+                return result
 
         # Find the current/upcoming episode for this podcast
         episode = self._get_current_episode(podcast)
@@ -179,6 +197,125 @@ class TweetSchedulerService:
         ).order_by(EpisodeGuide.scheduled_date.desc()).first()
 
         return episode
+
+    def post_tweet_for_user(
+        self, user_id: int, episode_id: int, connection: SocialConnection | None = None
+    ) -> dict:
+        """
+        Post a tweet for a specific user. Used by both scheduler and manual posting.
+
+        Args:
+            user_id: The user's ID
+            episode_id: The episode to tweet about
+            connection: Optional pre-fetched Twitter connection
+
+        Returns:
+            dict with 'success', 'error', 'tweet_url', etc.
+        """
+        # Get config with row-level locking to prevent duplicate posts
+        config = EpisodeTweetConfig.query.filter_by(
+            episode_id=episode_id, user_id=user_id
+        ).with_for_update().first()
+
+        if not config:
+            return {'success': False, 'error': 'No tweet configuration found'}
+
+        if config.status == EpisodeTweetConfig.STATUS_POSTED:
+            return {'success': False, 'error': 'Tweet already posted', 'tweet_url': config.tweet_url}
+
+        # Get Twitter connection if not provided
+        if not connection:
+            connection = self.social_service.get_user_connection(user_id, 'twitter')
+
+        if not connection:
+            config.status = EpisodeTweetConfig.STATUS_FAILED
+            config.error_message = 'No Twitter account connected'
+            db.session.commit()
+            return {'success': False, 'error': 'No Twitter account connected'}
+
+        # Get episode
+        episode = config.episode
+        if not episode:
+            return {'success': False, 'error': 'Episode not found'}
+
+        # Build content
+        content = config.content
+        if not content:
+            content = episode.title
+            if config.include_url and episode.episode_url:
+                content = f"{content}\n\n{episode.episode_url}"
+
+        if not content:
+            return {'success': False, 'error': 'No content to post'}
+
+        # Ensure content fits Twitter limit (280 chars)
+        if len(content) > 280:
+            if config.include_url and episode.episode_url:
+                url_len = len(episode.episode_url) + 4
+                max_text = 280 - url_len
+                content = content[:max_text-3] + '...'
+                content = f"{content}\n\n{episode.episode_url}"
+            else:
+                content = content[:277] + '...'
+
+        # Post the tweet
+        try:
+            result = self.social_service.post_to_twitter(connection, content)
+
+            if result.get('success'):
+                config.status = EpisodeTweetConfig.STATUS_POSTED
+                config.posted_at = datetime.now(timezone.utc)
+                config.tweet_id = result.get('tweet_id')
+                config.tweet_url = result.get('tweet_url')
+                config.error_message = None
+
+                # Log the post
+                log = SocialPostLog(
+                    user_id=user_id,
+                    connection_id=connection.id,
+                    platform='twitter',
+                    content_posted=content,
+                    success=True,
+                    platform_post_id=result.get('tweet_id'),
+                    platform_post_url=result.get('tweet_url'),
+                    response_time_ms=result.get('response_time_ms'),
+                )
+                db.session.add(log)
+                db.session.commit()
+
+                current_app.logger.info(
+                    f'Posted tweet for user {user_id}, episode {episode.id}: {result.get("tweet_url")}'
+                )
+                return {
+                    'success': True,
+                    'tweet_url': result.get('tweet_url'),
+                    'tweet_id': result.get('tweet_id'),
+                }
+            else:
+                config.status = EpisodeTweetConfig.STATUS_FAILED
+                config.error_message = result.get('error', 'Unknown error')
+                config.retry_count += 1
+                db.session.commit()
+
+                current_app.logger.warning(
+                    f'Failed to post tweet for user {user_id}: {result.get("error")}'
+                )
+                return {'success': False, 'error': result.get('error', 'Failed to post tweet')}
+
+        except SocialPostingError as e:
+            db.session.rollback()
+
+            # Re-fetch and update status in clean session
+            config = EpisodeTweetConfig.query.filter_by(
+                episode_id=episode_id, user_id=user_id
+            ).first()
+            if config:
+                config.status = EpisodeTweetConfig.STATUS_FAILED
+                config.error_message = str(e)[:500]
+                config.retry_count += 1
+                db.session.commit()
+
+            raise
 
     def _post_tweet_for_host(self, tweet_config: EpisodeTweetConfig, episode: EpisodeGuide) -> bool:
         """

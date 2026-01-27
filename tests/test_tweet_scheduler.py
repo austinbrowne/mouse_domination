@@ -151,10 +151,16 @@ class TestYouTubeLiveService:
             # Mock the requests to simulate a live channel
             with patch('services.youtube_live.requests') as mock_requests:
                 # Simulate redirect to a video
-                mock_response = Mock()
-                mock_response.status_code = 302
-                mock_response.headers = {'Location': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
-                mock_requests.head.return_value = mock_response
+                mock_head = Mock()
+                mock_head.status_code = 302
+                mock_head.headers = {'Location': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+                mock_requests.head.return_value = mock_head
+
+                # Mock GET request following redirect with live indicators
+                mock_get = Mock()
+                mock_get.status_code = 200
+                mock_get.text = '<html>"isLive":true<title>Live Stream Title - YouTube</title></html>'
+                mock_requests.get.return_value = mock_get
 
                 result = service.check_channel_live('UCxxxxxxxxxxxxxxxx1234')
 
@@ -536,3 +542,450 @@ class TestPodcastYouTubeField:
 
             data = podcast.to_dict()
             assert data['youtube_channel_id'] == 'UCabcdefghij1234567890'
+
+
+# =============================================================================
+# YouTube Title Extraction Tests
+# =============================================================================
+
+class TestYouTubeTitleExtraction:
+    """Tests for extracting video titles from YouTube pages."""
+
+    def test_extract_title_from_og_meta_tag(self, app):
+        """Test extracting title from og:title meta tag."""
+        with app.app_context():
+            from services.youtube_live import YouTubeLiveService
+
+            service = YouTubeLiveService()
+            html = '''
+            <html>
+            <head>
+                <meta property="og:title" content="Mouse Domination Podcast - Episode 100">
+            </head>
+            <body></body>
+            </html>
+            '''
+            title = service._extract_title_from_html(html)
+            assert title == 'Mouse Domination Podcast - Episode 100'
+
+    def test_extract_title_from_json(self, app):
+        """Test extracting title from embedded JSON."""
+        with app.app_context():
+            from services.youtube_live import YouTubeLiveService
+
+            service = YouTubeLiveService()
+            html = '''
+            <html>
+            <script>
+            var ytInitialPlayerResponse = {"videoDetails":{"title":"Live Stream Today"}};
+            </script>
+            </html>
+            '''
+            title = service._extract_title_from_html(html)
+            assert title == 'Live Stream Today'
+
+    def test_extract_title_removes_youtube_suffix(self, app):
+        """Test that ' - YouTube' suffix is removed from title."""
+        with app.app_context():
+            from services.youtube_live import YouTubeLiveService
+
+            service = YouTubeLiveService()
+            html = '<title>My Cool Stream - YouTube</title>'
+            title = service._extract_title_from_html(html)
+            assert title == 'My Cool Stream'
+
+    def test_extract_title_from_empty_html(self, app):
+        """Test that empty HTML returns None."""
+        with app.app_context():
+            from services.youtube_live import YouTubeLiveService
+
+            service = YouTubeLiveService()
+            assert service._extract_title_from_html('') is None
+            assert service._extract_title_from_html(None) is None
+
+    def test_check_channel_live_returns_title(self, app):
+        """Test that check_channel_live returns video_title."""
+        with app.app_context():
+            from services.youtube_live import YouTubeLiveService
+
+            service = YouTubeLiveService()
+
+            with patch('services.youtube_live.requests') as mock_requests:
+                # Simulate redirect to a video
+                mock_head = Mock()
+                mock_head.status_code = 302
+                mock_head.headers = {'Location': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+                mock_requests.head.return_value = mock_head
+
+                # Mock GET request following redirect with live indicators AND title
+                mock_get = Mock()
+                mock_get.status_code = 200
+                mock_get.text = '<html>"isLive":true<title>Test Live Stream - YouTube</title></html>'
+                mock_requests.get.return_value = mock_get
+
+                result = service.check_channel_live('UCxxxxxxxxxxxxxxxx1234')
+
+                assert result['is_live'] is True
+                assert result['video_title'] == 'Test Live Stream'
+
+
+# =============================================================================
+# YouTube Title Filter Tests
+# =============================================================================
+
+class TestYouTubeTitleFilter:
+    """Tests for YouTube live stream title filtering."""
+
+    def test_title_filter_fields_on_podcast(self, app, test_user):
+        """Test that title filter fields are stored correctly."""
+        with app.app_context():
+            podcast = Podcast(
+                name='Filtered Podcast',
+                slug='filtered-podcast',
+                youtube_channel_id='UCxxxxxxxxxxxxxxxx1234',
+                youtube_title_filter='Mouse Domination',
+                youtube_title_filter_enabled=True,
+                created_by=test_user['id']
+            )
+            db.session.add(podcast)
+            db.session.commit()
+
+            retrieved = Podcast.query.filter_by(slug='filtered-podcast').first()
+            assert retrieved.youtube_title_filter == 'Mouse Domination'
+            assert retrieved.youtube_title_filter_enabled is True
+
+    def test_title_filter_defaults_disabled(self, app, test_user):
+        """Test that title filter is disabled by default."""
+        with app.app_context():
+            podcast = Podcast(
+                name='Default Podcast',
+                slug='default-podcast',
+                youtube_channel_id='UCxxxxxxxxxxxxxxxx1234',
+                created_by=test_user['id']
+            )
+            db.session.add(podcast)
+            db.session.commit()
+
+            retrieved = Podcast.query.filter_by(slug='default-podcast').first()
+            assert retrieved.youtube_title_filter_enabled is False
+            assert retrieved.youtube_title_filter is None
+
+    def test_title_filter_skips_non_matching_stream(self, app, episode_today, test_user, podcast_with_youtube, twitter_connection):
+        """Test that tweets are NOT posted when title doesn't match filter."""
+        with app.app_context():
+            from services.tweet_scheduler import TweetSchedulerService
+
+            # Enable title filter
+            podcast = Podcast.query.get(podcast_with_youtube['id'])
+            podcast.youtube_title_filter = 'Mouse Domination'
+            podcast.youtube_title_filter_enabled = True
+            db.session.commit()
+
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='We are LIVE!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            service = TweetSchedulerService()
+
+            # Mock YouTube live check with non-matching title
+            with patch.object(service.youtube_service, 'check_channel_live') as mock_live:
+                mock_live.return_value = {
+                    'is_live': True,
+                    'video_id': 'abc123',
+                    'video_url': 'https://www.youtube.com/watch?v=abc123',
+                    'video_title': 'Gaming Stream',  # Doesn't match filter
+                    'error': None
+                }
+
+                result = service._check_podcast_live(podcast)
+
+            # Tweet should NOT be posted
+            assert result['is_live'] is True
+            assert result['tweets_posted'] == 0
+            assert 'Title filter not matched' in result['errors'][0]
+
+    def test_title_filter_posts_for_matching_stream(self, app, episode_today, test_user, podcast_with_youtube, twitter_connection):
+        """Test that tweets ARE posted when title matches filter."""
+        with app.app_context():
+            from services.tweet_scheduler import TweetSchedulerService
+
+            # Enable title filter
+            podcast = Podcast.query.get(podcast_with_youtube['id'])
+            podcast.youtube_title_filter = 'Mouse Domination'
+            podcast.youtube_title_filter_enabled = True
+            db.session.commit()
+
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='We are LIVE!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            service = TweetSchedulerService()
+
+            # Mock YouTube live check with matching title
+            with patch.object(service.youtube_service, 'check_channel_live') as mock_live:
+                mock_live.return_value = {
+                    'is_live': True,
+                    'video_id': 'abc123',
+                    'video_url': 'https://www.youtube.com/watch?v=abc123',
+                    'video_title': 'Mouse Domination Podcast - Episode 100',  # Matches filter
+                    'error': None
+                }
+
+                with patch.object(service.social_service, 'post_to_twitter') as mock_post:
+                    mock_post.return_value = {
+                        'success': True,
+                        'tweet_id': '1234567890',
+                        'tweet_url': 'https://twitter.com/testhost/status/1234567890'
+                    }
+
+                    with patch.object(service.social_service, 'get_user_connection') as mock_conn:
+                        mock_conn.return_value = SocialConnection.query.get(twitter_connection['id'])
+
+                        result = service._check_podcast_live(podcast)
+
+            # Tweet SHOULD be posted
+            assert result['is_live'] is True
+            assert result['tweets_posted'] == 1
+
+    def test_title_filter_case_insensitive(self, app, episode_today, test_user, podcast_with_youtube, twitter_connection):
+        """Test that title filter matching is case-insensitive."""
+        with app.app_context():
+            from services.tweet_scheduler import TweetSchedulerService
+
+            # Enable title filter with lowercase
+            podcast = Podcast.query.get(podcast_with_youtube['id'])
+            podcast.youtube_title_filter = 'mouse domination'  # lowercase
+            podcast.youtube_title_filter_enabled = True
+            db.session.commit()
+
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='We are LIVE!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            service = TweetSchedulerService()
+
+            # Mock YouTube live check with mixed case title
+            with patch.object(service.youtube_service, 'check_channel_live') as mock_live:
+                mock_live.return_value = {
+                    'is_live': True,
+                    'video_id': 'abc123',
+                    'video_url': 'https://www.youtube.com/watch?v=abc123',
+                    'video_title': 'MOUSE DOMINATION Podcast',  # UPPERCASE
+                    'error': None
+                }
+
+                with patch.object(service.social_service, 'post_to_twitter') as mock_post:
+                    mock_post.return_value = {
+                        'success': True,
+                        'tweet_id': '1234567890',
+                        'tweet_url': 'https://twitter.com/testhost/status/1234567890'
+                    }
+
+                    with patch.object(service.social_service, 'get_user_connection') as mock_conn:
+                        mock_conn.return_value = SocialConnection.query.get(twitter_connection['id'])
+
+                        result = service._check_podcast_live(podcast)
+
+            # Tweet SHOULD be posted (case-insensitive match)
+            assert result['is_live'] is True
+            assert result['tweets_posted'] == 1
+
+    def test_title_filter_disabled_posts_any_stream(self, app, episode_today, test_user, podcast_with_youtube, twitter_connection):
+        """Test that when filter is disabled, any stream triggers tweets."""
+        with app.app_context():
+            from services.tweet_scheduler import TweetSchedulerService
+
+            # Filter is disabled (default)
+            podcast = Podcast.query.get(podcast_with_youtube['id'])
+            podcast.youtube_title_filter = 'Mouse Domination'  # Set but not enabled
+            podcast.youtube_title_filter_enabled = False
+            db.session.commit()
+
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='We are LIVE!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            service = TweetSchedulerService()
+
+            # Mock YouTube live check with non-matching title
+            with patch.object(service.youtube_service, 'check_channel_live') as mock_live:
+                mock_live.return_value = {
+                    'is_live': True,
+                    'video_id': 'abc123',
+                    'video_url': 'https://www.youtube.com/watch?v=abc123',
+                    'video_title': 'Gaming Stream',  # Doesn't match filter
+                    'error': None
+                }
+
+                with patch.object(service.social_service, 'post_to_twitter') as mock_post:
+                    mock_post.return_value = {
+                        'success': True,
+                        'tweet_id': '1234567890',
+                        'tweet_url': 'https://twitter.com/testhost/status/1234567890'
+                    }
+
+                    with patch.object(service.social_service, 'get_user_connection') as mock_conn:
+                        mock_conn.return_value = SocialConnection.query.get(twitter_connection['id'])
+
+                        result = service._check_podcast_live(podcast)
+
+            # Tweet SHOULD be posted (filter disabled)
+            assert result['is_live'] is True
+            assert result['tweets_posted'] == 1
+
+    def test_title_filter_empty_title_no_match(self, app, episode_today, test_user, podcast_with_youtube):
+        """Test that empty video title doesn't match a filter."""
+        with app.app_context():
+            from services.tweet_scheduler import TweetSchedulerService
+
+            # Enable title filter
+            podcast = Podcast.query.get(podcast_with_youtube['id'])
+            podcast.youtube_title_filter = 'Mouse Domination'
+            podcast.youtube_title_filter_enabled = True
+            db.session.commit()
+
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='We are LIVE!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            service = TweetSchedulerService()
+
+            # Mock YouTube live check with empty/None title
+            with patch.object(service.youtube_service, 'check_channel_live') as mock_live:
+                mock_live.return_value = {
+                    'is_live': True,
+                    'video_id': 'abc123',
+                    'video_url': 'https://www.youtube.com/watch?v=abc123',
+                    'video_title': None,  # No title extracted
+                    'error': None
+                }
+
+                result = service._check_podcast_live(podcast)
+
+            # Tweet should NOT be posted
+            assert result['is_live'] is True
+            assert result['tweets_posted'] == 0
+            assert 'Title filter not matched' in result['errors'][0]
+
+
+# =============================================================================
+# Manual Tweet Post Tests
+# =============================================================================
+
+class TestManualTweetPost:
+    """Tests for the manual tweet posting feature."""
+
+    def test_post_tweet_now_success(self, app, episode_today, test_user, podcast_with_youtube, twitter_connection):
+        """Test manually posting a tweet succeeds."""
+        with app.app_context():
+            # Create tweet config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='Test tweet content!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            from services.social_posting import SocialPostingService
+
+            with patch.object(SocialPostingService, 'post_to_twitter') as mock_post:
+                mock_post.return_value = {
+                    'success': True,
+                    'tweet_id': '1234567890',
+                    'tweet_url': 'https://twitter.com/testhost/status/1234567890',
+                    'response_time_ms': 150
+                }
+
+                # Simulate the route logic
+                connection = SocialConnection.query.get(twitter_connection['id'])
+                content = config.content
+
+                result = mock_post(connection, content)
+
+                assert result['success'] is True
+                assert result['tweet_id'] == '1234567890'
+
+    def test_post_tweet_now_already_posted(self, app, episode_today, test_user, podcast_with_youtube):
+        """Test that already-posted tweets cannot be posted again."""
+        with app.app_context():
+            # Create already-posted config
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='Already posted!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_POSTED,
+                tweet_id='existing123',
+                tweet_url='https://twitter.com/user/status/existing123'
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            # Verify status is posted
+            retrieved = EpisodeTweetConfig.query.filter_by(
+                episode_id=episode_today['id'],
+                user_id=test_user['id']
+            ).first()
+
+            assert retrieved.status == EpisodeTweetConfig.STATUS_POSTED
+
+    def test_post_tweet_now_no_twitter_connection(self, app, episode_today, test_user, podcast_with_youtube):
+        """Test that posting fails without Twitter connection."""
+        with app.app_context():
+            # Create tweet config (no Twitter connection fixture)
+            config = EpisodeTweetConfig(
+                episode_id=episode_today['id'],
+                user_id=test_user['id'],
+                generated_content='No Twitter connected!',
+                enabled=True,
+                status=EpisodeTweetConfig.STATUS_PENDING
+            )
+            db.session.add(config)
+            db.session.commit()
+
+            # Verify no Twitter connection exists
+            connection = SocialConnection.query.filter_by(
+                user_id=test_user['id'],
+                platform='twitter',
+                is_active=True
+            ).first()
+
+            assert connection is None

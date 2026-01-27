@@ -17,6 +17,8 @@ class Podcast(db.Model):
 
     # YouTube integration for live detection
     youtube_channel_id = db.Column(db.String(100), nullable=True)  # e.g., UCxxxxxx
+    youtube_title_filter = db.Column(db.String(200), nullable=True)  # e.g., "Mouse Domination"
+    youtube_title_filter_enabled = db.Column(db.Boolean, default=False, server_default='false')
 
     # Creator (first admin, for reference)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
@@ -63,6 +65,8 @@ class Podcast(db.Model):
             'website_url': self.website_url,
             'rss_feed_url': self.rss_feed_url,
             'youtube_channel_id': self.youtube_channel_id,
+            'youtube_title_filter': self.youtube_title_filter,
+            'youtube_title_filter_enabled': self.youtube_title_filter_enabled,
             'created_by': self.created_by,
             'is_active': self.is_active,
             'episode_count': self.episodes.count() if self.episodes else 0,

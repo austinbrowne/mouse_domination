@@ -49,6 +49,7 @@ class YouTubeLiveService:
                 - is_live: bool
                 - video_id: str or None
                 - video_url: str or None
+                - video_title: str or None
                 - error: str or None
         """
         if not channel_id:
@@ -56,6 +57,7 @@ class YouTubeLiveService:
                 'is_live': False,
                 'video_id': None,
                 'video_url': None,
+                'video_title': None,
                 'error': 'No channel ID provided',
             }
 
@@ -81,12 +83,25 @@ class YouTubeLiveService:
                 video_id = self._extract_video_id(redirect_url)
 
                 if video_id:
-                    return {
-                        'is_live': True,
-                        'video_id': video_id,
-                        'video_url': f'https://www.youtube.com/watch?v={video_id}',
-                        'error': None,
-                    }
+                    # Follow redirect with GET to verify live status AND get title in one request
+                    video_response = requests.get(
+                        redirect_url,
+                        timeout=self.timeout,
+                        headers={
+                            'User-Agent': 'Mozilla/5.0 (compatible; PodcastBot/1.0)',
+                        }
+                    )
+
+                    # Verify it's actually live AND extract title from same response
+                    if self._is_live_page(video_response.text):
+                        video_title = self._extract_title_from_html(video_response.text)
+                        return {
+                            'is_live': True,
+                            'video_id': video_id,
+                            'video_url': f'https://www.youtube.com/watch?v={video_id}',
+                            'video_title': video_title,
+                            'error': None,
+                        }
 
             # If no redirect or redirect isn't to a video, try GET request
             # to check page content for live indicators
@@ -105,10 +120,12 @@ class YouTubeLiveService:
             if video_id:
                 # Verify it's actually live by checking page content
                 if self._is_live_page(response.text):
+                    video_title = self._extract_title_from_html(response.text)
                     return {
                         'is_live': True,
                         'video_id': video_id,
                         'video_url': f'https://www.youtube.com/watch?v={video_id}',
+                        'video_title': video_title,
                         'error': None,
                     }
 
@@ -117,6 +134,7 @@ class YouTubeLiveService:
                 'is_live': False,
                 'video_id': None,
                 'video_url': None,
+                'video_title': None,
                 'error': None,
             }
 
@@ -125,6 +143,7 @@ class YouTubeLiveService:
                 'is_live': False,
                 'video_id': None,
                 'video_url': None,
+                'video_title': None,
                 'error': 'Request timed out',
             }
         except requests.ConnectionError:
@@ -132,6 +151,7 @@ class YouTubeLiveService:
                 'is_live': False,
                 'video_id': None,
                 'video_url': None,
+                'video_title': None,
                 'error': 'Connection failed',
             }
         except Exception as e:
@@ -140,6 +160,7 @@ class YouTubeLiveService:
                 'is_live': False,
                 'video_id': None,
                 'video_url': None,
+                'video_title': None,
                 'error': str(e),
             }
 
@@ -190,3 +211,70 @@ class YouTubeLiveService:
                 return True
 
         return False
+
+    def _extract_title_from_html(self, html: str) -> str | None:
+        """
+        Extract video title from YouTube page HTML.
+
+        Args:
+            html: The page HTML content
+
+        Returns:
+            Video title or None if not found
+        """
+        if not html:
+            return None
+
+        # Try multiple patterns to find the title
+        patterns = [
+            # Pattern in YouTube's embedded JSON data
+            r'"title":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"',
+            # Simpler pattern for title field
+            r'"title":\s*"([^"]+)"',
+            # og:title meta tag
+            r'<meta\s+property="og:title"\s+content="([^"]+)"',
+            # Title tag
+            r'<title>([^<]+)</title>',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, html)
+            if match:
+                title = match.group(1)
+                # Clean up escaped characters
+                title = title.replace('\\u0026', '&')
+                title = title.replace('\\u0027', "'")
+                title = title.replace('\\n', ' ')
+                title = title.replace('\\', '')
+                # Remove " - YouTube" suffix if present
+                if title.endswith(' - YouTube'):
+                    title = title[:-10]
+                return title.strip()
+
+        return None
+
+    def _fetch_video_title(self, video_id: str) -> str | None:
+        """
+        Fetch video title by requesting the video page.
+
+        Args:
+            video_id: YouTube video ID
+
+        Returns:
+            Video title or None if request fails
+        """
+        try:
+            video_url = f'https://www.youtube.com/watch?v={video_id}'
+            response = requests.get(
+                video_url,
+                timeout=self.timeout,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; PodcastBot/1.0)',
+                }
+            )
+            if response.status_code == 200:
+                return self._extract_title_from_html(response.text)
+        except Exception as e:
+            current_app.logger.warning(f'Failed to fetch video title: {e}')
+
+        return None

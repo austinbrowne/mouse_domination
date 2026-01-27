@@ -194,6 +194,53 @@ def generate_tweet(podcast_id, episode_id):
                           podcast_id=podcast_id, episode_id=episode_id))
 
 
+@podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/tweets/post-now', methods=['POST'])
+@login_required
+@require_podcast_access
+@limiter.limit("5 per minute")
+def post_tweet_now(podcast_id, episode_id):
+    """Manually post a tweet for the current user (for testing).
+
+    Delegates to TweetSchedulerService.post_tweet_for_user() for consistent behavior
+    with automated posting. Only handles HTTP response formatting here.
+    """
+    # Verify episode belongs to podcast
+    EpisodeGuide.query.filter_by(
+        id=episode_id,
+        podcast_id=podcast_id
+    ).first_or_404()
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    try:
+        scheduler_service = TweetSchedulerService()
+        result = scheduler_service.post_tweet_for_user(current_user.id, episode_id)
+
+        if result.get('success'):
+            if is_ajax:
+                return jsonify({
+                    'success': True,
+                    'tweet_url': result.get('tweet_url'),
+                    'message': 'Tweet posted successfully!'
+                })
+            flash('Tweet posted successfully!', 'success')
+        else:
+            error_msg = result.get('error', 'Failed to post tweet.')
+            if is_ajax:
+                return jsonify({'success': False, 'error': error_msg})
+            flash(error_msg, 'error')
+
+    except Exception as e:
+        log_exception(e, 'Failed to post tweet manually')
+
+        if is_ajax:
+            return jsonify({'success': False, 'error': 'An error occurred while posting.'})
+        flash('An error occurred while posting the tweet.', 'error')
+
+    return redirect(url_for('podcasts.my_tweet_config',
+                          podcast_id=podcast_id, episode_id=episode_id))
+
+
 @podcast_bp.route('/<int:podcast_id>/episodes/<int:episode_id>/tweets/create-all', methods=['POST'])
 @login_required
 @require_podcast_admin
@@ -227,24 +274,64 @@ def create_all_tweet_configs(podcast_id, episode_id):
 @login_required
 @require_podcast_admin
 def youtube_settings(podcast_id):
-    """Configure YouTube channel for live detection."""
+    """Configure YouTube channel for live detection.
+
+    Supports both form-based and JSON API access:
+    - Form: Standard HTML form submission
+    - JSON: POST with Content-Type: application/json, GET with Accept: application/json
+    """
     podcast = g.podcast
+    is_json_request = request.is_json or request.headers.get('Accept') == 'application/json'
 
     if request.method == 'POST':
         try:
-            channel_id = request.form.get('youtube_channel_id', '').strip()
+            # Accept JSON or form data
+            if request.is_json:
+                data = request.get_json()
+                channel_id = (data.get('youtube_channel_id') or '').strip()
+                title_filter_enabled = bool(data.get('youtube_title_filter_enabled', False))
+                title_filter = (data.get('youtube_title_filter') or '').strip()
+            else:
+                channel_id = request.form.get('youtube_channel_id', '').strip()
+                title_filter_enabled = request.form.get('youtube_title_filter_enabled') == 'on'
+                title_filter = request.form.get('youtube_title_filter', '').strip()
 
             # Basic validation - YouTube channel IDs start with UC and are 24 chars
+            channel_warning = None
             if channel_id and not (channel_id.startswith('UC') and len(channel_id) == 24):
-                # Allow other formats like custom URLs - just warn
-                flash('Note: Standard YouTube channel IDs start with "UC" and are 24 characters. '
-                      'Make sure you\'ve entered the correct channel ID.', 'warning')
+                channel_warning = ('Standard YouTube channel IDs start with "UC" and are 24 characters. '
+                                   'Make sure you\'ve entered the correct channel ID.')
+                if not is_json_request:
+                    flash(f'Note: {channel_warning}', 'warning')
+
+            # Validate title filter length
+            if title_filter and len(title_filter) > 200:
+                error_msg = 'Title filter must be 200 characters or less.'
+                if is_json_request:
+                    return jsonify({'success': False, 'error': error_msg}), 400
+                flash(error_msg, 'error')
+                return redirect(url_for('podcasts.youtube_settings', podcast_id=podcast_id))
 
             podcast.youtube_channel_id = channel_id if channel_id else None
+            podcast.youtube_title_filter_enabled = title_filter_enabled
+            podcast.youtube_title_filter = title_filter if title_filter else None
+
             db.session.commit()
 
+            # Return JSON for API clients
+            if is_json_request:
+                response_data = {
+                    'success': True,
+                    'youtube_channel_id': podcast.youtube_channel_id,
+                    'youtube_title_filter': podcast.youtube_title_filter,
+                    'youtube_title_filter_enabled': podcast.youtube_title_filter_enabled,
+                }
+                if channel_warning:
+                    response_data['warning'] = channel_warning
+                return jsonify(response_data)
+
             if channel_id:
-                flash('YouTube channel configured for live detection.', 'success')
+                flash('YouTube settings saved.', 'success')
             else:
                 flash('YouTube channel ID cleared.', 'info')
 
@@ -253,7 +340,17 @@ def youtube_settings(podcast_id):
         except SQLAlchemyError as e:
             db.session.rollback()
             log_exception(e, 'Failed to save YouTube settings')
+            if is_json_request:
+                return jsonify({'success': False, 'error': 'Failed to save settings.'}), 500
             flash('Failed to save settings.', 'error')
+
+    # GET: Return JSON if requested
+    if is_json_request:
+        return jsonify({
+            'youtube_channel_id': podcast.youtube_channel_id,
+            'youtube_title_filter': podcast.youtube_title_filter,
+            'youtube_title_filter_enabled': podcast.youtube_title_filter_enabled,
+        })
 
     return render_template(
         'podcasts/settings/youtube.html',
@@ -284,6 +381,7 @@ def test_youtube_live(podcast_id):
             'success': True,
             'is_live': result.get('is_live', False),
             'video_url': result.get('video_url'),
+            'video_title': result.get('video_title'),
             'error': result.get('error'),
         })
 
