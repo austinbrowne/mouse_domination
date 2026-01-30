@@ -336,6 +336,8 @@ def live_episode(podcast_id, episode_id):
     sections = get_sections_with_items(guide)
     items_json = [item.to_dict() for item in guide.items] if guide.items else []
 
+    custom_sections_json = guide.custom_sections or []
+
     return render_template('podcasts/episodes/live.html',
         podcast=podcast,
         guide=guide,
@@ -343,6 +345,7 @@ def live_episode(podcast_id, episode_id):
         section_names=EPISODE_GUIDE_SECTION_NAMES,
         section_parents=EPISODE_GUIDE_SECTION_PARENTS,
         items_json=items_json,
+        custom_sections_json=custom_sections_json,
         user_role=g.user_podcast_role,
     )
 

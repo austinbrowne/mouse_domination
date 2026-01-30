@@ -56,3 +56,9 @@ DEPLOYMENT.md
 # Node.js (for Tailwind CSS build)
 node_modules/
 package-lock.json
+
+# Playwright
+test-results/
+playwright-report/
+.playwright-mcp/
+blob-report/
