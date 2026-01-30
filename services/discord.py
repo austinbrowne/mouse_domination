@@ -399,6 +399,10 @@ class DiscordService:
         """
         Parse a Discord message into a simplified format.
 
+        Handles regular messages and forwarded messages. Forwarded messages
+        store the original content in message_snapshots rather than the
+        top-level content field.
+
         Args:
             msg: Raw Discord message object
 
@@ -406,6 +410,17 @@ class DiscordService:
             Simplified message dict
         """
         content = msg.get('content', '')
+        embeds = msg.get('embeds', [])
+
+        # Handle forwarded messages: content is in message_snapshots
+        message_ref = msg.get('message_reference', {})
+        snapshots = msg.get('message_snapshots', [])
+        if snapshots and message_ref.get('type') == 1:
+            snapshot_msg = snapshots[0].get('message', {})
+            if not content:
+                content = snapshot_msg.get('content', '')
+            if not embeds:
+                embeds = snapshot_msg.get('embeds', [])
 
         # Extract URLs from content
         url_pattern = r'https?://[^\s<>\"\']+|www\.[^\s<>\"\']+\.[^\s<>\"\']+'
@@ -413,7 +428,6 @@ class DiscordService:
         link = urls[0] if urls else None
 
         # Also check embeds for URLs
-        embeds = msg.get('embeds', [])
         if not link and embeds:
             for embed in embeds:
                 if embed.get('url'):
