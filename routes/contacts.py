@@ -71,6 +71,7 @@ def _get_valid_roles():
 def new_contact():
     """Create a new contact."""
     context = _get_form_context()
+    context['preselect_company_id'] = request.args.get('company_id', type=int)
     valid_roles = _get_valid_roles()
 
     if request.method == 'POST':
