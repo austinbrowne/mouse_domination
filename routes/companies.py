@@ -1,6 +1,7 @@
 from flask_login import login_required
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 from models import Company
 from app import db
 from constants import (
@@ -55,6 +56,17 @@ def list_companies():
         current_priority=priority,
         search=search,
     )
+
+
+@companies_bp.route('/<int:id>')
+@login_required
+def view_company(id):
+    """View company details with associated contacts."""
+    company = Company.query.options(
+        joinedload(Company.contacts)
+    ).get_or_404(id)
+    contacts = sorted(company.contacts, key=lambda c: (c.name or '').lower())
+    return render_template('companies/view.html', company=company, contacts=contacts)
 
 
 @companies_bp.route('/new', methods=['GET', 'POST'])
@@ -200,7 +212,7 @@ def edit_company(id):
 
             db.session.commit()
             flash(f'Company "{company.name}" updated successfully.', 'success')
-            return redirect(url_for('companies.list_companies'))
+            return redirect(url_for('companies.view_company', id=company.id))
 
         except ValidationError as e:
             flash(f'{e.field}: {e.message}', 'error')
