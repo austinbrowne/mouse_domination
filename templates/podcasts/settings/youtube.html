@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}YouTube Settings - {{ podcast.name }} - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% include "podcasts/_subnav.html" %}
+
+    <div class="max-w-2xl">
+        <h1 class="text-xl font-bold text-gray-900 mb-2">YouTube Live Detection</h1>
+        <p class="text-sm text-gray-600 mb-6">Configure your YouTube channel to enable automatic tweet posting when you go live.</p>
+
+        <!-- Configuration Form -->
+        <form method="POST" class="bg-white rounded-xl border border-surface-200 p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label for="youtube_channel_id" class="block text-sm font-medium text-gray-700 mb-1">
+                    YouTube Channel ID
+                </label>
+                <input type="text" name="youtube_channel_id" id="youtube_channel_id"
+                       value="{{ podcast.youtube_channel_id or '' }}"
+                       placeholder="UCxxxxxxxxxxxxxxxxxx"
+                       class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <p class="text-xs text-gray-500 mt-2">
+                    Your channel ID starts with "UC" and is 24 characters long.
+                    <a href="https://support.google.com/youtube/answer/3250431" target="_blank" rel="noopener"
+                       class="text-primary-600 hover:underline">How to find your channel ID</a>
+                </p>
+            </div>
+
+            <!-- Title Filter -->
+            <div class="border-t border-surface-200 pt-6" x-data="{ filterEnabled: {{ 'true' if podcast.youtube_title_filter_enabled else 'false' }} }">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <label for="youtube_title_filter_enabled" class="text-sm font-medium text-gray-700">
+                            Filter by Live Stream Title
+                        </label>
+                        <p class="text-xs text-gray-500 mt-0.5">Only trigger tweets when the live stream title matches</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="youtube_title_filter_enabled" id="youtube_title_filter_enabled"
+                               class="sr-only peer"
+                               x-model="filterEnabled"
+                               {{ 'checked' if podcast.youtube_title_filter_enabled }}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                    </label>
+                </div>
+
+                <div x-show="filterEnabled" x-cloak class="mt-4">
+                    <label for="youtube_title_filter" class="block text-sm font-medium text-gray-700 mb-1">
+                        Live stream title must contain
+                    </label>
+                    <input type="text" name="youtube_title_filter" id="youtube_title_filter"
+                           value="{{ podcast.youtube_title_filter or '' }}"
+                           placeholder="e.g., Mouse Domination"
+                           maxlength="200"
+                           class="w-full border border-surface-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <p class="text-xs text-gray-500 mt-2">
+                        Tweets will only post when the live stream title contains this text (case-insensitive).
+                        Useful if your channel hosts multiple types of live streams.
+                    </p>
+                </div>
+            </div>
+
+            <!-- How It Works -->
+            <div class="bg-blue-50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-blue-800 mb-2">How Live Detection Works</h3>
+                <ul class="text-sm text-blue-700 space-y-1.5">
+                    <li class="flex items-start gap-2">
+                        <span class="text-blue-500 mt-0.5">1.</span>
+                        Our system checks your YouTube channel every few minutes
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-blue-500 mt-0.5">2.</span>
+                        When a live stream is detected, we capture the video URL
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-blue-500 mt-0.5">3.</span>
+                        Tweets are automatically posted for all enabled hosts
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-blue-500 mt-0.5">4.</span>
+                        Each host can customize their tweet content
+                    </li>
+                </ul>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t border-surface-200">
+                <a href="{{ url_for('podcasts.podcast_settings', podcast_id=podcast.id) }}"
+                   class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+                    Cancel
+                </a>
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                    Save Settings
+                </button>
+            </div>
+        </form>
+
+        <!-- Test Connection -->
+        {% if podcast.youtube_channel_id %}
+        <div class="mt-6 bg-white rounded-xl border border-surface-200 p-6" x-data="{ testing: false, result: null }">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Test Connection</h2>
+            <p class="text-sm text-gray-600 mb-4">Check if we can detect when your channel goes live.</p>
+
+            <button type="button"
+                    @click="testConnection()"
+                    :disabled="testing"
+                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium disabled:opacity-50">
+                <span x-show="!testing">Test Live Detection</span>
+                <span x-show="testing">Testing...</span>
+            </button>
+
+            <!-- Result Display -->
+            <div x-show="result !== null" x-cloak class="mt-4">
+                <template x-if="result && result.success">
+                    <div :class="result.is_live ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'"
+                         class="border rounded-lg p-4">
+                        <template x-if="result.is_live">
+                            <div>
+                                <div class="flex items-center gap-2 text-green-800">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span class="font-medium">Channel is LIVE!</span>
+                                </div>
+                                <template x-if="result.video_title">
+                                    <p class="text-sm text-green-800 mt-2 font-medium" x-text="'Title: ' + result.video_title"></p>
+                                </template>
+                                <a :href="result.video_url" target="_blank" rel="noopener"
+                                   class="text-sm text-green-700 hover:underline mt-1 inline-block"
+                                   x-text="result.video_url"></a>
+                            </div>
+                        </template>
+                        <template x-if="!result.is_live">
+                            <div class="text-gray-700">
+                                <span class="font-medium">Channel is not currently live.</span>
+                                <p class="text-sm mt-1">The detection is working correctly. Tweets will post when you go live.</p>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="result && !result.success">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center gap-2 text-red-800">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="font-medium">Test Failed</span>
+                        </div>
+                        <p class="text-sm text-red-700 mt-1" x-text="result.error"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <script>
+        function testConnection() {
+            const component = Alpine.$data(document.querySelector('[x-data]'));
+            component.testing = true;
+            component.result = null;
+
+            const csrf = document.querySelector('input[name="csrf_token"]').value;
+
+            fetch('{{ url_for("podcasts.test_youtube_live", podcast_id=podcast.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                component.testing = false;
+                component.result = data;
+            })
+            .catch(error => {
+                component.testing = false;
+                component.result = { success: false, error: 'Network error occurred' };
+            });
+        }
+        </script>
+        {% endif %}
+
+        <!-- Finding Channel ID Help -->
+        <div class="mt-6 bg-white rounded-xl border border-surface-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">How to Find Your Channel ID</h2>
+
+            <ol class="text-sm text-gray-700 space-y-3">
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-medium">1</span>
+                    <span>Go to your YouTube channel page</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-medium">2</span>
+                    <span>Click on your profile picture and select "Your channel"</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-medium">3</span>
+                    <span>Look at the URL - it will be in the format: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">youtube.com/channel/UCxxxxxxxxxx</code></span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-medium">4</span>
+                    <span>Copy the part starting with "UC" - that's your channel ID</span>
+                </li>
+            </ol>
+
+            <p class="text-xs text-gray-500 mt-4">
+                If your URL shows a custom handle (like @YourChannel), you can find your channel ID in
+                <a href="https://studio.youtube.com" target="_blank" rel="noopener" class="text-primary-600 hover:underline">YouTube Studio</a>
+                under Settings > Channel > Advanced settings.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
