@@ -201,6 +201,21 @@ class Inventory(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
+    def validate_publishable(self):
+        """Check minimum fields required for publishing. Returns list of missing fields."""
+        missing = []
+        if not self.slug:
+            missing.append('slug')
+        if not self.short_verdict:
+            missing.append('short_verdict')
+        if self.rating is None:
+            missing.append('rating')
+        elif not (1 <= self.rating <= 10):
+            missing.append('rating (must be 1-10)')
+        if not self.category or self.category == 'other':
+            missing.append('category')
+        return missing
+
     def to_public_dict(self):
         """Serialize for public API. Strict allowlist — never exposes internal/financial data."""
         company = self.company
