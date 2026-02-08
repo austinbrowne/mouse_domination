@@ -114,6 +114,7 @@ def create_app(config_class=None):
     from routes.content_atomizer import atomizer_bp
     from routes.social import social_bp
     from routes.google_auth import google_auth_bp
+    from routes.public_api import public_api_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -133,6 +134,11 @@ def create_app(config_class=None):
     app.register_blueprint(revenue_bp, url_prefix='/revenue')
     app.register_blueprint(atomizer_bp, url_prefix='/atomizer')
     app.register_blueprint(social_bp, url_prefix='/social')
+    app.register_blueprint(public_api_bp, url_prefix='/api/v1/public')
+    csrf.exempt(public_api_bp)
+
+    if not app.config.get('PUBLIC_API_KEY'):
+        app.logger.warning('PUBLIC_API_KEY is not set — public API will return 503')
 
     return app
 

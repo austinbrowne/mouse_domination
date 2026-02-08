@@ -103,6 +103,22 @@ class CreatorProfile(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
+    def to_public_dict(self):
+        """Serialize for public API. Strict allowlist — never exposes internal data."""
+        return {
+            'display_name': self.display_name,
+            'tagline': self.tagline,
+            'bio': self.bio,
+            'photo_url': self.photo_url,
+            'location': self.location,
+            'website_url': self.website_url,
+            'social_links': self.social_links,
+            'platform_stats': self.platform_stats,
+            'content_niches': self.content_niches,
+            'total_followers': self.get_total_followers(),
+            'avg_engagement_rate': self.get_avg_engagement_rate(),
+        }
+
 
 class RateCard(db.Model):
     """Pricing for creator services in the media kit."""

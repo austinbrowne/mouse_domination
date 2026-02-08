@@ -89,6 +89,16 @@ class Company(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
+    def to_public_dict(self):
+        """Serialize for public API. Strict allowlist — never exposes internal data."""
+        return {
+            'name': self.name,
+            'category': self.category,
+            'website': self.website,
+            'affiliate_status': self.affiliate_status,
+            'affiliate_link': self.affiliate_link,
+        }
+
 
 class Inventory(db.Model):
     """Products - both review units and personal purchases."""
@@ -114,6 +124,18 @@ class Inventory(db.Model):
     short_publish_date = db.Column(db.Date, nullable=True)
     video_url = db.Column(db.String(200), nullable=True)
     video_publish_date = db.Column(db.Date, nullable=True)
+
+    # Public site fields (nullable, populated when publishing reviews)
+    image_url = db.Column(db.Text, nullable=True)
+    retail_price = db.Column(db.Float, nullable=True)
+    short_verdict = db.Column(db.Text, nullable=True)
+    pros = db.Column(db.JSON, nullable=True)  # ["lightweight", "great sensor"]
+    cons = db.Column(db.JSON, nullable=True)  # ["mushy clicks", "no software"]
+    rating = db.Column(db.Integer, nullable=True)  # 1-10
+    slug = db.Column(db.String(200), nullable=True, unique=True, index=True)
+    is_published = db.Column(db.Boolean, default=False, index=True)
+    specs = db.Column(db.JSON, nullable=True)  # {"weight": "58g", "sensor": "PAW3950"}
+    pick_category = db.Column(db.String(50), nullable=True, index=True)  # "best-lightweight", "best-ergo"
 
     # Sales tracking
     sold = db.Column(db.Boolean, default=False, index=True)  # Index for sold filtering
@@ -177,6 +199,25 @@ class Inventory(db.Model):
             'buyer': self.buyer,
             'sale_notes': self.sale_notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def to_public_dict(self):
+        """Serialize for public API. Strict allowlist — never exposes internal/financial data."""
+        company = self.company
+        return {
+            'product_name': self.product_name,
+            'slug': self.slug,
+            'category': self.category,
+            'company_name': company.name if company else None,
+            'image_url': self.image_url,
+            'retail_price': self.retail_price,
+            'short_verdict': self.short_verdict,
+            'pros': self.pros,
+            'cons': self.cons,
+            'rating': self.rating,
+            'specs': self.specs,
+            'pick_category': self.pick_category,
+            'video_url': self.video_url,
         }
 
 

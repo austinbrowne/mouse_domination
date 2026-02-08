@@ -98,6 +98,9 @@ class Config:
     APP_NAME = os.environ.get('APP_NAME', 'Creator Hub')
     APP_TAGLINE = os.environ.get('APP_TAGLINE', 'Built for Creators')
 
+    # Public API
+    PUBLIC_API_KEY = os.environ.get('PUBLIC_API_KEY', '')
+
     # Feature flags
     ENABLE_EPISODE_GUIDE = os.environ.get('ENABLE_EPISODE_GUIDE', 'true').lower() == 'true'
 

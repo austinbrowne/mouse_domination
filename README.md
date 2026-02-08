@@ -401,7 +401,20 @@ docker compose exec mouse-domination python -m scripts.add_indexes
 
 ## API Endpoints
 
-All routes except `/auth/*` and `/health` require authentication.
+All routes except `/auth/*`, `/health`, and `/api/v1/public/*` require session authentication.
+
+### Public API
+
+Read-only API for the dazztrazak.com frontend. Authenticated via `X-API-Key` header, rate-limited to 60 req/min.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/public/products` | Published products (optional `?pick_category=` filter) |
+| `GET /api/v1/public/products/<slug>` | Single product by slug |
+| `GET /api/v1/public/companies` | Affiliate partner companies |
+| `GET /api/v1/public/creator-profile` | Public creator profile |
+
+### Internal Routes
 
 | Endpoint | Description |
 |----------|-------------|
