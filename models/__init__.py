@@ -49,6 +49,7 @@ from models.discord import (
 from models.podcast import (
     Podcast,
     PodcastMember,
+    EpisodeTweetConfig,
 )
 
 # Creator Hub models
@@ -92,6 +93,7 @@ __all__ = [
     # Podcast
     'Podcast',
     'PodcastMember',
+    'EpisodeTweetConfig',
     # Creator Hub
     'RevenueEntry',
     'DealDeliverable',

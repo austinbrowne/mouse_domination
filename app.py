@@ -140,6 +140,12 @@ def create_app(config_class=None):
     if not app.config.get('PUBLIC_API_KEY'):
         app.logger.warning('PUBLIC_API_KEY is not set — public API will return 503')
 
+    # Initialize background scheduler for tweet automation
+    # Only initialize if not in a subprocess (prevents double-init with Flask reloader)
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+        from services.scheduler import init_scheduler
+        init_scheduler(app)
+
     return app
 
 

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Tweet - {{ episode.title }} - {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% include "podcasts/_subnav.html" %}
+
+    <div class="max-w-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-xl font-bold text-gray-900">Your Tweet Settings</h1>
+                <p class="text-sm text-gray-600 mt-1">For episode: "{{ episode.title }}"</p>
+            </div>
+            <a href="{{ url_for('podcasts.episode_tweets', podcast_id=podcast.id, episode_id=episode.id) }}"
+               class="text-sm text-gray-600 hover:text-gray-900">
+                Back to All Tweets
+            </a>
+        </div>
+
+        {% if not user_twitter %}
+        <!-- Twitter Not Connected Warning -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
+            <div class="flex items-start gap-4">
+                <svg class="w-6 h-6 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <h3 class="text-lg font-semibold text-yellow-800">Connect Your Twitter Account</h3>
+                    <p class="text-sm text-yellow-700 mt-1">
+                        You need to connect your Twitter account before automated tweets can be posted on your behalf.
+                    </p>
+                    <a href="{{ url_for('social.connect_twitter') }}"
+                       class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        Connect Twitter
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tweet Configuration Form -->
+        <form method="POST" class="bg-white rounded-xl border border-surface-200 p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Status Display -->
+            {% if config.status == 'posted' %}
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm font-medium text-green-800">Tweet Posted</span>
+                </div>
+                {% if config.tweet_url %}
+                <a href="{{ config.tweet_url }}" target="_blank" rel="noopener" class="text-sm text-green-700 hover:underline mt-2 inline-block">
+                    View on Twitter
+                </a>
+                {% endif %}
+            </div>
+            {% elif config.status == 'failed' %}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm font-medium text-red-800">Tweet Failed</span>
+                </div>
+                {% if config.error_message %}
+                <p class="text-sm text-red-700 mt-2">{{ config.error_message }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Enable/Disable -->
+            <div class="flex items-center gap-3">
+                <input type="checkbox" name="enabled" id="enabled" {% if config.enabled %}checked{% endif %}
+                       class="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                <label for="enabled" class="text-sm font-medium text-gray-700">
+                    Enable automatic tweet when episode goes live
+                </label>
+            </div>
+
+            <!-- Include URL -->
+            <div class="flex items-center gap-3">
+                <input type="checkbox" name="include_url" id="include_url" {% if config.include_url %}checked{% endif %}
+                       class="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                <label for="include_url" class="text-sm font-medium text-gray-700">
+                    Include episode URL in tweet
+                </label>
+            </div>
+
+            <!-- Generated Content Preview -->
+            {% if config.generated_content %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">AI-Generated Content</label>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ config.generated_content }}</p>
+                    <p class="text-xs text-gray-500 mt-2">{{ config.generated_content|length }}/280 characters</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Custom Content -->
+            <div x-data="{ content: '{{ (config.custom_content or '')|e }}', charCount: {{ (config.custom_content or '')|length }} }">
+                <div class="flex items-center justify-between mb-2">
+                    <label for="custom_content" class="block text-sm font-medium text-gray-700">
+                        Custom Tweet Content
+                        <span class="font-normal text-gray-500">(overrides AI-generated)</span>
+                    </label>
+                    <span class="text-xs" :class="charCount > 280 ? 'text-red-600 font-medium' : 'text-gray-500'">
+                        <span x-text="charCount"></span>/280
+                    </span>
+                </div>
+                <textarea name="custom_content" id="custom_content" rows="4"
+                          x-model="content"
+                          @input="charCount = content.length"
+                          :class="charCount > 280 ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-surface-200 focus:ring-primary-500 focus:border-primary-500'"
+                          class="w-full rounded-lg px-3 py-2"
+                          placeholder="Leave empty to use AI-generated content">{{ config.custom_content or '' }}</textarea>
+                <p class="text-xs text-gray-500 mt-1">Leave empty to use the AI-generated content above.</p>
+            </div>
+
+            <!-- Generate Button -->
+            <div class="flex items-center gap-4">
+                <button type="button" id="generate-btn"
+                        onclick="generateTweet()"
+                        class="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 text-sm font-medium">
+                    Generate with AI
+                </button>
+                <span id="generate-status" class="text-sm text-gray-500"></span>
+            </div>
+
+            <!-- Manual Post Button (only show if not already posted and Twitter connected) -->
+            {% if user_twitter and config.status != 'posted' %}
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4" x-data="{ posting: false, showConfirm: false }">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-amber-800">Manual Post (Testing)</h4>
+                        <p class="text-xs text-amber-700 mt-1">Post this tweet immediately without waiting for the live stream trigger.</p>
+
+                        <!-- Confirmation dialog -->
+                        <div x-show="!showConfirm" class="mt-3">
+                            <button type="button" @click="showConfirm = true"
+                                    class="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium">
+                                Post Tweet Now
+                            </button>
+                        </div>
+
+                        <div x-show="showConfirm" x-cloak class="mt-3 p-3 bg-white rounded-lg border border-amber-300">
+                            <p class="text-sm text-gray-700 font-medium mb-3">Are you sure you want to post this tweet to Twitter right now?</p>
+                            <div class="flex gap-2">
+                                <button type="button" @click="postTweetNow()" :disabled="posting"
+                                        class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50">
+                                    <span x-show="!posting">Yes, Post Now</span>
+                                    <span x-show="posting">Posting...</span>
+                                </button>
+                                <button type="button" @click="showConfirm = false" :disabled="posting"
+                                        class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium disabled:opacity-50">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-3 pt-4 border-t border-surface-200">
+                <a href="{{ url_for('podcasts.episode_tweets', podcast_id=podcast.id, episode_id=episode.id) }}"
+                   class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+                    Cancel
+                </a>
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm">
+                    Save Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function generateTweet() {
+    const btn = document.getElementById('generate-btn');
+    const status = document.getElementById('generate-status');
+    const csrf = document.querySelector('input[name="csrf_token"]').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.textContent = '';
+
+    fetch('{{ url_for("podcasts.generate_tweet", podcast_id=podcast.id, episode_id=episode.id) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Generate with AI';
+
+        if (data.success) {
+            // Reload page to show new content
+            window.location.reload();
+        } else {
+            status.textContent = data.error || 'Failed to generate content';
+            status.classList.add('text-red-600');
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.textContent = 'Generate with AI';
+        status.textContent = 'An error occurred';
+        status.classList.add('text-red-600');
+    });
+}
+
+function postTweetNow() {
+    const csrf = document.querySelector('input[name="csrf_token"]').value;
+    const component = Alpine.$data(document.querySelector('[x-data*="posting"]'));
+
+    component.posting = true;
+
+    fetch('{{ url_for("podcasts.post_tweet_now", podcast_id=podcast.id, episode_id=episode.id) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        component.posting = false;
+
+        if (data.success) {
+            // Reload page to show success
+            window.location.reload();
+        } else {
+            alert('Failed to post tweet: ' + (data.error || 'Unknown error'));
+            component.showConfirm = false;
+        }
+    })
+    .catch(error => {
+        component.posting = false;
+        alert('An error occurred while posting the tweet.');
+        component.showConfirm = false;
+    });
+}
+</script>
+{% endblock %}
